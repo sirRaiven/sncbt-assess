@@ -1,0 +1,1 @@
+<template><UAlert icon="i-lucide-flask-conical" color="info" variant="soft" title="UI preview mode" description="This screen currently uses sample data and local interactions. Supabase Edge Functions and Realtime will be connected after UI approval." /></template>

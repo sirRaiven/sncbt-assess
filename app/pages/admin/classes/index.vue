@@ -1,0 +1,1 @@
+<script setup lang="ts">definePageMeta({layout:'admin'})</script><template><FeaturePage eyebrow="Academic oversight" title="Classes" description="Review all instructor-owned classes and current enrollment." action-label="" action-to="" action-icon="i-lucide-plus"/></template>

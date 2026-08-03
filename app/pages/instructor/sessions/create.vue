@@ -1,0 +1,1 @@
+<script setup lang="ts">definePageMeta({layout:'instructor'})</script><template><FeaturePage eyebrow="Host assessment" title="Start a live session" description="Choose a published assessment, class, and session settings." action-label="Open Lobby" action-to="/instructor/sessions/demo/lobby" action-icon="i-lucide-door-open"/></template>

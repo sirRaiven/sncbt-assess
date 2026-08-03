@@ -1,0 +1,1 @@
+<script setup lang="ts">definePageMeta({layout:'admin'})</script><template><FeaturePage eyebrow="Account governance" title="User accounts" description="Review registrations, approve instructors, and manage account access." action-label="Add User" action-to="/admin/users/new" action-icon="i-lucide-user-plus"/></template>

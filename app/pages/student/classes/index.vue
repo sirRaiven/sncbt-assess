@@ -1,0 +1,1 @@
+<script setup lang="ts">definePageMeta({layout:'student'})</script><template><FeaturePage eyebrow="Learning spaces" title="My classes" description="Open enrolled classes and check available assessments." action-label="Join Class" action-to="/student/classes/join" action-icon="i-lucide-plus"/></template>

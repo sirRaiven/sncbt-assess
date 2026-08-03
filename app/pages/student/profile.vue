@@ -1,0 +1,1 @@
+<script setup lang="ts">definePageMeta({layout:'student'})</script><template><FeaturePage eyebrow="Account" title="My profile" description="Review your student identity and permitted personal information." action-label="Save Profile" action-to="" action-icon="i-lucide-save"/></template>

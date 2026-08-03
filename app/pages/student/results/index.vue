@@ -1,0 +1,1 @@
+<script setup lang="ts">definePageMeta({layout:'student'})</script><template><FeaturePage eyebrow="Academic performance" title="My results" description="Review completed assessments, scores, rankings, and feedback." action-label="" action-to="" action-icon="i-lucide-plus"/></template>

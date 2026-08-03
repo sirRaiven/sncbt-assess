@@ -1,0 +1,1 @@
+<template><DashboardShell role="student"><slot/></DashboardShell></template>
