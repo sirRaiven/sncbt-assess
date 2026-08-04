@@ -1,1 +1,101 @@
-<script setup lang="ts">definePageMeta({layout:'instructor'})</script><template><div class="page-stack"><section class="rounded-3xl bg-gradient-to-r from-brand-900 via-brand-700 to-indigo-700 p-7 text-white"><UBadge color="neutral" variant="soft" class="bg-white/10 text-blue-50">First Semester · 2026-2027</UBadge><h1 class="mt-4 text-4xl font-black">Good evening, Prof. Raiven.</h1><p class="mt-3 max-w-2xl text-blue-100">Continue building assessments or start a live session when your learners are ready.</p><div class="mt-6 flex flex-wrap gap-3"><UButton to="/instructor/assessments/create" color="neutral" class="bg-white text-brand-800">Create Assessment</UButton><UButton to="/instructor/sessions/create" color="neutral" variant="outline" class="border-white/30 text-white">Start Live Session</UButton></div></section><UiPreviewNotice/><section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><StatCard label="My classes" value="5" icon="i-lucide-school" tone="primary"/><StatCard label="Assessments" value="18" icon="i-lucide-clipboard-list" tone="info"/><StatCard label="Completed sessions" value="32" icon="i-lucide-circle-check-big" tone="success"/><StatCard label="Average score" value="82%" icon="i-lucide-chart-column" tone="warning"/></section><section class="grid gap-6 xl:grid-cols-[1.2fr_.8fr]"><FeaturePage title="Recent assessments" description="Continue editing or prepare a live session."/><UCard><template #header><h2 class="font-bold text-highlighted">Active session</h2></template><StatusPill status="Live"/><h3 class="mt-4 font-black text-highlighted">Mobile Development Prelim</h3><p class="mt-1 text-sm text-muted">BSIT 2A · 39 of 42 joined</p><UProgress :model-value="72" class="mt-4"/><UButton to="/instructor/sessions/demo/monitor" block class="mt-4">Open Monitoring</UButton></UCard></section></div></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "instructor",
+});
+</script>
+
+<template>
+  <div class="page-stack">
+    <section
+      class="rounded-xl bg-gradient-to-r from-brand-900 via-brand-700 to-indigo-700 p-7 text-white"
+    >
+      <UBadge
+        color="neutral"
+        variant="soft"
+        class="bg-white/10 text-blue-50"
+      >
+        First Semester · 2026-2027
+      </UBadge>
+      <h1 class="mt-4 text-4xl font-black">
+        Good evening, Prof. Raiven.
+      </h1>
+      <p class="mt-3 max-w-2xl text-blue-100">
+        Continue building assessments or start a live session when your learners are ready.
+      </p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <UButton
+          to="/instructor/assessments/create"
+          color="neutral"
+          class="bg-white text-brand-800"
+        >
+          Create Assessment
+        </UButton>
+        <UButton
+          to="/instructor/sessions/create"
+          color="neutral"
+          variant="outline"
+          class="border-white/30 text-white"
+        >
+          Start Live Session
+        </UButton>
+      </div>
+    </section>
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatCard
+        label="My classes"
+        value="5"
+        icon="i-lucide-school"
+        tone="primary"
+       />
+      <StatCard
+        label="Assessments"
+        value="18"
+        icon="i-lucide-clipboard-list"
+        tone="info"
+       />
+      <StatCard
+        label="Completed sessions"
+        value="32"
+        icon="i-lucide-circle-check-big"
+        tone="success"
+       />
+      <StatCard
+        label="Average score"
+        value="82%"
+        icon="i-lucide-chart-column"
+        tone="warning"
+       />
+    </section>
+    <section class="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
+      <FeaturePage
+        title="Recent assessments"
+        description="Continue editing or prepare a live session."
+       />
+      <UCard>
+        <template #header>
+          <h2 class="font-bold text-highlighted">
+            Active session
+          </h2>
+        </template>
+        <StatusPill status="Live" />
+        <h3 class="mt-4 font-black text-highlighted">
+          Mobile Development Prelim
+        </h3>
+        <p class="mt-1 text-sm text-muted">
+          BSIT 2A · 39 of 42 joined
+        </p>
+        <UProgress
+          :model-value="72"
+          class="mt-4"
+         />
+        <UButton
+          to="/instructor/sessions/demo/monitor"
+          block
+          class="mt-4"
+        >
+          Open Monitoring
+        </UButton>
+      </UCard>
+    </section>
+  </div>
+</template>

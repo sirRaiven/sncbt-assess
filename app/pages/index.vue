@@ -1,4 +1,118 @@
 <script setup lang="ts">
-definePageMeta({layout:'auth'});useSeoMeta({title:'Sign in'});const role=ref('Instructor');const email=ref('sirraivensupan@gmail.com');const password=ref('');const loading=ref(false);async function submit(){loading.value=true;await new Promise(r=>setTimeout(r,400));const d:{[k:string]:string}={Administrator:'/admin/dashboard',Instructor:'/instructor/dashboard',Student:'/student/dashboard'};await navigateTo(d[role.value] ?? '/instructor/dashboard');loading.value=false}
+definePageMeta({
+    layout: "auth",
+});
+useSeoMeta({
+    title: "Sign in",
+});
+const email = ref("");
+const password = ref("");
+const rememberMe = ref(true);
+const isSubmitting = ref(false);
+async function signIn(): Promise<void> {
+    isSubmitting.value = true;
+    try {
+        await new Promise((resolve) => {
+            setTimeout(resolve, 450);
+        });
+    }
+    finally {
+        isSubmitting.value = false;
+    }
+}
 </script>
-<template><div class="mx-auto grid max-w-6xl overflow-hidden rounded-3xl border border-default bg-default shadow-2xl lg:grid-cols-[1.08fr_.92fr]"><section class="relative hidden min-h-[670px] overflow-hidden bg-gradient-to-br from-brand-950 via-brand-800 to-indigo-700 p-12 text-white lg:flex lg:flex-col"><BrandMark inverse/><div class="my-auto"><UBadge color="neutral" variant="soft" class="bg-white/10 text-blue-50">Built for connected learning</UBadge><h1 class="mt-6 text-5xl font-black leading-tight tracking-tight">Create, conduct, and monitor assessments in one academic workspace.</h1><p class="mt-5 max-w-lg leading-7 text-blue-100">Manage classes, prepare examinations, monitor learners in real time, and review meaningful results using a system designed for SNCBT.</p><div class="mt-9 grid grid-cols-2 gap-4"><div class="rounded-2xl border border-white/10 bg-white/10 p-4"><UIcon name="i-lucide-file-spreadsheet" class="size-6 text-sky-300"/><p class="mt-3 font-bold">Excel question import</p><p class="mt-1 text-sm text-blue-100">Prepare many questions using the familiar template.</p></div><div class="rounded-2xl border border-white/10 bg-white/10 p-4"><UIcon name="i-lucide-radio-tower" class="size-6 text-sky-300"/><p class="mt-3 font-bold">Live monitoring</p><p class="mt-1 text-sm text-blue-100">See progress, grading, and ranking in real time.</p></div></div></div><p class="text-xs text-blue-200">St. Nicolas College of Business and Technology</p></section><section class="flex min-h-[670px] items-center p-6 sm:p-10 lg:p-12"><div class="mx-auto w-full max-w-md"><div class="lg:hidden"><BrandMark/></div><p class="mt-8 text-xs font-bold uppercase tracking-[.18em] text-primary lg:mt-0">Welcome back</p><h2 class="mt-2 text-3xl font-black text-highlighted">Sign in to SNCBT Assess</h2><p class="mt-2 text-sm text-muted">Use your registered institutional account to continue.</p><UAlert class="mt-7" color="info" variant="soft" title="UI preview" description="Choose a role to preview its complete interface. Backend sign-in will be restored after UI approval."/><form class="mt-7 space-y-5" @submit.prevent="submit"><UFormField label="Email address" required><UInput v-model="email" type="email" size="lg" icon="i-lucide-mail" class="w-full"/></UFormField><UFormField label="Password" required><UInput v-model="password" type="password" size="lg" icon="i-lucide-lock-keyhole" class="w-full"/></UFormField><UFormField label="Preview as"><USelect v-model="role" :items="['Administrator','Instructor','Student']" size="lg" class="w-full"/></UFormField><div class="flex justify-end"><NuxtLink to="/forgot-password" class="text-sm font-semibold text-primary hover:underline">Forgot password?</NuxtLink></div><UButton type="submit" block size="lg" :loading="loading" trailing-icon="i-lucide-arrow-right">Sign In</UButton></form><UButton to="/register" block color="neutral" variant="outline" size="lg" class="mt-5">Create an Account</UButton></div></section></div></template>
+
+<template>
+  <div class="mx-auto w-full max-w-md">
+    <UCard class="shadow-xl shadow-slate-950/5">
+      <template #header>
+        <div class="text-center">
+          <div
+            class="mx-auto flex size-12 items-center justify-center rounded-xl bg-brand-700 text-white"
+          >
+            <UIcon
+              name="i-lucide-graduation-cap"
+              class="size-6"
+             />
+          </div>
+          <p class="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-primary">
+            St. Nicolas College of Business and Technology
+          </p>
+          <h1 class="mt-2 text-2xl font-black text-highlighted">
+            Sign in to SNCBT Assess
+          </h1>
+          <p class="mt-2 text-sm leading-6 text-muted">
+            Enter your registered account credentials to continue.
+          </p>
+        </div>
+      </template>
+      <form
+        class="space-y-5"
+        @submit.prevent="signIn"
+      >
+        <UFormField
+          label="Email address"
+          required
+        >
+          <UInput
+            v-model="email"
+            type="email"
+            size="lg"
+            icon="i-lucide-mail"
+            placeholder="Enter your email address"
+            class="w-full"
+            autocomplete="email"
+           />
+        </UFormField>
+        <UFormField
+          label="Password"
+          required
+        >
+          <UInput
+            v-model="password"
+            type="password"
+            size="lg"
+            icon="i-lucide-lock-keyhole"
+            placeholder="Enter your password"
+            class="w-full"
+            autocomplete="current-password"
+           />
+        </UFormField>
+        <div class="flex items-center justify-between gap-3">
+          <UCheckbox
+            v-model="rememberMe"
+            label="Remember me"
+           />
+          <NuxtLink
+            to="/forgot-password"
+            class="text-sm font-semibold text-primary hover:underline"
+          >
+            Forgot password?
+          </NuxtLink>
+        </div>
+        <UButton
+          type="submit"
+          block
+          size="lg"
+          :loading="isSubmitting"
+        >
+          Sign In
+        </UButton>
+      </form>
+      <template #footer>
+        <p class="text-center text-sm text-muted">
+          Do not have an account?
+          <NuxtLink
+            to="/register"
+            class="font-semibold text-primary hover:underline"
+          >
+            Create account
+          </NuxtLink>
+        </p>
+      </template>
+    </UCard>
+    <p class="mt-5 text-center text-xs text-muted">
+      Assessment Classroom Management System
+    </p>
+  </div>
+</template>

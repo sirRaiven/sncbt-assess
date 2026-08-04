@@ -1,1 +1,16 @@
-<script setup lang="ts">definePageMeta({layout:'admin'})</script><template><FeaturePage eyebrow="Configuration" title="System settings" description="Manage institution details, policies, and platform controls." action-label="Save Changes" action-to="" action-icon="i-lucide-save"/></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "admin",
+});
+</script>
+
+<template>
+  <FeaturePage
+    eyebrow="Configuration"
+    title="System settings"
+    description="Manage institution details, policies, and platform controls."
+    action-label="Save Changes"
+    action-to=""
+    action-icon="i-lucide-save"
+   />
+</template>

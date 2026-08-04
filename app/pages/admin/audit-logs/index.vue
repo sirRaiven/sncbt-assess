@@ -1,1 +1,16 @@
-<script setup lang="ts">definePageMeta({layout:'admin'})</script><template><FeaturePage eyebrow="Security and accountability" title="Audit logs" description="Review important administrative and academic actions." action-label="Export Logs" action-to="" action-icon="i-lucide-download"/></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "admin",
+});
+</script>
+
+<template>
+  <FeaturePage
+    eyebrow="Security and accountability"
+    title="Audit logs"
+    description="Review important administrative and academic actions."
+    action-label="Export Logs"
+    action-to=""
+    action-icon="i-lucide-download"
+   />
+</template>

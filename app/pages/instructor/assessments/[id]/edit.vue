@@ -1,2 +1,188 @@
-<script setup lang="ts">definePageMeta({layout:'instructor'});interface Q{id:number;text:string;correct:number;options:string[]};const qs=ref<Q[]>([{id:1,text:'Which framework is used for mobile development in this course?',correct:1,options:['Laravel','Flutter','Django','Spring Boot']},{id:2,text:'Which file contains Flutter package dependencies?',correct:2,options:['main.html','package.json','pubspec.yaml','settings.xml']}]);const selected=ref(1);const q=computed<Q>(()=>qs.value.find(x=>x.id===selected.value)??qs.value[0]!);function add(){const id=Math.max(...qs.value.map(x=>x.id))+1;qs.value.push({id,text:'Write your new question here.',correct:0,options:['Option 1','Option 2','Option 3','Option 4']});selected.value=id}</script>
-<template><div class="page-stack"><PageHeader eyebrow="Assessment builder" title="Mobile Development Prelim Examination" description="Add questions, select correct answers, and review settings before publishing."><template #actions><UButton to="/instructor/assessments/demo/preview" color="neutral" variant="outline" icon="i-lucide-eye">Preview</UButton><UButton icon="i-lucide-save">Save Draft</UButton></template></PageHeader><div class="grid gap-6 xl:grid-cols-[280px_1fr_320px]"><UCard class="h-fit"><template #header><div class="flex justify-between"><div><h2 class="font-bold text-highlighted">Questions</h2><p class="text-xs text-muted">{{qs.length}} total</p></div><UButton icon="i-lucide-plus" size="sm" @click="add"/></div></template><button v-for="(x,i) in qs" :key="x.id" class="mb-2 w-full rounded-xl border p-3 text-left" :class="selected===x.id?'border-primary bg-primary/5':'border-default'" @click="selected=x.id"><p class="text-xs font-bold text-primary">QUESTION {{i+1}}</p><p class="mt-1 line-clamp-2 text-sm font-semibold text-highlighted">{{x.text}}</p></button></UCard><UCard v-if="q"><template #header><h2 class="font-bold text-highlighted">Edit question</h2></template><UFormField label="Question text"><UTextarea v-model="q.text" :rows="4" class="w-full"/></UFormField><p class="mb-3 mt-6 font-semibold text-highlighted">Answer choices</p><label v-for="(o,i) in q.options" :key="i" class="mb-3 flex items-center gap-3 rounded-2xl border border-default p-3"><input v-model="q.correct" type="radio" :value="i" class="size-4 accent-blue-600"><UInput v-model="q.options[i]" variant="none" class="w-full"/></label></UCard><div class="space-y-6"><UCard><template #header><h2 class="font-bold text-highlighted">Question settings</h2></template><div class="space-y-5"><UFormField label="Type"><USelect model-value="Multiple Choice" :items="['Multiple Choice','Checkbox']" class="w-full"/></UFormField><UFormField label="Points"><UInput type="number" model-value="1" class="w-full"/></UFormField><UFormField label="Time limit"><USelect model-value="30 seconds" :items="['15 seconds','30 seconds','45 seconds','60 seconds']" class="w-full"/></UFormField></div></UCard><UButton block color="success" icon="i-lucide-send">Publish Assessment</UButton></div></div></div></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "instructor",
+});
+interface Question {
+    id: number;
+    text: string;
+    correct: number;
+    options: string[];
+}
+const qs = ref<Question[]>([
+    {
+        id: 1,
+        text: "Which framework is used for mobile development in this course?",
+        correct: 1,
+        options: [
+            "Laravel",
+            "Flutter",
+            "Django",
+            "Spring Boot",
+        ],
+    },
+    {
+        id: 2,
+        text: "Which file contains Flutter package dependencies?",
+        correct: 2,
+        options: [
+            "main.html",
+            "package.json",
+            "pubspec.yaml",
+            "settings.xml",
+        ],
+    },
+]);
+const selected = ref(1);
+const q = computed<Question>(() => {
+    return qs.value.find((question) => {
+        return question.id === selected.value;
+    }) ?? qs.value[0]!;
+});
+function add(): void {
+    const id = Math.max(...qs.value.map((question) => question.id)) + 1;
+    qs.value.push({
+        id,
+        text: "Write your new question here.",
+        correct: 0,
+        options: [
+            "Option 1",
+            "Option 2",
+            "Option 3",
+            "Option 4",
+        ],
+    });
+    selected.value = id;
+}
+</script>
+
+<template>
+  <div class="page-stack">
+    <PageHeader
+      eyebrow="Assessment builder"
+      title="Mobile Development Prelim Examination"
+      description="Add questions, select correct answers, and review settings before publishing."
+    >
+      <template #actions>
+        <UButton
+          to="/instructor/assessments/demo/preview"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-eye"
+        >
+          Preview
+        </UButton>
+        <UButton icon="i-lucide-save">
+          Save Draft
+        </UButton>
+      </template>
+    </PageHeader>
+    <div class="grid gap-6 xl:grid-cols-[280px_1fr_320px]">
+      <UCard class="h-fit">
+        <template #header>
+          <div class="flex justify-between">
+            <div>
+              <h2 class="font-bold text-highlighted">
+                Questions
+              </h2>
+              <p class="text-xs text-muted">
+                {{ qs.length }} total
+              </p>
+            </div>
+            <UButton
+              icon="i-lucide-plus"
+              size="sm"
+              @click="add"
+             />
+          </div>
+        </template>
+        <button
+          v-for="(x,i) in qs"
+          :key="x.id"
+          class="mb-2 w-full rounded-xl border p-3 text-left"
+          :class="selected===x.id?'border-primary bg-primary/5':'border-default'"
+          @click="selected=x.id"
+        >
+          <p class="text-xs font-bold text-primary">
+            QUESTION {{ i+1 }}
+          </p>
+          <p class="mt-1 line-clamp-2 text-sm font-semibold text-highlighted">
+            {{ x.text }}
+          </p>
+        </button>
+      </UCard>
+      <UCard v-if="q">
+        <template #header>
+          <h2 class="font-bold text-highlighted">
+            Edit question
+          </h2>
+        </template>
+        <UFormField label="Question text">
+          <UTextarea
+            v-model="q.text"
+            :rows="4"
+            class="w-full"
+           />
+        </UFormField>
+        <p class="mb-3 mt-6 font-semibold text-highlighted">
+          Answer choices
+        </p>
+        <label
+          v-for="(o,i) in q.options"
+          :key="i"
+          class="mb-3 flex items-center gap-3 rounded-xl border border-default p-3"
+        >
+          <input
+            v-model="q.correct"
+            type="radio"
+            :value="i"
+            class="size-4 accent-blue-600"
+          >
+          <UInput
+            v-model="q.options[i]"
+            variant="none"
+            class="w-full"
+           />
+        </label>
+      </UCard>
+      <div class="space-y-6">
+        <UCard>
+          <template #header>
+            <h2 class="font-bold text-highlighted">
+              Question settings
+            </h2>
+          </template>
+          <div class="space-y-5">
+            <UFormField label="Type">
+              <USelect
+                model-value="Multiple Choice"
+                :items="['Multiple Choice','Checkbox']"
+                class="w-full"
+               />
+            </UFormField>
+            <UFormField label="Points">
+              <UInput
+                type="number"
+                model-value="1"
+                class="w-full"
+               />
+            </UFormField>
+            <UFormField label="Time limit">
+              <USelect
+                model-value="30 seconds"
+                :items="['15 seconds','30 seconds','45 seconds','60 seconds']"
+                class="w-full"
+               />
+            </UFormField>
+          </div>
+        </UCard>
+        <UButton
+          block
+          color="success"
+          icon="i-lucide-send"
+        >
+          Publish Assessment
+        </UButton>
+      </div>
+    </div>
+  </div>
+</template>

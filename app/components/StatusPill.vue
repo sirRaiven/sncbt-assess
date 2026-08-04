@@ -1,2 +1,27 @@
-<script setup lang="ts">const p=defineProps<{status:string}>();const color=computed(()=>{const s=p.status.toLowerCase();if(/active|published|completed|approved|online|valid/.test(s))return'success';if(/pending|draft|waiting|paused/.test(s))return'warning';if(/live|answering|progress/.test(s))return'info';if(/suspended|rejected|failed|offline|unsupported/.test(s))return'error';return'neutral'})</script>
-<template><UBadge :color="color" variant="soft" class="capitalize">{{ status }}</UBadge></template>
+<script setup lang="ts">
+const p = defineProps<{
+    status: string;
+}>();
+const color = computed(() => {
+    const s = p.status.toLowerCase();
+    if (/active|published|completed|approved|online|valid/.test(s))
+        return 'success';
+    if (/pending|draft|waiting|paused/.test(s))
+        return 'warning';
+    if (/live|answering|progress/.test(s))
+        return 'info';
+    if (/suspended|rejected|failed|offline|unsupported/.test(s))
+        return 'error';
+    return 'neutral';
+});
+</script>
+
+<template>
+  <UBadge
+    :color="color"
+    variant="soft"
+    class="capitalize"
+  >
+    {{ status }}
+  </UBadge>
+</template>

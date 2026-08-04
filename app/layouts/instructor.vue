@@ -1,1 +1,5 @@
-<template><DashboardShell role="instructor"><slot/></DashboardShell></template>
+<template>
+  <DashboardShell role="instructor">
+    <slot />
+  </DashboardShell>
+</template>

@@ -1,2 +1,36 @@
-<script setup lang="ts">withDefaults(defineProps<{inverse?:boolean;compact?:boolean}>(),{inverse:false,compact:false})</script>
-<template><div class="flex min-w-0 items-center gap-3"><div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-800 text-white shadow-lg"><UIcon name="i-lucide-graduation-cap" class="size-6" /></div><div v-if="!compact" class="min-w-0"><p class="truncate font-black tracking-tight" :class="inverse?'text-white':'text-highlighted'">SNCBT Assess</p><p class="truncate text-[11px]" :class="inverse?'text-blue-100':'text-muted'">Assessment Classroom Management</p></div></div></template>
+<script setup lang="ts">
+withDefaults(defineProps<{
+    inverse?: boolean;
+    compact?: boolean;
+}>(), { inverse: false, compact: false });
+</script>
+
+<template>
+  <div class="flex min-w-0 items-center gap-3">
+    <div
+      class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-800 text-white shadow-lg"
+    >
+      <UIcon
+        name="i-lucide-graduation-cap"
+        class="size-6"
+       />
+    </div>
+    <div
+      v-if="!compact"
+      class="min-w-0"
+    >
+      <p
+        class="truncate font-black tracking-tight"
+        :class="inverse?'text-white':'text-highlighted'"
+      >
+        SNCBT Assess
+      </p>
+      <p
+        class="truncate text-[11px]"
+        :class="inverse?'text-blue-100':'text-muted'"
+      >
+        Assessment Classroom Management
+      </p>
+    </div>
+  </div>
+</template>

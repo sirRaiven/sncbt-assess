@@ -1,1 +1,16 @@
-<script setup lang="ts">definePageMeta({layout:'instructor'})</script><template><FeaturePage eyebrow="New classroom" title="Create a class" description="Add subject and section details. A unique class code will be generated." action-label="Create Class" action-to="" action-icon="i-lucide-save"/></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "instructor",
+});
+</script>
+
+<template>
+  <FeaturePage
+    eyebrow="New classroom"
+    title="Create a class"
+    description="Add subject and section details. A unique class code will be generated."
+    action-label="Create Class"
+    action-to=""
+    action-icon="i-lucide-save"
+   />
+</template>

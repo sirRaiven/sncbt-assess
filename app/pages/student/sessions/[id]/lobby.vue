@@ -1,1 +1,16 @@
-<script setup lang="ts">definePageMeta({layout:'student'})</script><template><FeaturePage eyebrow="Waiting lobby" title="Mobile Development Prelim Examination" description="Connected to session 382 914. Wait for the instructor to begin." action-label="Preview Start" action-to="/student/sessions/demo/play" action-icon="i-lucide-play"/></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "student",
+});
+</script>
+
+<template>
+  <FeaturePage
+    eyebrow="Waiting lobby"
+    title="Mobile Development Prelim Examination"
+    description="Connected to session 382 914. Wait for the instructor to begin."
+    action-label="Preview Start"
+    action-to="/student/sessions/demo/play"
+    action-icon="i-lucide-play"
+   />
+</template>

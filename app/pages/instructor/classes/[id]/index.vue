@@ -1,1 +1,16 @@
-<script setup lang="ts">definePageMeta({layout:'instructor'})</script><template><FeaturePage eyebrow="Class workspace" title="Introduction to Mobile Development" description="IT216 · BSIT 2A · First Semester 2026-2027" action-label="Manage Students" action-to="/instructor/classes/demo/students" action-icon="i-lucide-users"/></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "instructor",
+});
+</script>
+
+<template>
+  <FeaturePage
+    eyebrow="Class workspace"
+    title="Introduction to Mobile Development"
+    description="IT216 · BSIT 2A · First Semester 2026-2027"
+    action-label="Manage Students"
+    action-to="/instructor/classes/demo/students"
+    action-icon="i-lucide-users"
+   />
+</template>

@@ -1,1 +1,30 @@
-<script setup lang="ts">definePageMeta({layout:'auth'})</script><template><div class="mx-auto max-w-xl"><UCard><div class="py-10 text-center"><UIcon name="i-lucide-map-pinned" class="mx-auto size-12 text-muted"/><h1 class="mt-5 text-2xl font-black">Page not found</h1><p class="mt-2 text-sm text-muted">The requested page is not part of the current interface.</p><UButton to="/" class="mt-6">Return Home</UButton></div></UCard></div></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "auth",
+});
+</script>
+
+<template>
+  <div class="mx-auto max-w-xl">
+    <UCard>
+      <div class="py-10 text-center">
+        <UIcon
+          name="i-lucide-map-pinned"
+          class="mx-auto size-12 text-muted"
+         />
+        <h1 class="mt-5 text-2xl font-black">
+          Page not found
+        </h1>
+        <p class="mt-2 text-sm text-muted">
+          The requested page is not part of the current interface.
+        </p>
+        <UButton
+          to="/"
+          class="mt-6"
+        >
+          Return Home
+        </UButton>
+      </div>
+    </UCard>
+  </div>
+</template>

@@ -1,1 +1,16 @@
-<script setup lang="ts">definePageMeta({layout:'admin'})</script><template><FeaturePage eyebrow="Live operations" title="Live sessions" description="View running assessment sessions and participant counts." action-label="" action-to="" action-icon="i-lucide-plus"/></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "admin",
+});
+</script>
+
+<template>
+  <FeaturePage
+    eyebrow="Live operations"
+    title="Live sessions"
+    description="View running assessment sessions and participant counts."
+    action-label=""
+    action-to=""
+    action-icon="i-lucide-plus"
+   />
+</template>

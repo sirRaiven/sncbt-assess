@@ -1,2 +1,191 @@
-<script setup lang="ts">definePageMeta({layout:'instructor'});const file=ref(false);const checked=ref(false);const rows=[{row:3,q:'Which framework is used for mobile development?',type:'Multiple Choice',answer:'2',status:'Valid'},{row:4,q:'Select valid mobile operating systems.',type:'Checkbox',answer:'1,2',status:'Valid'},{row:5,q:'Explain pubspec.yaml.',type:'Open-Ended',answer:'—',status:'Unsupported'}]</script>
-<template><div class="page-stack"><PageHeader eyebrow="Excel question import" title="Import questions" description="Upload the Wayground-compatible Excel template and review each row before importing."><template #actions><UButton color="neutral" variant="outline" icon="i-lucide-download">Download Template</UButton></template></PageHeader><UiPreviewNotice/><div class="grid gap-6 xl:grid-cols-[1fr_350px]"><div class="space-y-6"><UCard><div class="rounded-3xl border-2 border-dashed border-default p-10 text-center"><UIcon name="i-lucide-file-spreadsheet" class="mx-auto size-12 text-success"/><h2 class="mt-5 text-xl font-black text-highlighted">{{file?'QuizizzSampleSpreadsheetUpdated_v2.xlsx':'Upload an Excel question file'}}</h2><p class="mt-2 text-sm text-muted">Accepted format: .xlsx · Recommended maximum: 5 MB</p><input id="file" type="file" class="sr-only" accept=".xlsx" @change="file=true"><label for="file" class="mt-5 inline-flex cursor-pointer rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white">Browse Excel File</label><UButton v-if="file" class="ml-3" @click="checked=true">Check Excel File</UButton></div></UCard><template v-if="checked"><section class="grid gap-4 sm:grid-cols-3"><StatCard label="Rows found" value="3" icon="i-lucide-rows-3"/><StatCard label="Valid" value="2" icon="i-lucide-circle-check-big" tone="success"/><StatCard label="Needs correction" value="1" icon="i-lucide-triangle-alert" tone="warning"/></section><div class="table-shell table-scroll"><table class="app-table"><thead><tr><th>Row</th><th>Question</th><th>Type</th><th>Answer</th><th>Status</th></tr></thead><tbody><tr v-for="r in rows" :key="r.row"><td>{{r.row}}</td><td class="font-semibold text-highlighted">{{r.q}}</td><td>{{r.type}}</td><td>{{r.answer}}</td><td><StatusPill :status="r.status"/></td></tr></tbody></table></div></template></div><UCard class="h-fit"><template #header><h2 class="font-bold text-highlighted">Import destination</h2></template><p class="text-sm text-muted">Mobile Development Prelim Examination</p><dl class="mt-5 space-y-4 text-sm"><div class="flex justify-between"><dt class="text-muted">Existing questions</dt><dd class="font-bold">2</dd></div><div class="flex justify-between"><dt class="text-muted">Valid to append</dt><dd class="font-bold">{{checked?2:0}}</dd></div></dl><UButton to="/instructor/assessments/demo/edit" block color="success" class="mt-5" :disabled="!checked">Import Valid Questions</UButton></UCard></div></div></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "instructor",
+});
+const file = ref(false);
+const checked = ref(false);
+const rows = [
+    {
+        row: 3,
+        q: "Which framework is used for mobile development?",
+        type: "Multiple Choice",
+        answer: "2",
+        status: "Valid",
+    },
+    {
+        row: 4,
+        q: "Select valid mobile operating systems.",
+        type: "Checkbox",
+        answer: "1,2",
+        status: "Valid",
+    },
+    {
+        row: 5,
+        q: "Explain pubspec.yaml.",
+        type: "Open-Ended",
+        answer: "—",
+        status: "Unsupported",
+    },
+];
+</script>
+
+<template>
+  <div class="page-stack">
+    <PageHeader
+      eyebrow="Excel question import"
+      title="Import questions"
+      description="Upload the Wayground-compatible Excel template and review each row before importing."
+    >
+      <template #actions>
+        <UButton
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-download"
+        >
+          Download Template
+        </UButton>
+      </template>
+    </PageHeader>
+    <div class="grid gap-6 xl:grid-cols-[1fr_350px]">
+      <div class="space-y-6">
+        <UCard>
+          <div class="rounded-xl border-2 border-dashed border-default p-10 text-center">
+            <UIcon
+              name="i-lucide-file-spreadsheet"
+              class="mx-auto size-12 text-success"
+             />
+            <h2 class="mt-5 text-xl font-black text-highlighted">
+              {{ file?'QuizizzSampleSpreadsheetUpdated_v2.xlsx':'Upload an Excel question file' }}
+            </h2>
+            <p class="mt-2 text-sm text-muted">
+              Accepted format: .xlsx · Recommended maximum: 5 MB
+            </p>
+            <input
+              id="file"
+              type="file"
+              class="sr-only"
+              accept=".xlsx"
+              @change="file=true"
+            >
+            <label
+              for="file"
+              class="mt-5 inline-flex cursor-pointer rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white"
+            >
+              Browse Excel File
+            </label>
+            <UButton
+              v-if="file"
+              class="ml-3"
+              @click="checked=true"
+            >
+              Check Excel File
+            </UButton>
+          </div>
+        </UCard>
+        <template v-if="checked">
+          <section class="grid gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Rows found"
+              value="3"
+              icon="i-lucide-rows-3"
+             />
+            <StatCard
+              label="Valid"
+              value="2"
+              icon="i-lucide-circle-check-big"
+              tone="success"
+             />
+            <StatCard
+              label="Needs correction"
+              value="1"
+              icon="i-lucide-triangle-alert"
+              tone="warning"
+             />
+          </section>
+          <div class="table-shell table-scroll">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th>
+                    Row
+                  </th>
+                  <th>
+                    Question
+                  </th>
+                  <th>
+                    Type
+                  </th>
+                  <th>
+                    Answer
+                  </th>
+                  <th>
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="r in rows"
+                  :key="r.row"
+                >
+                  <td>
+                    {{ r.row }}
+                  </td>
+                  <td class="font-semibold text-highlighted">
+                    {{ r.q }}
+                  </td>
+                  <td>
+                    {{ r.type }}
+                  </td>
+                  <td>
+                    {{ r.answer }}
+                  </td>
+                  <td>
+                    <StatusPill :status="r.status" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </div>
+      <UCard class="h-fit">
+        <template #header>
+          <h2 class="font-bold text-highlighted">
+            Import destination
+          </h2>
+        </template>
+        <p class="text-sm text-muted">
+          Mobile Development Prelim Examination
+        </p>
+        <dl class="mt-5 space-y-4 text-sm">
+          <div class="flex justify-between">
+            <dt class="text-muted">
+              Existing questions
+            </dt>
+            <dd class="font-bold">
+              2
+            </dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-muted">
+              Valid to append
+            </dt>
+            <dd class="font-bold">
+              {{ checked?2:0 }}
+            </dd>
+          </div>
+        </dl>
+        <UButton
+          to="/instructor/assessments/demo/edit"
+          block
+          color="success"
+          class="mt-5"
+          :disabled="!checked"
+        >
+          Import Valid Questions
+        </UButton>
+      </UCard>
+    </div>
+  </div>
+</template>

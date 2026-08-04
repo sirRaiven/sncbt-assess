@@ -1,1 +1,104 @@
-<script setup lang="ts">definePageMeta({layout:'admin'});const a=['Instructor account approved','Live examination completed','New class created','Assessment imported through Excel']</script><template><div class="page-stack"><PageHeader eyebrow="Administration" title="System overview" description="Monitor users, academic activities, live sessions, and platform health."><template #actions><UButton to="/admin/users" icon="i-lucide-user-plus">Manage Accounts</UButton></template></PageHeader><UiPreviewNotice/><section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><StatCard label="Registered users" value="1,284" icon="i-lucide-users" tone="primary" change="+42 this month"/><StatCard label="Active classes" value="38" icon="i-lucide-school" tone="info"/><StatCard label="Published assessments" value="126" icon="i-lucide-clipboard-check" tone="success"/><StatCard label="Live sessions" value="3" icon="i-lucide-radio" tone="warning"/></section><section class="grid gap-6 xl:grid-cols-[1.3fr_.7fr]"><UCard><template #header><h2 class="font-bold text-highlighted">Recent system activity</h2></template><div class="divide-y divide-default"><div v-for="x in a" :key="x" class="flex items-center gap-4 py-4 first:pt-0"><div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><UIcon name="i-lucide-activity"/></div><div class="flex-1"><p class="font-semibold text-highlighted">{{x}}</p><p class="text-xs text-muted">Recorded through the system activity service</p></div><span class="text-xs text-muted">Recently</span></div></div></UCard><UCard><template #header><h2 class="font-bold text-highlighted">Platform health</h2></template><div class="space-y-4"><div v-for="s in ['Supabase database','Edge Functions','Realtime service','Vercel frontend']" :key="s" class="flex justify-between"><span class="text-sm text-muted">{{s}}</span><StatusPill status="Active"/></div></div></UCard></section></div></template>
+<script setup lang="ts">
+definePageMeta({
+    layout: "admin",
+});
+const a = ['Instructor account approved', 'Live examination completed', 'New class created', 'Assessment imported through Excel'];
+</script>
+
+<template>
+  <div class="page-stack">
+    <PageHeader
+      eyebrow="Administration"
+      title="System overview"
+      description="Monitor users, academic activities, live sessions, and platform health."
+    >
+      <template #actions>
+        <UButton
+          to="/admin/users"
+          icon="i-lucide-user-plus"
+        >
+          Manage Accounts
+        </UButton>
+      </template>
+    </PageHeader>
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatCard
+        label="Registered users"
+        value="1,284"
+        icon="i-lucide-users"
+        tone="primary"
+        change="+42 this month"
+       />
+      <StatCard
+        label="Active classes"
+        value="38"
+        icon="i-lucide-school"
+        tone="info"
+       />
+      <StatCard
+        label="Published assessments"
+        value="126"
+        icon="i-lucide-clipboard-check"
+        tone="success"
+       />
+      <StatCard
+        label="Live sessions"
+        value="3"
+        icon="i-lucide-radio"
+        tone="warning"
+       />
+    </section>
+    <section class="grid gap-6 xl:grid-cols-[1.3fr_.7fr]">
+      <UCard>
+        <template #header>
+          <h2 class="font-bold text-highlighted">
+            Recent system activity
+          </h2>
+        </template>
+        <div class="divide-y divide-default">
+          <div
+            v-for="x in a"
+            :key="x"
+            class="flex items-center gap-4 py-4 first:pt-0"
+          >
+            <div
+              class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"
+            >
+              <UIcon name="i-lucide-activity" />
+            </div>
+            <div class="flex-1">
+              <p class="font-semibold text-highlighted">
+                {{ x }}
+              </p>
+              <p class="text-xs text-muted">
+                Recorded through the system activity service
+              </p>
+            </div>
+            <span class="text-xs text-muted">
+              Recently
+            </span>
+          </div>
+        </div>
+      </UCard>
+      <UCard>
+        <template #header>
+          <h2 class="font-bold text-highlighted">
+            Platform health
+          </h2>
+        </template>
+        <div class="space-y-4">
+          <div
+            v-for="s in ['Supabase database','Edge Functions','Realtime service','Vercel frontend']"
+            :key="s"
+            class="flex justify-between"
+          >
+            <span class="text-sm text-muted">
+              {{ s }}
+            </span>
+            <StatusPill status="Active" />
+          </div>
+        </div>
+      </UCard>
+    </section>
+  </div>
+</template>
