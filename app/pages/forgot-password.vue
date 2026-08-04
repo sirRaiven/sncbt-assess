@@ -1,51 +1,157 @@
 <script setup lang="ts">
+import type {
+  FormSubmitEvent,
+} from "@nuxt/ui";
+
+import {
+  z,
+} from "zod";
+
 definePageMeta({
-    layout: "auth",
+  layout: "auth",
 });
-const sent = ref(false);
+
+useSeoMeta({
+  title: "Recover password",
+});
+
+const supabase = useSupabaseClient();
+const requestUrl = useRequestURL();
+
+const schema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email(
+      "Enter a valid email address.",
+    ),
+});
+
+type ForgotPasswordSchema =
+  z.output<typeof schema>;
+
+const state = reactive<ForgotPasswordSchema>({
+  email: "",
+});
+
+const isSubmitting = ref(false);
+const requestCompleted = ref(false);
+const errorMessage = ref("");
+
+async function requestPasswordReset(
+  event: FormSubmitEvent<ForgotPasswordSchema>,
+): Promise<void> {
+  isSubmitting.value = true;
+  errorMessage.value = "";
+
+  try {
+    const {
+      error,
+    } = await supabase.auth.resetPasswordForEmail(
+      event.data.email
+        .trim()
+        .toLowerCase(),
+      {
+        redirectTo:
+          `${requestUrl.origin}/reset-password`,
+      },
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    requestCompleted.value = true;
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Unable to request a password reset.";
+  } finally {
+    isSubmitting.value = false;
+  }
+}
 </script>
 
 <template>
   <div class="mx-auto max-w-lg">
     <UCard>
       <template #header>
-        <PageHeader
-          title="Recover your password"
-          description="Enter your registered email address to receive a secure reset link."
-         />
+        <div class="text-center">
+          <div class="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <UIcon
+              name="i-lucide-key-round"
+              class="size-6"
+            />
+          </div>
+
+          <h1 class="mt-5 text-2xl font-black text-highlighted">
+            Recover your password
+          </h1>
+
+          <p class="mt-2 text-sm leading-6 text-muted">
+            Enter your registered email address to receive a secure reset link.
+          </p>
+        </div>
       </template>
+
       <UAlert
-        v-if="sent"
+        v-if="requestCompleted"
         color="success"
         variant="soft"
+        icon="i-lucide-mail-check"
         title="Check your email"
-        description="Password-reset delivery will be connected to Supabase Auth later."
-       />
-      <form
+        description="When an account matches the submitted address, Supabase will send a password-reset link."
+      />
+
+      <UForm
         v-else
+        :schema="schema"
+        :state="state"
         class="space-y-5"
-        @submit.prevent="sent=true"
+        @submit="requestPasswordReset"
       >
-        <UFormField label="Email address">
+        <UAlert
+          v-if="errorMessage"
+          color="error"
+          variant="soft"
+          icon="i-lucide-circle-alert"
+          title="Request unsuccessful"
+          :description="errorMessage"
+        />
+
+        <UFormField
+          label="Email address"
+          name="email"
+          required
+        >
           <UInput
+            v-model="state.email"
             type="email"
+            size="lg"
             icon="i-lucide-mail"
             class="w-full"
-           />
+            autocomplete="email"
+          />
         </UFormField>
+
         <UButton
           type="submit"
           block
+          size="lg"
+          :loading="isSubmitting"
         >
           Send Reset Link
         </UButton>
-      </form>
+      </UForm>
+
       <template #footer>
         <UButton
           to="/"
           block
           color="neutral"
           variant="ghost"
+          icon="i-lucide-arrow-left"
         >
           Return to Sign In
         </UButton>

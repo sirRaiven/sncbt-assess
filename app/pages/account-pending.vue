@@ -1,6 +1,19 @@
 <script setup lang="ts">
 definePageMeta({
-    layout: "auth",
+  layout: "auth",
+});
+
+useSeoMeta({
+  title: "Account pending",
+});
+
+const {
+  profile,
+  loadProfile,
+} = useCurrentProfile();
+
+await loadProfile({
+  force: true,
 });
 </script>
 
@@ -8,28 +21,44 @@ definePageMeta({
   <div class="mx-auto max-w-lg">
     <UCard>
       <div class="py-8 text-center">
-        <div
-          class="mx-auto flex size-16 items-center justify-center rounded-full bg-warning/10 text-warning"
-        >
+        <div class="mx-auto flex size-14 items-center justify-center rounded-xl bg-warning/10 text-warning">
           <UIcon
             name="i-lucide-clock-3"
-            class="size-8"
-           />
+            class="size-7"
+          />
         </div>
-        <h1 class="mt-6 text-2xl font-black text-highlighted">
+
+        <h1 class="mt-5 text-2xl font-black text-highlighted">
           Instructor account pending
         </h1>
+
         <p class="mt-3 text-sm leading-6 text-muted">
-          An administrator must approve the instructor account before classes and assessments can be created.
+          Your email is confirmed. An administrator must approve your instructor account before you can create classes and assessments.
         </p>
-        <UButton
-          to="/"
-          color="neutral"
-          variant="outline"
+
+        <div class="mt-6 rounded-xl border border-default bg-elevated/50 p-4 text-left text-sm">
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-muted">
+              Email address
+            </span>
+
+            <span class="truncate font-semibold text-highlighted">
+              {{ profile?.email }}
+            </span>
+          </div>
+
+          <div class="mt-3 flex items-center justify-between gap-4">
+            <span class="text-muted">
+              Account status
+            </span>
+
+            <StatusPill status="Pending approval" />
+          </div>
+        </div>
+
+        <SignOutButton
           class="mt-7"
-        >
-          Return to Sign In
-        </UButton>
+        />
       </div>
     </UCard>
   </div>

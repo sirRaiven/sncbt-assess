@@ -1,7 +1,10 @@
-import type { Profile } from "~/types/profile";
+import type {
+  Profile,
+} from "~/types/profile";
 
 interface LoadProfileOptions {
   force?: boolean;
+  userId?: string;
 }
 
 export function useCurrentProfile() {
@@ -26,11 +29,9 @@ export function useCurrentProfile() {
   async function loadProfile(
     options: LoadProfileOptions = {},
   ): Promise<Profile | null> {
-    /*
-     * @nuxtjs/supabase v2 returns JWT claims.
-     * The authenticated user's UUID is stored in `sub`.
-     */
-    const userId = user.value?.sub;
+    const userId =
+      options.userId
+      ?? user.value?.sub;
 
     if (!userId) {
       clearProfile();
@@ -58,13 +59,16 @@ export function useCurrentProfile() {
         .maybeSingle();
 
       if (error) {
-        console.error("Unable to load profile:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          userId,
-        });
+        console.error(
+          "Unable to load the authenticated profile.",
+          {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            userId,
+          },
+        );
 
         throw error;
       }
@@ -94,6 +98,13 @@ export function useCurrentProfile() {
     }
   }
 
+  function setProfile(
+    value: Profile,
+  ): void {
+    profile.value = value;
+    profileError.value = null;
+  }
+
   function clearProfile(): void {
     profile.value = null;
     profileError.value = null;
@@ -105,6 +116,7 @@ export function useCurrentProfile() {
     profileError,
     isLoadingProfile,
     loadProfile,
+    setProfile,
     clearProfile,
   };
 }
