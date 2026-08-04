@@ -14,6 +14,109 @@ export type Database = {
   }
   public: {
     Tables: {
+      assessments: {
+        Row: {
+          allow_backtracking: boolean
+          archived_at: string | null
+          assessment_type: Database["public"]["Enums"]["assessment_type"]
+          classroom_id: string
+          created_at: string
+          id: string
+          instructions: string | null
+          instructor_id: string
+          leaderboard_enabled: boolean
+          overall_time_limit_seconds: number | null
+          published_at: string | null
+          question_count: number
+          randomize_options: boolean
+          randomize_questions: boolean
+          result_visibility: Database["public"]["Enums"]["assessment_result_visibility"]
+          scoring_mode: Database["public"]["Enums"]["assessment_scoring_mode"]
+          source_assessment_id: string | null
+          status: Database["public"]["Enums"]["assessment_status"]
+          subject_code: string
+          subject_name: string
+          title: string
+          total_points: number
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          allow_backtracking?: boolean
+          archived_at?: string | null
+          assessment_type?: Database["public"]["Enums"]["assessment_type"]
+          classroom_id: string
+          created_at?: string
+          id?: string
+          instructions?: string | null
+          instructor_id: string
+          leaderboard_enabled?: boolean
+          overall_time_limit_seconds?: number | null
+          published_at?: string | null
+          question_count?: number
+          randomize_options?: boolean
+          randomize_questions?: boolean
+          result_visibility?: Database["public"]["Enums"]["assessment_result_visibility"]
+          scoring_mode?: Database["public"]["Enums"]["assessment_scoring_mode"]
+          source_assessment_id?: string | null
+          status?: Database["public"]["Enums"]["assessment_status"]
+          subject_code: string
+          subject_name: string
+          title: string
+          total_points?: number
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          allow_backtracking?: boolean
+          archived_at?: string | null
+          assessment_type?: Database["public"]["Enums"]["assessment_type"]
+          classroom_id?: string
+          created_at?: string
+          id?: string
+          instructions?: string | null
+          instructor_id?: string
+          leaderboard_enabled?: boolean
+          overall_time_limit_seconds?: number | null
+          published_at?: string | null
+          question_count?: number
+          randomize_options?: boolean
+          randomize_questions?: boolean
+          result_visibility?: Database["public"]["Enums"]["assessment_result_visibility"]
+          scoring_mode?: Database["public"]["Enums"]["assessment_scoring_mode"]
+          source_assessment_id?: string | null
+          status?: Database["public"]["Enums"]["assessment_status"]
+          subject_code?: string
+          subject_name?: string
+          title?: string
+          total_points?: number
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessments_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessments_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessments_source_assessment_id_fkey"
+            columns: ["source_assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -237,6 +340,13 @@ export type Database = {
     }
     Enums: {
       account_status: "pending" | "active" | "suspended" | "rejected"
+      assessment_result_visibility:
+        | "hidden"
+        | "score_only"
+        | "score_and_answers"
+      assessment_scoring_mode: "standard" | "speed_bonus"
+      assessment_status: "draft" | "published" | "archived"
+      assessment_type: "quiz" | "examination" | "activity" | "practice"
       classroom_membership_status:
         | "pending"
         | "active"
@@ -373,6 +483,14 @@ export const Constants = {
   public: {
     Enums: {
       account_status: ["pending", "active", "suspended", "rejected"],
+      assessment_result_visibility: [
+        "hidden",
+        "score_only",
+        "score_and_answers",
+      ],
+      assessment_scoring_mode: ["standard", "speed_bonus"],
+      assessment_status: ["draft", "published", "archived"],
+      assessment_type: ["quiz", "examination", "activity", "practice"],
       classroom_membership_status: [
         "pending",
         "active",

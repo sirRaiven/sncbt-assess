@@ -4,6 +4,10 @@ import type {
   StudentClassMembership,
 } from "~/types/classroom";
 
+import type {
+  StudentPublishedAssessment,
+} from "~/types/assessment";
+
 definePageMeta({
   layout: "student",
 });
@@ -24,46 +28,88 @@ const {
   leaveClass,
 } = useClassrooms();
 
+const {
+  listStudentClassAssessments,
+} = useAssessments();
+
 const classroom =
   ref<Classroom | null>(null);
 
 const membership =
   ref<StudentClassMembership | null>(null);
 
+const assessments =
+  ref<StudentPublishedAssessment[]>([]);
+
 const instructorName = ref("");
 const isLoading = ref(true);
 const isLeaving = ref(false);
 const errorMessage = ref("");
 
+function typeLabel(
+  value: string,
+): string {
+  return value
+    .split("_")
+    .map(
+      (part) =>
+        part.charAt(0).toUpperCase()
+        + part.slice(1),
+    )
+    .join(" ");
+}
+
 async function loadClass(): Promise<void> {
   isLoading.value = true;
   errorMessage.value = "";
 
-  const result =
-    await getStudentClass(
+  const [
+    classResult,
+    assessmentResult,
+  ] = await Promise.all([
+    getStudentClass(
       classroomId.value,
-    );
+    ),
+    listStudentClassAssessments(
+      classroomId.value,
+    ),
+  ]);
 
   if (
-    result.error
-    || !result.data
+    classResult.error
+    || !classResult.data
   ) {
     errorMessage.value =
-      result.error
+      classResult.error
       || "Unable to load the class.";
 
     isLoading.value = false;
     return;
   }
 
+  if (
+    assessmentResult.error
+    || !assessmentResult.data
+  ) {
+    errorMessage.value =
+      assessmentResult.error
+      || "Unable to load class assessments.";
+
+    isLoading.value = false;
+    return;
+  }
+
   classroom.value =
-    result.data.classroom;
+    classResult.data.classroom;
 
   membership.value =
-    result.data.membership;
+    classResult.data.membership;
 
   instructorName.value =
-    result.data.instructor.name;
+    classResult.data.instructor.name;
+
+  assessments.value =
+    assessmentResult.data.assessments;
 
   isLoading.value = false;
 }
@@ -161,28 +207,98 @@ onMounted(
       </section>
 
       <div class="grid gap-6 xl:grid-cols-[1fr_340px]">
-        <UCard>
-          <template #header>
-            <h2 class="font-bold text-highlighted">
-              Class overview
-            </h2>
-          </template>
+        <div class="space-y-6">
+          <UCard>
+            <template #header>
+              <h2 class="font-bold text-highlighted">
+                Class overview
+              </h2>
+            </template>
 
-          <p class="whitespace-pre-line text-sm leading-6 text-muted">
-            {{
-              classroom.description
-              || "No class description was provided."
-            }}
-          </p>
+            <p class="whitespace-pre-line text-sm leading-6 text-muted">
+              {{
+                classroom.description
+                || "No class description was provided."
+              }}
+            </p>
+          </UCard>
 
-          <USeparator class="my-6" />
+          <UCard>
+            <template #header>
+              <div>
+                <h2 class="font-bold text-highlighted">
+                  Published assessments
+                </h2>
 
-          <EmptyPanel
-            icon="i-lucide-clipboard-list"
-            title="No assessments connected yet"
-            description="Assessment assignment and availability will be implemented in Phase 2."
-          />
-        </UCard>
+                <p class="mt-1 text-sm text-muted">
+                  An assessment session must be opened by the instructor before answering is allowed.
+                </p>
+              </div>
+            </template>
+
+            <EmptyPanel
+              v-if="assessments.length === 0"
+              icon="i-lucide-clipboard-list"
+              title="No published assessments"
+              description="Published quizzes and examinations assigned to this class will appear here."
+            />
+
+            <div
+              v-else
+              class="space-y-3"
+            >
+              <div
+                v-for="assessment in assessments"
+                :key="assessment.id"
+                class="rounded-xl border border-default p-4"
+              >
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+                  <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <UIcon
+                      name="i-lucide-clipboard-check"
+                      class="size-5"
+                    />
+                  </div>
+
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p class="font-black text-highlighted">
+                          {{ assessment.title }}
+                        </p>
+
+                        <p class="mt-1 text-sm text-muted">
+                          {{ typeLabel(assessment.assessmentType) }}
+                          ·
+                          {{ assessment.questionCount }} questions
+                          ·
+                          {{ assessment.totalPoints }} points
+                        </p>
+                      </div>
+
+                      <StatusPill status="Published" />
+                    </div>
+
+                    <p
+                      v-if="assessment.instructions"
+                      class="mt-3 line-clamp-2 text-sm leading-6 text-muted"
+                    >
+                      {{ assessment.instructions }}
+                    </p>
+
+                    <UAlert
+                      class="mt-4"
+                      color="info"
+                      variant="soft"
+                      title="Waiting for an assessment session"
+                      description="Session creation and secure student attempts begin in Phase 5."
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </UCard>
+        </div>
 
         <div class="space-y-6">
           <UCard>
@@ -201,8 +317,7 @@ onMounted(
                 <dd>
                   <StatusPill
                     :status="
-                      membership
-                        ?.membership_status
+                      membership?.membership_status
                       || 'Active'
                     "
                   />
