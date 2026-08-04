@@ -3,82 +3,225 @@ import type {
   AssessmentWithClassroom,
 } from "~/types/assessment";
 
+import type {
+  AssessmentQuestion,
+} from "~/types/question";
+
 definePageMeta({
   layout: "instructor",
 });
 
 useSeoMeta({
-  title: "Assessment preview",
+  title: "Student-view preview",
 });
 
 const route = useRoute();
 
 const assessmentId = computed(
-  () => String(route.params.id),
+  () =>
+    String(
+      route.params.id,
+    ),
 );
 
 const {
   getInstructorAssessment,
 } = useAssessments();
 
+const {
+  listQuestions,
+} = useQuestions();
+
 const assessment =
-  ref<AssessmentWithClassroom | null>(null);
+  ref<AssessmentWithClassroom | null>(
+    null,
+  );
 
-const isLoading = ref(true);
-const errorMessage = ref("");
+const questions =
+  ref<AssessmentQuestion[]>([]);
 
-function label(
-  value: string,
-): string {
-  return value
-    .split("_")
-    .map(
-      (part) =>
-        part.charAt(0).toUpperCase()
-        + part.slice(1),
-    )
-    .join(" ");
+const currentIndex =
+  ref(0);
+
+const selectedOptionIds =
+  ref<string[]>([]);
+
+const isLoading =
+  ref(true);
+
+const errorMessage =
+  ref("");
+
+const currentQuestion = computed(
+  () =>
+    questions.value[
+      currentIndex.value
+    ]
+    || null,
+);
+
+const progress = computed(
+  () =>
+    questions.value.length > 0
+      ? (
+          (
+            currentIndex.value
+            + 1
+          )
+          / questions.value.length
+        ) * 100
+      : 0,
+);
+
+function isSelected(
+  optionId: string,
+): boolean {
+  return selectedOptionIds.value
+    .includes(optionId);
 }
 
-async function loadAssessment(): Promise<void> {
-  isLoading.value = true;
-
-  const result =
-    await getInstructorAssessment(
-      assessmentId.value,
-    );
+function selectOption(
+  optionId: string,
+): void {
+  if (!currentQuestion.value) {
+    return;
+  }
 
   if (
-    result.error
-    || !result.data
+    currentQuestion.value
+      .question_type
+    === "multiple_choice"
+  ) {
+    selectedOptionIds.value = [
+      optionId,
+    ];
+
+    return;
+  }
+
+  if (
+    selectedOptionIds.value
+      .includes(optionId)
+  ) {
+    selectedOptionIds.value =
+      selectedOptionIds.value.filter(
+        (id) =>
+          id !== optionId,
+      );
+  } else {
+    selectedOptionIds.value.push(
+      optionId,
+    );
+  }
+}
+
+function move(
+  direction: -1 | 1,
+): void {
+  const target =
+    currentIndex.value
+    + direction;
+
+  if (
+    target < 0
+    || target >= questions.value.length
+  ) {
+    return;
+  }
+
+  currentIndex.value =
+    target;
+
+  selectedOptionIds.value =
+    [];
+}
+
+async function loadData(): Promise<void> {
+  isLoading.value =
+    true;
+
+  const [
+    assessmentResult,
+    questionResult,
+  ] = await Promise.all([
+    getInstructorAssessment(
+      assessmentId.value,
+    ),
+
+    listQuestions(
+      assessmentId.value,
+    ),
+  ]);
+
+  if (
+    assessmentResult.error
+    || !assessmentResult.data
   ) {
     errorMessage.value =
-      result.error
-      || "Unable to load the assessment preview.";
+      assessmentResult.error
+      || "Unable to load the assessment.";
 
-    isLoading.value = false;
+    isLoading.value =
+      false;
+
+    return;
+  }
+
+  if (
+    questionResult.error
+    || !questionResult.data
+  ) {
+    errorMessage.value =
+      questionResult.error
+      || "Unable to load assessment questions.";
+
+    isLoading.value =
+      false;
+
     return;
   }
 
   assessment.value =
-    result.data.assessment;
+    assessmentResult.data.assessment;
 
-  isLoading.value = false;
+  questions.value =
+    questionResult.data.questions;
+
+  currentIndex.value =
+    0;
+
+  selectedOptionIds.value =
+    [];
+
+  isLoading.value =
+    false;
 }
 
 onMounted(
-  loadAssessment,
+  loadData,
 );
 </script>
 
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="Assessment preview"
-      :title="assessment?.title || 'Assessment'"
-      description="Review the instructions and delivery settings that will be used for the student assessment experience."
+      eyebrow="Student-view preview"
+      :title="
+        assessment?.title
+        || 'Assessment'
+      "
+      description="This preview intentionally hides correct-answer indicators and answer explanations."
     >
       <template #actions>
+        <UButton
+          :to="`/instructor/assessments/${assessmentId}/edit`"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-pencil"
+        >
+          Question Builder
+        </UButton>
+
         <UButton
           :to="`/instructor/assessments/${assessmentId}/settings`"
           color="neutral"
@@ -100,126 +243,195 @@ onMounted(
 
     <div
       v-if="isLoading"
-      class="space-y-5"
+      class="mx-auto w-full max-w-5xl space-y-5"
     >
-      <USkeleton class="h-56 rounded-xl" />
-      <USkeleton class="h-72 rounded-xl" />
+      <USkeleton class="h-20 rounded-xl" />
+      <USkeleton class="h-[520px] rounded-xl" />
     </div>
 
-    <template v-else-if="assessment">
-      <div class="mx-auto w-full max-w-5xl">
-        <UCard>
-          <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div class="max-w-3xl">
-              <div class="flex flex-wrap gap-2">
-                <StatusPill
-                  :status="assessment.status"
-                />
+    <EmptyPanel
+      v-else-if="
+        questions.length === 0
+      "
+      icon="i-lucide-list-plus"
+      title="No questions to preview"
+      description="Add at least one question using the manual question builder."
+    >
+      <template #actions>
+        <UButton
+          :to="`/instructor/assessments/${assessmentId}/edit`"
+          icon="i-lucide-plus"
+        >
+          Add Question
+        </UButton>
+      </template>
+    </EmptyPanel>
 
-                <UBadge
-                  color="info"
-                  variant="soft"
-                >
-                  {{ label(assessment.assessment_type) }}
-                </UBadge>
-              </div>
+    <div
+      v-else-if="
+        assessment
+        && currentQuestion
+      "
+      class="mx-auto w-full max-w-5xl"
+    >
+      <div class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.16em] text-primary">
+            {{ assessment.subject_code }}
+            ·
+            {{ assessment.classroom.section }}
+          </p>
 
-              <h1 class="mt-5 text-3xl font-black leading-tight text-highlighted">
-                {{ assessment.title }}
-              </h1>
+          <p class="mt-1 text-sm text-muted">
+            Question
+            {{ currentIndex + 1 }}
+            of
+            {{ questions.length }}
+          </p>
+        </div>
 
-              <p class="mt-2 text-sm text-muted">
-                {{ assessment.subject_code }}
-                ·
-                {{ assessment.classroom.section }}
-                ·
-                {{ assessment.classroom.name }}
-              </p>
-            </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <UBadge
+            color="info"
+            variant="soft"
+          >
+            {{
+              currentQuestion.question_type
+                === 'multiple_choice'
+                ? 'Multiple Choice'
+                : 'Checkbox'
+            }}
+          </UBadge>
 
-            <div class="rounded-xl border border-default bg-elevated p-4 text-sm">
-              <p class="text-muted">
-                Questions
-              </p>
-              <p class="mt-1 text-2xl font-black text-highlighted">
-                {{ assessment.question_count }}
-              </p>
-            </div>
-          </div>
+          <UBadge
+            color="warning"
+            variant="soft"
+            icon="i-lucide-clock-3"
+          >
+            {{ currentQuestion.time_limit_seconds }}
+            seconds
+          </UBadge>
 
-          <USeparator class="my-7" />
-
-          <div>
-            <h2 class="font-bold text-highlighted">
-              Instructions
-            </h2>
-
-            <p class="mt-3 whitespace-pre-line text-sm leading-7 text-muted">
-              {{
-                assessment.instructions
-                || "No instructions were provided."
-              }}
-            </p>
-          </div>
-
-          <USeparator class="my-7" />
-
-          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div class="rounded-lg bg-elevated p-4">
-              <p class="text-xs text-muted">
-                Scoring
-              </p>
-              <p class="mt-1 font-semibold text-highlighted">
-                {{ label(assessment.scoring_mode) }}
-              </p>
-            </div>
-
-            <div class="rounded-lg bg-elevated p-4">
-              <p class="text-xs text-muted">
-                Results
-              </p>
-              <p class="mt-1 font-semibold text-highlighted">
-                {{ label(assessment.result_visibility) }}
-              </p>
-            </div>
-
-            <div class="rounded-lg bg-elevated p-4">
-              <p class="text-xs text-muted">
-                Time limit
-              </p>
-              <p class="mt-1 font-semibold text-highlighted">
-                {{
-                  assessment.overall_time_limit_seconds
-                    ? `${Math.round(
-                        assessment.overall_time_limit_seconds / 60,
-                      )} minutes`
-                    : "Per-question"
-                }}
-              </p>
-            </div>
-
-            <div class="rounded-lg bg-elevated p-4">
-              <p class="text-xs text-muted">
-                Backtracking
-              </p>
-              <p class="mt-1 font-semibold text-highlighted">
-                {{
-                  assessment.allow_backtracking
-                    ? "Allowed"
-                    : "Not allowed"
-                }}
-              </p>
-            </div>
-          </div>
-        </UCard>
-
-        <EmptyPanel
-          class="mt-6"
-          icon="i-lucide-list-plus"
-          title="Question builder begins in Phase 3"
-          description="Questions will appear in this preview after the manual builder is connected to the database."
-        />
+          <UBadge
+            color="neutral"
+            variant="soft"
+          >
+            {{ currentQuestion.points }}
+            pt
+          </UBadge>
+        </div>
       </div>
-    </template>
+
+      <UProgress
+        :model-value="progress"
+        class="mb-6"
+      />
+
+      <UCard>
+        <img
+          v-if="currentQuestion.image_url"
+          :src="currentQuestion.image_url"
+          alt="Question illustration"
+          class="mx-auto mb-7 max-h-72 rounded-xl object-contain"
+        >
+
+        <h1 class="text-2xl font-black leading-tight text-highlighted sm:text-3xl">
+          {{ currentQuestion.question_text }}
+        </h1>
+
+        <p class="mt-3 text-sm text-muted">
+          {{
+            currentQuestion.question_type
+              === 'multiple_choice'
+              ? 'Select one answer.'
+              : 'Select all answers that apply.'
+          }}
+        </p>
+
+        <div class="mt-8 grid gap-3 sm:grid-cols-2">
+          <button
+            v-for="(
+              option,
+              index
+            ) in currentQuestion.options"
+            :key="option.id"
+            type="button"
+            class="rounded-xl border p-5 text-left transition"
+            :class="
+              isSelected(
+                option.id,
+              )
+                ? 'border-primary bg-primary/5 ring-3 ring-primary/10'
+                : 'border-default hover:border-primary/40 hover:bg-primary/5'
+            "
+            @click="
+              selectOption(
+                option.id,
+              )
+            "
+          >
+            <div class="flex items-center gap-3">
+              <span
+                class="flex size-8 shrink-0 items-center justify-center rounded-lg text-sm font-black"
+                :class="
+                  isSelected(
+                    option.id,
+                  )
+                    ? 'bg-primary text-white'
+                    : 'bg-elevated text-muted'
+                "
+              >
+                {{
+                  String.fromCharCode(
+                    65 + index,
+                  )
+                }}
+              </span>
+
+              <span class="font-semibold text-highlighted">
+                {{ option.option_text }}
+              </span>
+            </div>
+          </button>
+        </div>
+
+        <div class="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+          <UButton
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-arrow-left"
+            :disabled="
+              currentIndex === 0
+            "
+            @click="
+              move(-1)
+            "
+          >
+            Previous
+          </UButton>
+
+          <UButton
+            trailing-icon="i-lucide-arrow-right"
+            :disabled="
+              currentIndex
+              === questions.length - 1
+            "
+            @click="
+              move(1)
+            "
+          >
+            Next Question
+          </UButton>
+        </div>
+      </UCard>
+
+      <UAlert
+        class="mt-6"
+        color="info"
+        variant="soft"
+        title="Preview only"
+        description="Selections are local and are not submitted or graded. Secure student attempts begin in a later phase."
+      />
+    </div>
   </div>
 </template>

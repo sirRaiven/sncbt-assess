@@ -324,11 +324,103 @@ export type Database = {
         }
         Relationships: []
       }
+      question_options: {
+        Row: {
+          created_at: string
+          id: string
+          is_correct: boolean
+          option_text: string
+          order_number: number
+          question_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          option_text: string
+          order_number: number
+          question_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          option_text?: string
+          order_number?: number
+          question_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_options_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      questions: {
+        Row: {
+          assessment_id: string
+          created_at: string
+          explanation: string | null
+          id: string
+          image_url: string | null
+          order_number: number
+          points: number
+          question_text: string
+          question_type: Database["public"]["Enums"]["assessment_question_type"]
+          time_limit_seconds: number
+          updated_at: string
+        }
+        Insert: {
+          assessment_id: string
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          image_url?: string | null
+          order_number: number
+          points?: number
+          question_text: string
+          question_type: Database["public"]["Enums"]["assessment_question_type"]
+          time_limit_seconds?: number
+          updated_at?: string
+        }
+        Update: {
+          assessment_id?: string
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          image_url?: string | null
+          order_number?: number
+          points?: number
+          question_text?: string
+          question_type?: Database["public"]["Enums"]["assessment_question_type"]
+          time_limit_seconds?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      assert_assessment_publishable: {
+        Args: { p_assessment_id: string; p_instructor_id: string }
+        Returns: undefined
+      }
       current_account_status: {
         Args: never
         Returns: Database["public"]["Enums"]["account_status"]
@@ -337,9 +429,45 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      delete_assessment_question: {
+        Args: { p_instructor_id: string; p_question_id: string }
+        Returns: string
+      }
+      duplicate_assessment_question: {
+        Args: { p_instructor_id: string; p_question_id: string }
+        Returns: string
+      }
+      duplicate_assessment_with_questions: {
+        Args: { p_assessment_id: string; p_instructor_id: string }
+        Returns: string
+      }
+      reorder_assessment_questions: {
+        Args: {
+          p_assessment_id: string
+          p_instructor_id: string
+          p_question_ids: string[]
+        }
+        Returns: undefined
+      }
+      save_assessment_question: {
+        Args: {
+          p_assessment_id: string
+          p_explanation: string
+          p_image_url: string
+          p_instructor_id: string
+          p_options: Json
+          p_points: number
+          p_question_id: string
+          p_question_text: string
+          p_question_type: Database["public"]["Enums"]["assessment_question_type"]
+          p_time_limit_seconds: number
+        }
+        Returns: string
+      }
     }
     Enums: {
       account_status: "pending" | "active" | "suspended" | "rejected"
+      assessment_question_type: "multiple_choice" | "checkbox"
       assessment_result_visibility:
         | "hidden"
         | "score_only"
@@ -483,6 +611,7 @@ export const Constants = {
   public: {
     Enums: {
       account_status: ["pending", "active", "suspended", "rejected"],
+      assessment_question_type: ["multiple_choice", "checkbox"],
       assessment_result_visibility: [
         "hidden",
         "score_only",

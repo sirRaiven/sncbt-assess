@@ -442,8 +442,17 @@ onMounted(
 
             <div class="mt-5 flex flex-wrap gap-2">
               <UButton
-                :to="`/instructor/assessments/${assessment.id}/settings`"
+                :to="`/instructor/assessments/${assessment.id}/edit`"
                 variant="soft"
+                icon="i-lucide-list-plus"
+              >
+                Questions
+              </UButton>
+
+              <UButton
+                :to="`/instructor/assessments/${assessment.id}/settings`"
+                color="neutral"
+                variant="outline"
                 icon="i-lucide-settings-2"
               >
                 Settings

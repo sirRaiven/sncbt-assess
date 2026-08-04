@@ -432,6 +432,13 @@ onMounted(
     >
       <template #actions>
         <UButton
+          :to="`/instructor/assessments/${assessmentId}/edit`"
+          icon="i-lucide-list-plus"
+        >
+          Question Builder
+        </UButton>
+
+        <UButton
           :to="`/instructor/assessments/${assessmentId}/preview`"
           color="neutral"
           variant="outline"
