@@ -193,22 +193,14 @@ async function signIn(
       <template #header>
         <div class="text-center">
           <InstitutionLogo
-            size="xl"
+            size="lg"
             class="mx-auto"
             eager
           />
 
-          <p class="mt-4 text-xs font-bold uppercase tracking-[0.16em] text-primary">
-            St. Nicolas College of Business and Technology
-          </p>
-
           <h1 class="mt-2 text-2xl font-black text-highlighted">
             Sign in to SNCBT Assess
           </h1>
-
-          <p class="mt-2 text-sm leading-6 text-muted">
-            Enter your registered account credentials to continue.
-          </p>
         </div>
       </template>
 
