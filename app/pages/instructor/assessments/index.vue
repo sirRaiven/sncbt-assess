@@ -101,6 +101,13 @@ const filteredAssessments = computed(() => {
 
   return assessments.value.filter(
     (assessment) => {
+      if (
+        assessment.status
+        === "archived"
+      ) {
+        return false;
+      }
+
       const assignedClassText =
         assessment.assignedClassrooms
           .map(

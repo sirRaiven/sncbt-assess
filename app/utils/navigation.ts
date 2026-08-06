@@ -160,14 +160,6 @@ const items: Record<
     },
     {
       label:
-        "Join Session",
-      icon:
-        "i-lucide-log-in",
-      to:
-        "/student/sessions/join",
-    },
-    {
-      label:
         "My Results",
       icon:
         "i-lucide-trophy",

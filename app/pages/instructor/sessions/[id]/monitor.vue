@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import type {
-  InstructorSessionDetail,
-  SessionParticipant,
-} from "~/types/assessment-session";
+  InstructorDeliveryMonitor,
+  InstructorMonitorStudent,
+} from "~/types/assessment-delivery";
 
 definePageMeta({
-  layout: "instructor",
+  layout:
+    "instructor",
 });
 
 useSeoMeta({
-  title: "Live session monitor",
+  title:
+    "Assessment Monitor",
 });
 
 const route =
@@ -18,302 +20,377 @@ const route =
 const toast =
   useToast();
 
-const sessionId = computed(
-  () =>
-    String(
-      route.params.id,
-    ),
-);
+const assignmentId =
+  computed(
+    () =>
+      String(
+        route.params.id,
+      ),
+  );
 
 const {
-  getInstructorSession,
-  endSession,
-  removeParticipant,
-} = useAssessmentSessions();
+  getInstructorMonitor,
+  forceSubmitAttempt,
+  grantExtraTime,
+} = useAssessmentDelivery();
 
-const {
-  connectionStatus,
-  subscribe,
-} = useSessionRealtime();
-
-const detail =
-  ref<InstructorSessionDetail | null>(
+const monitor =
+  ref<
+    InstructorDeliveryMonitor
+    | null
+  >(
     null,
   );
 
 const isLoading =
   ref(true);
 
-const busyAction =
-  ref("");
+const isRefreshing =
+  ref(false);
 
 const errorMessage =
   ref("");
 
-const monitorActionModalOpen =
+const activeView =
+  ref<
+    | "progress"
+    | "ranking"
+  >(
+    "progress",
+  );
+
+const query =
+  ref("");
+
+const forceSubmitModalOpen =
   ref(false);
 
-const pendingMonitorAction =
+const extraTimeModalOpen =
+  ref(false);
+
+const pendingStudent =
   ref<
-    | {
-        type:
-          "end";
-      }
-    | {
-        type:
-          "remove";
-        participant:
-          SessionParticipant;
-      }
+    InstructorMonitorStudent
     | null
   >(
     null,
   );
 
-const monitorActionTitle =
-  computed(
-    () =>
-      pendingMonitorAction.value
-        ?.type
-      === "end"
-        ? "End this live session?"
-        : "Remove this student?",
+const extraMinutes =
+  ref(15);
+
+const busyAction =
+  ref<
+    string | null
+  >(
+    null,
   );
 
-const monitorActionDescription =
+let refreshTimer:
+  | ReturnType<
+      typeof setInterval
+    >
+  | null =
+    null;
+
+const filteredStudents =
   computed(
     () => {
-      const pending =
-        pendingMonitorAction.value;
+      const students =
+        monitor.value?.students
+        ?? [];
 
-      if (
-        pending?.type
-        === "end"
-      ) {
-        return "The session code will stop working and all active participants will be moved to the final closed state.";
+      const keyword =
+        query.value
+          .trim()
+          .toLowerCase();
+
+      if (!keyword) {
+        return students;
       }
 
-      if (
-        pending?.type
-        === "remove"
-      ) {
-        return `Remove ${pending.participant.student.name} from this active session?`;
-      }
-
-      return "";
+      return students.filter(
+        (student) =>
+          [
+            student.studentName,
+            student.studentNumber,
+            student.email,
+            student.status,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+            .includes(keyword),
+      );
     },
   );
 
-const elapsedSeconds =
-  ref(0);
+const rankingStudents =
+  computed(
+    () =>
+      filteredStudents.value
+        .filter(
+          (student) =>
+            student.rank
+            !== null,
+        )
+        .sort(
+          (
+            first,
+            second,
+          ) =>
+            (
+              first.rank
+              ?? Number.MAX_SAFE_INTEGER
+            )
+            - (
+              second.rank
+              ?? Number.MAX_SAFE_INTEGER
+            ),
+        ),
+  );
 
-let elapsedTimer:
-  | ReturnType<typeof setInterval>
-  | null = null;
+function formatDate(
+  value: string | null,
+): string {
+  if (!value) {
+    return "Not recorded";
+  }
 
-const visibleParticipants = computed(
-  () =>
-    detail.value
-      ?.participants
-      .filter(
-        (participant) =>
-          participant.status
-          !== "removed",
-      )
-    ?? [],
-);
+  return new Intl
+    .DateTimeFormat(
+      "en-PH",
+      {
+        dateStyle:
+          "medium",
+        timeStyle:
+          "short",
+      },
+    )
+    .format(
+      new Date(value),
+    );
+}
 
-const elapsedLabel = computed(() => {
+function formatRemaining(
+  expiresAt: string | null,
+): string {
+  if (!expiresAt) {
+    return "—";
+  }
+
+  const seconds =
+    Math.max(
+      0,
+      Math.ceil(
+        (
+          new Date(expiresAt)
+            .getTime()
+          - Date.now()
+        ) / 1000,
+      ),
+    );
+
   const hours =
     Math.floor(
-      elapsedSeconds.value
-      / 3600,
+      seconds / 3600,
     );
 
   const minutes =
     Math.floor(
       (
-        elapsedSeconds.value
-        % 3600
-      )
-      / 60,
+        seconds % 3600
+      ) / 60,
     );
 
-  const seconds =
-    elapsedSeconds.value
-    % 60;
+  const remainingSeconds =
+    seconds % 60;
 
-  return [
-    hours,
-    minutes,
-    seconds,
-  ]
-    .map(
-      (value) =>
-        String(value)
-          .padStart(
-            2,
-            "0",
-          ),
-    )
-    .join(":");
-});
-
-function initials(
-  participant: SessionParticipant,
-): string {
-  return participant.student.name
-    .split(" ")
-    .filter(Boolean)
-    .map(
-      (part) =>
-        part.charAt(0),
-    )
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
-function updateElapsed(): void {
-  if (
-    !detail.value?.session.started_at
-  ) {
-    elapsedSeconds.value =
-      0;
-
-    return;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
   }
 
-  const endingTime =
-    detail.value.session.ended_at
-      ? Date.parse(
-          detail.value.session.ended_at,
-        )
-      : Date.now();
-
-  elapsedSeconds.value =
-    Math.max(
-      0,
-      Math.floor(
-        (
-          endingTime
-          - Date.parse(
-            detail.value.session.started_at,
-          )
-        )
-        / 1000,
-      ),
-    );
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
-async function loadSession(
+function scoreLabel(
+  student:
+    InstructorMonitorStudent,
+): string {
+  return `${student.score} / ${student.maximumScore}`;
+}
+
+async function loadMonitor(
   silent = false,
 ): Promise<void> {
-  if (!silent) {
+  if (silent) {
+    isRefreshing.value =
+      true;
+  } else {
     isLoading.value =
       true;
   }
 
+  if (!silent) {
+    errorMessage.value =
+      "";
+  }
+
   const result =
-    await getInstructorSession(
-      sessionId.value,
+    await getInstructorMonitor(
+      assignmentId.value,
     );
 
   if (
     result.error
     || !result.data
   ) {
-    errorMessage.value =
-      result.error
-      || "Unable to load the live session.";
+    if (!silent) {
+      errorMessage.value =
+        result.error
+        || "Unable to load the assessment monitor.";
+    }
 
     isLoading.value =
+      false;
+
+    isRefreshing.value =
       false;
 
     return;
   }
 
-  detail.value =
-    result.data.detail;
-
-  errorMessage.value =
-    "";
+  monitor.value =
+    result.data;
 
   isLoading.value =
     false;
 
-  updateElapsed();
-
-  if (
-    detail.value.session.status
-    === "lobby"
-  ) {
-    await navigateTo(
-      `/instructor/sessions/${detail.value.session.id}/lobby`,
-    );
-  }
+  isRefreshing.value =
+    false;
 }
 
-function requestEnd(): void {
-  pendingMonitorAction.value = {
-    type:
-      "end",
-  };
-
-  monitorActionModalOpen.value =
-    true;
-}
-
-function requestParticipantRemoval(
-  participant: SessionParticipant,
+function requestForceSubmit(
+  student:
+    InstructorMonitorStudent,
 ): void {
-  pendingMonitorAction.value = {
-    type:
-      "remove",
-    participant,
-  };
-
-  monitorActionModalOpen.value =
-    true;
-}
-
-async function confirmMonitorAction(): Promise<void> {
-  const pending =
-    pendingMonitorAction.value;
-
-  if (!pending) {
+  if (
+    !student.attemptId
+    || student.status
+    !== "in_progress"
+  ) {
     return;
   }
 
+  pendingStudent.value =
+    student;
+
+  forceSubmitModalOpen.value =
+    true;
+}
+
+async function confirmForceSubmit():
+  Promise<void> {
   if (
-    pending.type
-    === "end"
+    !pendingStudent.value
+      ?.attemptId
   ) {
-    await end();
-  } else {
-    await remove(
-      pending.participant,
-    );
+    return;
   }
 
-  monitorActionModalOpen.value =
+  busyAction.value =
+    pendingStudent.value
+      .attemptId;
+
+  const result =
+    await forceSubmitAttempt(
+      pendingStudent.value
+        .attemptId,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title:
+        "Attempt could not be submitted",
+      description:
+        result.error
+        || "The server did not accept the instructor submission.",
+      color:
+        "error",
+    });
+
+    busyAction.value =
+      null;
+
+    return;
+  }
+
+  forceSubmitModalOpen.value =
     false;
 
-  pendingMonitorAction.value =
+  toast.add({
+    title:
+      "Attempt submitted",
+    description:
+      result.data.message,
+    color:
+      "success",
+  });
+
+  pendingStudent.value =
     null;
+
+  busyAction.value =
+    null;
+
+  await loadMonitor(
+    true,
+  );
 }
 
-async function end(): Promise<void> {
-  if (!detail.value) {
+function requestExtraTime(
+  student:
+    InstructorMonitorStudent,
+): void {
+  if (
+    !student.attemptId
+    || student.status
+    !== "in_progress"
+  ) {
+    return;
+  }
+
+  pendingStudent.value =
+    student;
+
+  extraMinutes.value =
+    15;
+
+  extraTimeModalOpen.value =
+    true;
+}
+
+async function confirmExtraTime():
+  Promise<void> {
+  if (
+    !pendingStudent.value
+      ?.attemptId
+  ) {
     return;
   }
 
   busyAction.value =
-    "end";
+    pendingStudent.value
+      .attemptId;
 
   const result =
-    await endSession(
-      detail.value.session.id,
+    await grantExtraTime(
+      pendingStudent.value
+        .attemptId,
+      extraMinutes.value,
     );
 
   if (
@@ -322,118 +399,64 @@ async function end(): Promise<void> {
   ) {
     toast.add({
       title:
-        "Session could not be ended",
+        "Extra time could not be added",
       description:
         result.error
-        || "The action could not be completed.",
+        || "The accommodation could not be saved.",
       color:
         "error",
     });
 
     busyAction.value =
-      "";
+      null;
 
     return;
   }
 
-  detail.value =
-    result.data.detail;
+  extraTimeModalOpen.value =
+    false;
 
   toast.add({
     title:
-      "Session ended",
+      "Extra time added",
     description:
-      result.data.message,
+      `${extraMinutes.value} minutes were added to the student's deadline.`,
     color:
       "success",
   });
 
-  busyAction.value =
-    "";
-}
-
-async function remove(
-  participant: SessionParticipant,
-): Promise<void> {
-  if (
-    !detail.value
-    || detail.value.session.status
-    !== "active"
-  ) {
-    return;
-  }
+  pendingStudent.value =
+    null;
 
   busyAction.value =
-    participant.id;
+    null;
 
-  const result =
-    await removeParticipant(
-      detail.value.session.id,
-      participant.id,
-    );
-
-  if (
-    result.error
-    || !result.data
-  ) {
-    toast.add({
-      title:
-        "Participant could not be removed",
-      description:
-        result.error
-        || "The action could not be completed.",
-      color:
-        "error",
-    });
-
-    busyAction.value =
-      "";
-
-    return;
-  }
-
-  detail.value =
-    result.data.detail;
-
-  toast.add({
-    title:
-      "Participant removed",
-    description:
-      result.data.message,
-    color:
-      "success",
-  });
-
-  busyAction.value =
-    "";
+  await loadMonitor(
+    true,
+  );
 }
 
 onMounted(
   async () => {
-    await loadSession();
+    await loadMonitor();
 
-    if (detail.value) {
-      await subscribe(
-        detail.value.session.id,
-        () =>
-          loadSession(
+    refreshTimer =
+      setInterval(
+        () => {
+          void loadMonitor(
             true,
-          ),
+          );
+        },
+        5000,
       );
-    }
-
-    elapsedTimer = setInterval(
-      updateElapsed,
-      1000,
-    );
   },
 );
 
 onBeforeUnmount(
   () => {
-    if (elapsedTimer) {
+    if (refreshTimer) {
       clearInterval(
-        elapsedTimer,
+        refreshTimer,
       );
     }
   },
@@ -442,270 +465,407 @@ onBeforeUnmount(
 
 <template>
   <div class="page-stack">
+    <PageHeader
+      eyebrow="Live assessment monitoring"
+      :title="
+        monitor?.delivery.title
+        || 'Assessment Monitor'
+      "
+      :description="
+        monitor
+          ? `${monitor.delivery.subjectCode} · ${monitor.delivery.classroom.section} · ${formatDate(monitor.delivery.startsAt)} to ${formatDate(monitor.delivery.endsAt)}`
+          : 'Loading delivery'
+      "
+    >
+      <template #actions>
+        <div class="flex gap-2">
+          <UButton
+            to="/instructor/sessions"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-arrow-left"
+          >
+            Sessions
+          </UButton>
+
+          <UButton
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-refresh-cw"
+            :loading="isRefreshing"
+            @click="
+              loadMonitor(
+                true,
+              )
+            "
+          >
+            Refresh
+          </UButton>
+        </div>
+      </template>
+    </PageHeader>
+
     <UAlert
       v-if="errorMessage"
       color="error"
       variant="soft"
-      title="Live session could not be loaded"
+      title="Monitor could not be loaded"
       :description="errorMessage"
     />
 
     <div
       v-if="isLoading"
-      class="space-y-5"
+      class="space-y-4"
     >
-      <USkeleton class="h-56 rounded-xl" />
-      <USkeleton class="h-80 rounded-xl" />
+      <USkeleton class="h-44 rounded-xl" />
+      <USkeleton class="h-96 rounded-xl" />
     </div>
 
-    <template v-else-if="detail">
-      <section class="rounded-xl bg-gradient-to-r from-slate-950 via-brand-900 to-indigo-800 p-6 text-white sm:p-8">
-        <div class="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+    <template
+      v-else-if="monitor"
+    >
+      <section class="rounded-xl bg-gradient-to-r from-blue-900 via-blue-800 to-violet-800 p-6 text-white">
+        <div class="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap gap-2">
               <StatusPill
                 :status="
-                  detail.session.status
+                  monitor.delivery.status
                 "
               />
 
               <UBadge
                 color="neutral"
                 variant="soft"
-                class="bg-white/10 text-blue-50"
               >
-                {{
-                  detail.session.session_mode
-                  === "teacher_led"
-                    ? "Teacher-led"
-                    : "Student-paced"
-                }}
+                {{ monitor.delivery.classroom.name }}
               </UBadge>
             </div>
 
-            <p class="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-blue-200">
-              {{ detail.assessment.subjectCode }}
-              ·
-              {{ detail.classroom.section }}
-            </p>
-
-            <h1 class="mt-3 text-3xl font-black tracking-tight">
-              {{ detail.assessment.title }}
+            <h1 class="mt-4 text-3xl font-black">
+              {{ monitor.delivery.title }}
             </h1>
 
-            <p class="mt-3 text-sm text-blue-100">
-              Session
-              {{
-                detail.session.session_code
-                  .replace(
-                    /(\d{3})(\d{3})/,
-                    "$1 $2",
-                  )
-              }}
-              ·
-              {{ elapsedLabel }}
+            <p class="mt-2 text-sm text-blue-100">
+              Monitoring updates every five seconds. Scores for in-progress students are provisional.
             </p>
           </div>
 
-          <UButton
-            v-if="
-              detail.session.status
-              === 'active'
-            "
-            color="error"
-            size="lg"
-            icon="i-lucide-square"
-            :loading="
-              busyAction
-              === 'end'
-            "
-            @click="requestEnd"
-          >
-            End Session
-          </UButton>
+          <div class="rounded-xl bg-white/10 p-4">
+            <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">
+              Assessment window
+            </p>
 
-          <UButton
-            v-else
-            to="/instructor/sessions"
-            color="neutral"
-            variant="solid"
-            class="bg-white text-brand-800 hover:bg-blue-50"
-          >
-            Return to Sessions
-          </UButton>
+            <p class="mt-2 font-bold">
+              {{ formatDate(monitor.delivery.startsAt) }}
+            </p>
+
+            <p class="text-sm text-blue-100">
+              to
+              {{ formatDate(monitor.delivery.endsAt) }}
+            </p>
+          </div>
         </div>
       </section>
 
-      <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
         <StatCard
-          label="Active students"
+          label="Class members"
           :value="
             String(
-              detail.participantCounts.active,
+              monitor.summary.classMembers,
             )
           "
           icon="i-lucide-users"
+        />
+
+        <StatCard
+          label="Started"
+          :value="
+            String(
+              monitor.summary.started,
+            )
+          "
+          icon="i-lucide-play"
+          tone="info"
+        />
+
+        <StatCard
+          label="In progress"
+          :value="
+            String(
+              monitor.summary.inProgress,
+            )
+          "
+          icon="i-lucide-loader-circle"
+          tone="warning"
+        />
+
+        <StatCard
+          label="Submitted"
+          :value="
+            String(
+              monitor.summary.submitted,
+            )
+          "
+          icon="i-lucide-circle-check"
           tone="success"
         />
 
         <StatCard
-          label="Finished"
+          label="Auto-submitted"
           :value="
             String(
-              detail.participantCounts.finished,
+              monitor.summary.autoSubmitted,
             )
           "
-          icon="i-lucide-circle-check-big"
-          tone="primary"
-        />
-
-        <StatCard
-          label="Left"
-          :value="
-            String(
-              detail.participantCounts.left,
-            )
-          "
-          icon="i-lucide-log-out"
+          icon="i-lucide-clock-alert"
           tone="neutral"
         />
 
         <StatCard
-          label="Connection"
+          label="Not started"
           :value="
-            connectionStatus
-            === 'SUBSCRIBED'
-              ? 'Live'
-              : 'Polling'
+            String(
+              monitor.summary.notStarted,
+            )
           "
-          icon="i-lucide-wifi"
-          :tone="
-            connectionStatus
-            === 'SUBSCRIBED'
-              ? 'success'
-              : 'warning'
+          icon="i-lucide-circle-dashed"
+          tone="neutral"
+        />
+
+        <StatCard
+          label="Class average"
+          :value="
+            monitor.summary.classAverage
+            === null
+              ? '—'
+              : String(
+                  monitor.summary.classAverage,
+                )
           "
+          icon="i-lucide-chart-column"
+          tone="info"
+        />
+
+        <StatCard
+          label="Highest score"
+          :value="
+            monitor.summary.highestScore
+            === null
+              ? '—'
+              : String(
+                  monitor.summary.highestScore,
+                )
+          "
+          icon="i-lucide-trophy"
+          tone="warning"
         />
       </section>
 
       <UCard>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center">
+          <div class="flex rounded-xl border border-default bg-elevated p-1">
+            <button
+              type="button"
+              class="min-h-10 rounded-lg px-4 text-sm font-bold transition"
+              :class="
+                activeView
+                === 'progress'
+                  ? 'bg-primary/12 text-primary'
+                  : 'text-muted hover:bg-default hover:text-highlighted'
+              "
+              @click="
+                activeView =
+                  'progress'
+              "
+            >
+              Student Progress
+            </button>
+
+            <button
+              type="button"
+              class="min-h-10 rounded-lg px-4 text-sm font-bold transition"
+              :class="
+                activeView
+                === 'ranking'
+                  ? 'bg-primary/12 text-primary'
+                  : 'text-muted hover:bg-default hover:text-highlighted'
+              "
+              @click="
+                activeView =
+                  'ranking'
+              "
+            >
+              Ranking and Scores
+            </button>
+          </div>
+
+          <UInput
+            v-model="query"
+            icon="i-lucide-search"
+            placeholder="Search student"
+            class="w-full lg:ml-auto lg:max-w-sm"
+          />
+        </div>
+      </UCard>
+
+      <UCard
+        v-if="
+          activeView
+          === 'progress'
+        "
+      >
         <template #header>
           <div>
             <h2 class="font-black text-highlighted">
-              Session participants
+              Student progress
             </h2>
 
             <p class="mt-1 text-sm text-muted">
-              Answer progress and scores will be connected after the student assessment player and grading workflow are finalized.
+              The roster includes every active member of the assigned class.
             </p>
           </div>
         </template>
 
-        <EmptyPanel
-          v-if="
-            visibleParticipants.length
-            === 0
-          "
-          icon="i-lucide-users"
-          title="No session participants"
-          description="No students joined this session."
-        />
-
-        <div
-          v-else
-          class="table-scroll"
-        >
+        <div class="table-shell table-scroll">
           <table class="app-table">
             <thead>
               <tr>
-                <th>Student</th>
-                <th>Student number</th>
-                <th>Joined</th>
-                <th>Status</th>
-                <th>Action</th>
+                <th>
+                  Student
+                </th>
+                <th>
+                  Status
+                </th>
+                <th>
+                  Progress
+                </th>
+                <th>
+                  Remaining
+                </th>
+                <th>
+                  Provisional score
+                </th>
+                <th>
+                  Last activity
+                </th>
+                <th>
+                  Actions
+                </th>
               </tr>
             </thead>
 
             <tbody>
               <tr
-                v-for="participant in visibleParticipants"
-                :key="participant.id"
+                v-for="student in filteredStudents"
+                :key="student.studentId"
               >
                 <td>
-                  <div class="flex items-center gap-3">
-                    <UAvatar
-                      :text="
-                        initials(
-                          participant,
-                        )
-                      "
-                      size="sm"
-                    />
+                  <p class="font-black text-highlighted">
+                    {{ student.studentName }}
+                  </p>
 
-                    <div>
-                      <p class="font-semibold text-highlighted">
-                        {{ participant.student.name }}
-                      </p>
-
-                      <p class="text-xs text-muted">
-                        {{ participant.student.email }}
-                      </p>
-                    </div>
-                  </div>
-                </td>
-
-                <td class="font-mono text-xs">
-                  {{
-                    participant.student.studentNumber
-                    || "—"
-                  }}
-                </td>
-
-                <td>
-                  {{
-                    new Date(
-                      participant.joined_at,
-                    ).toLocaleString()
-                  }}
+                  <p class="mt-1 text-xs text-muted">
+                    {{
+                      student.studentNumber
+                      || "No student number"
+                    }}
+                  </p>
                 </td>
 
                 <td>
                   <StatusPill
-                    :status="participant.status"
+                    :status="
+                      student.status
+                    "
                   />
                 </td>
 
                 <td>
-                  <UButton
-                    v-if="
-                      detail.session.status
-                      === 'active'
-                      && participant.status
-                      === 'active'
-                    "
-                    color="error"
-                    variant="ghost"
-                    size="sm"
-                    icon="i-lucide-user-x"
-                    :loading="
-                      busyAction
-                      === participant.id
-                    "
-                    @click="
-                      requestParticipantRemoval(
-                        participant,
-                      )
-                    "
-                  >
-                    Remove
-                  </UButton>
+                  <div class="min-w-40">
+                    <div class="flex justify-between text-xs text-muted">
+                      <span>
+                        {{ student.answeredCount }}
+                        /
+                        {{ student.questionCount }}
+                      </span>
 
-                  <span
-                    v-else
-                    class="text-xs text-muted"
-                  >
-                    No action
-                  </span>
+                      <span>
+                        {{ student.progressPercent }}%
+                      </span>
+                    </div>
+
+                    <UProgress
+                      class="mt-2"
+                      :model-value="
+                        student.progressPercent
+                      "
+                    />
+                  </div>
+                </td>
+
+                <td class="font-mono text-sm">
+                  {{
+                    student.status
+                    === "in_progress"
+                      ? formatRemaining(
+                          student.expiresAt,
+                        )
+                      : "—"
+                  }}
+                </td>
+
+                <td class="font-black text-highlighted">
+                  {{ scoreLabel(student) }}
+                </td>
+
+                <td class="text-sm text-muted">
+                  {{
+                    formatDate(
+                      student.lastActivityAt,
+                    )
+                  }}
+                </td>
+
+                <td>
+                  <div class="flex flex-wrap gap-2">
+                    <UButton
+                      color="warning"
+                      variant="soft"
+                      size="xs"
+                      icon="i-lucide-clock-plus"
+                      :disabled="
+                        student.status
+                        !== 'in_progress'
+                      "
+                      @click="
+                        requestExtraTime(
+                          student,
+                        )
+                      "
+                    >
+                      Extra Time
+                    </UButton>
+
+                    <UButton
+                      color="error"
+                      variant="soft"
+                      size="xs"
+                      icon="i-lucide-send"
+                      :disabled="
+                        student.status
+                        !== 'in_progress'
+                      "
+                      @click="
+                        requestForceSubmit(
+                          student,
+                        )
+                      "
+                    >
+                      Force Submit
+                    </UButton>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -713,57 +873,137 @@ onBeforeUnmount(
         </div>
       </UCard>
 
-      <UAlert
-        v-if="
-          detail.session.status
-          === 'active'
-        "
-        color="info"
-        variant="soft"
-        title="Session foundation is active"
-        description="Students have passed institutional eligibility checks and reached the instructions page. Secure answer delivery is the next workflow to design."
-      />
+      <UCard v-else>
+        <template #header>
+          <div>
+            <h2 class="font-black text-highlighted">
+              Live ranking and scoring
+            </h2>
 
-      <UAlert
-        v-else
-        color="success"
-        variant="soft"
-        title="Session closed"
-        description="The session code is no longer valid and the final participant states were preserved."
-      />
+            <p class="mt-1 text-sm text-muted">
+              In-progress scores are provisional. Submitted scores are final.
+            </p>
+          </div>
+        </template>
+
+        <EmptyPanel
+          v-if="
+            rankingStudents.length
+            === 0
+          "
+          icon="i-lucide-trophy"
+          title="No ranking yet"
+          description="Students appear after they begin answering the assessment."
+        />
+
+        <div
+          v-else
+          class="space-y-3"
+        >
+          <div
+            v-for="student in rankingStudents"
+            :key="student.studentId"
+            class="flex flex-col gap-3 rounded-xl border border-default p-4 sm:flex-row sm:items-center"
+          >
+            <div
+              class="flex size-10 shrink-0 items-center justify-center rounded-xl font-black"
+              :class="
+                student.rank
+                === 1
+                  ? 'bg-amber-400 text-amber-950'
+                  : 'bg-elevated text-highlighted'
+              "
+            >
+              {{ student.rank }}
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <p class="font-black text-highlighted">
+                {{ student.studentName }}
+              </p>
+
+              <p class="mt-1 text-xs text-muted">
+                {{ student.answeredCount }}
+                /
+                {{ student.questionCount }}
+                answered
+                ·
+                {{ student.status }}
+              </p>
+            </div>
+
+            <div class="text-right">
+              <p class="text-xl font-black text-highlighted">
+                {{ scoreLabel(student) }}
+              </p>
+
+              <p class="text-xs text-muted">
+                {{
+                  student.status
+                  === "in_progress"
+                    ? "Provisional"
+                    : "Final"
+                }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </UCard>
     </template>
 
     <ConfirmationModal
       v-model:open="
-        monitorActionModalOpen
+        forceSubmitModalOpen
       "
-      :title="
-        monitorActionTitle
-      "
+      title="Force-submit this attempt?"
       :description="
-        monitorActionDescription
+        pendingStudent
+          ? `${pendingStudent.studentName}'s saved answers will be locked and graded immediately.`
+          : 'The attempt will be submitted.'
       "
-      :confirm-label="
-        pendingMonitorAction?.type
-        === 'end'
-          ? 'End Session'
-          : 'Remove Student'
-      "
+      confirm-label="Force Submit"
       confirm-color="error"
-      :icon="
-        pendingMonitorAction?.type
-        === 'end'
-          ? 'i-lucide-circle-stop'
-          : 'i-lucide-user-x'
-      "
+      icon="i-lucide-send"
       :loading="
         Boolean(
           busyAction,
         )
       "
-      @confirm="
-        confirmMonitorAction
-      "
+      @confirm="confirmForceSubmit"
     />
+
+    <ConfirmationModal
+      v-model:open="
+        extraTimeModalOpen
+      "
+      title="Add approved extra time?"
+      :description="
+        pendingStudent
+          ? `Add an individual accommodation to ${pendingStudent.studentName}'s active attempt.`
+          : 'Add extra time to the active attempt.'
+      "
+      confirm-label="Add Extra Time"
+      confirm-color="warning"
+      icon="i-lucide-clock-plus"
+      :loading="
+        Boolean(
+          busyAction,
+        )
+      "
+      @confirm="confirmExtraTime"
+    >
+      <UFormField
+        class="mt-4"
+        label="Additional minutes"
+      >
+        <UInput
+          v-model.number="extraMinutes"
+          type="number"
+          min="1"
+          max="120"
+          class="w-full"
+        />
+      </UFormField>
+    </ConfirmationModal>
   </div>
 </template>

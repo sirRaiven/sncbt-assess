@@ -5,23 +5,32 @@ import type {
 } from "~/types/classroom";
 
 import type {
-  StudentPublishedAssessment,
-} from "~/types/assessment";
+  StudentAssessmentDelivery,
+} from "~/types/assessment-delivery";
 
 definePageMeta({
-  layout: "student",
+  layout:
+    "student",
 });
 
 useSeoMeta({
-  title: "Class details",
+  title:
+    "Class Details",
 });
 
-const route = useRoute();
-const toast = useToast();
+const route =
+  useRoute();
 
-const classroomId = computed(
-  () => String(route.params.id),
-);
+const toast =
+  useToast();
+
+const classroomId =
+  computed(
+    () =>
+      String(
+        route.params.id,
+      ),
+  );
 
 const {
   getStudentClass,
@@ -29,54 +38,167 @@ const {
 } = useClassrooms();
 
 const {
-  listStudentClassAssessments,
-} = useAssessments();
+  listStudentDeliveries,
+} = useAssessmentDelivery();
 
 const classroom =
-  ref<Classroom | null>(null);
+  ref<Classroom | null>(
+    null,
+  );
 
 const membership =
-  ref<StudentClassMembership | null>(null);
+  ref<StudentClassMembership | null>(
+    null,
+  );
 
-const assessments =
-  ref<StudentPublishedAssessment[]>([]);
+const instructorName =
+  ref("");
 
-const instructorName = ref("");
-const isLoading = ref(true);
-const isLeaving = ref(false);
-const errorMessage = ref("");
+const deliveries =
+  ref<StudentAssessmentDelivery[]>(
+    [],
+  );
 
-const leaveClassModalOpen =
+const isLoading =
+  ref(true);
+
+const isLeaving =
   ref(false);
 
-function typeLabel(
-  value: string,
+const errorMessage =
+  ref("");
+
+const leaveModalOpen =
+  ref(false);
+
+function formatDate(
+  value: string | null,
 ): string {
-  return value
-    .split("_")
-    .map(
-      (part) =>
-        part.charAt(0).toUpperCase()
-        + part.slice(1),
+  if (!value) {
+    return "Not recorded";
+  }
+
+  return new Intl
+    .DateTimeFormat(
+      "en-PH",
+      {
+        dateStyle:
+          "medium",
+        timeStyle:
+          "short",
+      },
     )
-    .join(" ");
+    .format(
+      new Date(value),
+    );
 }
 
-async function loadClass(): Promise<void> {
-  isLoading.value = true;
-  errorMessage.value = "";
+function deliveryStatus(
+  delivery:
+    StudentAssessmentDelivery,
+): string {
+  if (
+    delivery.attempt?.status
+    === "in_progress"
+  ) {
+    return "in_progress";
+  }
+
+  if (
+    delivery.attempt
+    && [
+      "submitted",
+      "auto_submitted",
+    ].includes(
+      delivery.attempt.status,
+    )
+  ) {
+    return delivery.attempt.status;
+  }
+
+  return delivery.status;
+}
+
+function deliveryAction(
+  delivery:
+    StudentAssessmentDelivery,
+): {
+  label: string;
+  route: string;
+  enabled: boolean;
+} {
+  if (
+    delivery.canResume
+  ) {
+    return {
+      label:
+        "Continue Assessment",
+      route:
+        `/student/assessments/${delivery.assignmentId}/play`,
+      enabled:
+        true,
+    };
+  }
+
+  if (
+    delivery.canViewResult
+  ) {
+    return {
+      label:
+        "View Result",
+      route:
+        `/student/assessments/${delivery.assignmentId}/completed`,
+      enabled:
+        true,
+    };
+  }
+
+  if (
+    delivery.canStart
+  ) {
+    return {
+      label:
+        "Start Assessment",
+      route:
+        `/student/assessments/${delivery.assignmentId}/instructions`,
+      enabled:
+        true,
+    };
+  }
+
+  return {
+    label:
+      delivery.status
+      === "upcoming"
+        ? "View Schedule"
+        : "View Details",
+    route:
+      `/student/assessments/${delivery.assignmentId}/instructions`,
+    enabled:
+      true,
+  };
+}
+
+async function loadClass():
+  Promise<void> {
+  isLoading.value =
+    true;
+
+  errorMessage.value =
+    "";
 
   const [
     classResult,
-    assessmentResult,
-  ] = await Promise.all([
-    getStudentClass(
-      classroomId.value,
-    ),
-    listStudentClassAssessments(
-      classroomId.value,
-    ),
-  ]);
+    deliveryResult,
+  ] =
+    await Promise.all([
+      getStudentClass(
+        classroomId.value,
+      ),
+      listStudentDeliveries(
+        classroomId.value,
+      ),
+    ]);
 
   if (
     classResult.error
@@ -86,19 +208,23 @@ async function loadClass(): Promise<void> {
       classResult.error
       || "Unable to load the class.";
 
-    isLoading.value = false;
+    isLoading.value =
+      false;
+
     return;
   }
 
   if (
-    assessmentResult.error
-    || !assessmentResult.data
+    deliveryResult.error
+    || !deliveryResult.data
   ) {
     errorMessage.value =
-      assessmentResult.error
-      || "Unable to load class assessments.";
+      deliveryResult.error
+      || "Unable to load the class assessments.";
 
-    isLoading.value = false;
+    isLoading.value =
+      false;
+
     return;
   }
 
@@ -109,20 +235,25 @@ async function loadClass(): Promise<void> {
     classResult.data.membership;
 
   instructorName.value =
-    classResult.data.instructor.name;
+    classResult.data
+      .instructor.name;
 
-  assessments.value =
-    assessmentResult.data.assessments;
+  deliveries.value =
+    deliveryResult.data
+      .deliveries;
 
-  isLoading.value = false;
+  isLoading.value =
+    false;
 }
 
-async function leave(): Promise<void> {
+async function leave():
+  Promise<void> {
   if (!classroom.value) {
     return;
   }
 
-  isLeaving.value = true;
+  isLeaving.value =
+    true;
 
   const result =
     await leaveClass(
@@ -143,9 +274,14 @@ async function leave(): Promise<void> {
         "error",
     });
 
-    isLeaving.value = false;
+    isLeaving.value =
+      false;
+
     return;
   }
+
+  leaveModalOpen.value =
+    false;
 
   toast.add({
     title:
@@ -181,22 +317,26 @@ onMounted(
       class="space-y-5"
     >
       <USkeleton class="h-44 rounded-xl" />
-      <USkeleton class="h-72 rounded-xl" />
+      <USkeleton class="h-96 rounded-xl" />
     </div>
 
-    <template v-else-if="classroom">
-      <section class="rounded-xl bg-gradient-to-r from-brand-900 via-brand-700 to-indigo-700 p-6 text-white sm:p-8">
+    <template
+      v-else-if="
+        classroom
+        && membership
+      "
+    >
+      <section class="rounded-xl bg-gradient-to-r from-blue-800 via-blue-700 to-violet-700 p-6 text-white">
         <UBadge
           color="neutral"
           variant="soft"
-          class="bg-white/10 text-blue-50"
         >
           {{ classroom.subject_code }}
           ·
           {{ classroom.section }}
         </UBadge>
 
-        <h1 class="mt-4 text-3xl font-black tracking-tight">
+        <h1 class="mt-4 text-3xl font-black">
           {{ classroom.name }}
         </h1>
 
@@ -209,16 +349,16 @@ onMounted(
         </p>
       </section>
 
-      <div class="grid gap-6 xl:grid-cols-[1fr_340px]">
-        <div class="space-y-6">
+      <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_21rem]">
+        <div class="space-y-5">
           <UCard>
             <template #header>
-              <h2 class="font-bold text-highlighted">
+              <h2 class="font-black text-highlighted">
                 Class overview
               </h2>
             </template>
 
-            <p class="whitespace-pre-line text-sm leading-6 text-muted">
+            <p class="text-sm leading-6 text-muted">
               {{
                 classroom.description
                 || "No class description was provided."
@@ -229,130 +369,201 @@ onMounted(
           <UCard>
             <template #header>
               <div>
-                <h2 class="font-bold text-highlighted">
-                  Published assessments
+                <h2 class="font-black text-highlighted">
+                  Class assessments
                 </h2>
 
                 <p class="mt-1 text-sm text-muted">
-                  An assessment session must be opened by the instructor before answering is allowed.
+                  Assessments become available automatically based on the schedule set by your instructor.
                 </p>
               </div>
             </template>
 
             <EmptyPanel
-              v-if="assessments.length === 0"
+              v-if="
+                deliveries.length
+                === 0
+              "
               icon="i-lucide-clipboard-list"
-              title="No published assessments"
-              description="Published quizzes and examinations assigned to this class will appear here."
+              title="No assigned assessments"
+              description="Published and scheduled assessments for this class will appear here."
             />
 
             <div
               v-else
-              class="space-y-3"
+              class="space-y-4"
             >
-              <div
-                v-for="assessment in assessments"
-                :key="assessment.id"
+              <article
+                v-for="delivery in deliveries"
+                :key="delivery.assignmentId"
                 class="rounded-xl border border-default p-4"
               >
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <UIcon
-                      name="i-lucide-clipboard-check"
-                      class="size-5"
-                    />
-                  </div>
-
-                  <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p class="font-black text-highlighted">
-                          {{ assessment.title }}
-                        </p>
-
-                        <p class="mt-1 text-sm text-muted">
-                          {{ typeLabel(assessment.assessmentType) }}
-                          ·
-                          {{ assessment.questionCount }} questions
-                          ·
-                          {{ assessment.totalPoints }} points
-                        </p>
-                      </div>
-
-                      <StatusPill status="Published" />
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center">
+                  <div class="flex min-w-0 flex-1 items-start gap-3">
+                    <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <UIcon
+                        name="i-lucide-clipboard-check"
+                        class="size-5"
+                      />
                     </div>
 
-                    <p
-                      v-if="assessment.instructions"
-                      class="mt-3 line-clamp-2 text-sm leading-6 text-muted"
-                    >
-                      {{ assessment.instructions }}
-                    </p>
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="font-black text-highlighted">
+                          {{ delivery.title }}
+                        </h3>
 
-                    <UAlert
-                      class="mt-4"
-                      color="info"
-                      variant="soft"
-                      title="Waiting for an assessment session"
-                      description="Session creation and secure student attempts begin in Phase 5."
-                    />
+                        <StatusPill
+                          :status="
+                            deliveryStatus(
+                              delivery,
+                            )
+                          "
+                        />
+                      </div>
+
+                      <p class="mt-1 text-sm text-muted">
+                        {{ delivery.assessmentType }}
+                        ·
+                        {{ delivery.questionCount }}
+                        questions
+                        ·
+                        {{ delivery.totalPoints }}
+                        points
+                      </p>
+
+                      <p class="mt-2 text-xs text-muted">
+                        Opens:
+                        {{
+                          formatDate(
+                            delivery.startsAt,
+                          )
+                        }}
+                        ·
+                        Closes:
+                        {{
+                          formatDate(
+                            delivery.endsAt,
+                          )
+                        }}
+                      </p>
+                    </div>
                   </div>
+
+                  <UButton
+                    :to="
+                      deliveryAction(
+                        delivery,
+                      ).route
+                    "
+                    :disabled="
+                      !deliveryAction(
+                        delivery,
+                      ).enabled
+                    "
+                    :variant="
+                      delivery.canStart
+                      || delivery.canResume
+                        ? 'solid'
+                        : 'outline'
+                    "
+                    :color="
+                      delivery.canStart
+                      || delivery.canResume
+                        ? 'primary'
+                        : 'neutral'
+                    "
+                  >
+                    {{
+                      deliveryAction(
+                        delivery,
+                      ).label
+                    }}
+                  </UButton>
                 </div>
-              </div>
+
+                <div
+                  v-if="
+                    delivery.attempt
+                    && delivery.attempt.status
+                    === 'in_progress'
+                  "
+                  class="mt-4"
+                >
+                  <div class="flex justify-between text-xs text-muted">
+                    <span>
+                      Saved progress
+                    </span>
+
+                    <span>
+                      {{ delivery.attempt.answeredCount }}
+                      /
+                      {{ delivery.questionCount }}
+                    </span>
+                  </div>
+
+                  <UProgress
+                    class="mt-2"
+                    :model-value="
+                      delivery.questionCount
+                        ? (
+                            delivery.attempt.answeredCount
+                            / delivery.questionCount
+                          ) * 100
+                        : 0
+                    "
+                  />
+                </div>
+              </article>
             </div>
           </UCard>
         </div>
 
-        <div class="space-y-6">
+        <div class="space-y-5">
           <UCard>
             <template #header>
-              <h2 class="font-bold text-highlighted">
+              <h2 class="font-black text-highlighted">
                 Membership
               </h2>
             </template>
 
-            <dl class="space-y-4 text-sm">
+            <div class="space-y-4">
               <div class="flex justify-between gap-4">
-                <dt class="text-muted">
+                <span class="text-sm text-muted">
                   Status
-                </dt>
+                </span>
 
-                <dd>
-                  <StatusPill
-                    :status="
-                      membership?.membership_status
-                      || 'Active'
-                    "
-                  />
-                </dd>
+                <StatusPill
+                  :status="
+                    membership.membership_status
+                  "
+                />
               </div>
 
               <div class="flex justify-between gap-4">
-                <dt class="text-muted">
+                <span class="text-sm text-muted">
                   Joined
-                </dt>
+                </span>
 
-                <dd class="text-right font-semibold text-highlighted">
+                <span class="text-right text-sm font-bold text-highlighted">
                   {{
-                    membership?.approved_at
-                      ? new Date(
-                          membership.approved_at,
-                        ).toLocaleString()
-                      : "—"
+                    formatDate(
+                      membership.approved_at
+                      || membership.created_at,
+                    )
                   }}
-                </dd>
+                </span>
               </div>
-            </dl>
+            </div>
 
             <UButton
+              class="mt-5"
               block
               color="error"
               variant="soft"
-              class="mt-5"
               icon="i-lucide-log-out"
-              :loading="isLeaving"
               @click="
-                leaveClassModalOpen = true
+                leaveModalOpen = true
               "
             >
               Leave Class
@@ -371,10 +582,10 @@ onMounted(
 
     <ConfirmationModal
       v-model:open="
-        leaveClassModalOpen
+        leaveModalOpen
       "
       title="Leave this class?"
-      description="Your active membership will be removed. The instructor must approve a new request if you join this class again."
+      description="Your active membership will be removed. You may lose access to open assessments in this class."
       confirm-label="Leave Class"
       confirm-color="error"
       icon="i-lucide-log-out"

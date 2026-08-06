@@ -3,44 +3,65 @@ const props = defineProps<{
   status: string;
 }>();
 
-const color = computed(() => {
-  const status =
-    props.status.toLowerCase();
+const normalizedStatus =
+  computed(
+    () =>
+      props.status
+        .trim()
+        .toLowerCase(),
+  );
 
-  if (
-    /active|published|completed|approved|online|valid|finished/.test(
-      status,
-    )
-  ) {
-    return "success";
-  }
+const color =
+  computed(
+    () => {
+      const status =
+        normalizedStatus.value;
 
-  if (
-    /pending|draft|waiting|paused|lobby/.test(
-      status,
-    )
-  ) {
-    return "warning";
-  }
+      if (
+        /active|published|completed|approved|online|valid|open|submitted|finished/.test(
+          status,
+        )
+      ) {
+        return "success";
+      }
 
-  if (
-    /live|answering|progress|student.paced|teacher.led/.test(
-      status,
-    )
-  ) {
-    return "info";
-  }
+      if (
+        /pending|draft|waiting|paused|upcoming|auto_submitted|auto-submitted/.test(
+          status,
+        )
+      ) {
+        return "warning";
+      }
 
-  if (
-    /suspended|rejected|failed|offline|unsupported|removed|cancelled/.test(
-      status,
-    )
-  ) {
-    return "error";
-  }
+      if (
+        /live|answering|progress|in_progress|student_paced|teacher_led/.test(
+          status,
+        )
+      ) {
+        return "info";
+      }
 
-  return "neutral";
-});
+      if (
+        /suspended|rejected|failed|offline|unsupported|cancelled|removed|locked/.test(
+          status,
+        )
+      ) {
+        return "error";
+      }
+
+      return "neutral";
+    },
+  );
+
+const label =
+  computed(
+    () =>
+      props.status
+        .replaceAll(
+          "_",
+          " ",
+        ),
+  );
 </script>
 
 <template>
@@ -49,9 +70,6 @@ const color = computed(() => {
     variant="soft"
     class="capitalize"
   >
-    {{
-      status
-        .replaceAll("_", " ")
-    }}
+    {{ label }}
   </UBadge>
 </template>

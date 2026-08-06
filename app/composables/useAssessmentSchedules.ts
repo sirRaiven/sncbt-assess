@@ -5,8 +5,6 @@ import type {
 import type {
   AssessmentScheduleInput,
   InstructorAssessmentScheduleOverview,
-  StudentAssessmentScheduleDetail,
-  StudentScheduledAssessment,
 } from "~/types/assessment-schedule";
 
 interface FunctionErrorBody {
@@ -25,7 +23,8 @@ interface MessageResponse {
 }
 
 export function useAssessmentSchedules() {
-  const supabase = useSupabaseClient();
+  const supabase =
+    useSupabaseClient();
 
   async function parseFunctionError(
     error: unknown,
@@ -36,7 +35,7 @@ export function useAssessmentSchedules() {
     const fallback =
       error instanceof Error
         ? error.message
-        : "The scheduled assessment request could not be completed.";
+        : "The assessment schedule request could not be completed.";
 
     const functionError =
       error as FunctionsHttpError;
@@ -47,14 +46,17 @@ export function useAssessmentSchedules() {
         !== "function"
     ) {
       return {
-        message: fallback,
-        code: null,
+        message:
+          fallback,
+        code:
+          null,
       };
     }
 
     try {
       const body =
-        await functionError.context.json() as FunctionErrorBody;
+        await functionError.context
+          .json() as FunctionErrorBody;
 
       return {
         message:
@@ -66,58 +68,76 @@ export function useAssessmentSchedules() {
       };
     } catch {
       return {
-        message: fallback,
-        code: null,
+        message:
+          fallback,
+        code:
+          null,
       };
     }
   }
 
   async function invoke<T>(
     action: string,
-    payload?: Record<string, unknown>,
+    payload:
+      | Record<string, unknown>
+      | undefined,
   ): Promise<FunctionResult<T>> {
     try {
       const {
         data,
         error,
-      } = await supabase.functions.invoke<T>(
-        "assessment-schedules",
-        {
-          body: payload
-            ? {
+      } =
+        await supabase.functions
+          .invoke<T>(
+            "assessment-schedules",
+            {
+              body: {
                 action,
-                payload,
-              }
-            : {
-                action,
+                ...(payload
+                  ? {
+                      payload,
+                    }
+                  : {}),
               },
-        },
-      );
+            },
+          );
 
       if (error) {
         const parsed =
-          await parseFunctionError(error);
+          await parseFunctionError(
+            error,
+          );
 
         return {
-          data: null,
-          error: parsed.message,
-          code: parsed.code,
+          data:
+            null,
+          error:
+            parsed.message,
+          code:
+            parsed.code,
         };
       }
 
       return {
         data,
-        error: null,
-        code: null,
+        error:
+          null,
+        code:
+          null,
       };
     } catch (error) {
       const parsed =
-        await parseFunctionError(error);
+        await parseFunctionError(
+          error,
+        );
 
       return {
-        data: null,
-        error: parsed.message,
-        code: parsed.code,
+        data:
+          null,
+        error:
+          parsed.message,
+        code:
+          parsed.code,
       };
     }
   }
@@ -125,7 +145,9 @@ export function useAssessmentSchedules() {
   async function getInstructorSchedule(
     assessmentId: string,
   ) {
-    return await invoke<InstructorAssessmentScheduleOverview>(
+    return await invoke<
+      InstructorAssessmentScheduleOverview
+    >(
       "get-instructor-schedule",
       {
         assessmentId,
@@ -135,7 +157,8 @@ export function useAssessmentSchedules() {
 
   async function saveSchedules(
     assessmentId: string,
-    schedules: AssessmentScheduleInput[],
+    schedules:
+      AssessmentScheduleInput[],
   ) {
     return await invoke<
       MessageResponse
@@ -160,38 +183,9 @@ export function useAssessmentSchedules() {
     );
   }
 
-  async function listStudentAssessments(
-    classroomId?: string,
-  ) {
-    return await invoke<{
-      serverNow: string;
-      assessments: StudentScheduledAssessment[];
-    }>(
-      "list-student-assessments",
-      classroomId
-        ? {
-            classroomId,
-          }
-        : undefined,
-    );
-  }
-
-  async function getStudentAssignment(
-    assignmentId: string,
-  ) {
-    return await invoke<StudentAssessmentScheduleDetail>(
-      "get-student-assignment",
-      {
-        assignmentId,
-      },
-    );
-  }
-
   return {
     getInstructorSchedule,
     saveSchedules,
     closeSchedule,
-    listStudentAssessments,
-    getStudentAssignment,
   };
 }

@@ -10,27 +10,43 @@ import type {
 } from "~/types/assessment-schedule";
 
 definePageMeta({
-  layout: "instructor",
+  layout:
+    "instructor",
 });
 
 useSeoMeta({
-  title: "Schedule assessment",
+  title:
+    "Assign Assessment",
 });
 
 interface ClassScheduleRow {
-  classroom: AssessmentClassOption;
+  classroom:
+    AssessmentClassOption;
   selected: boolean;
   startsAtLocal: string;
   endsAtLocal: string;
-  existing: AssessmentScheduleItem | null;
+  timeLimitMinutes:
+    number | null;
+  showLeaderboard: boolean;
+  maxAttempts: number;
+  existing:
+    AssessmentScheduleItem
+    | null;
 }
 
-const route = useRoute();
-const toast = useToast();
+const route =
+  useRoute();
 
-const assessmentId = computed(
-  () => String(route.params.id),
-);
+const toast =
+  useToast();
+
+const assessmentId =
+  computed(
+    () =>
+      String(
+        route.params.id,
+      ),
+  );
 
 const {
   listClassOptions,
@@ -43,17 +59,31 @@ const {
 } = useAssessmentSchedules();
 
 const overview =
-  ref<InstructorAssessmentScheduleOverview | null>(
+  ref<
+    InstructorAssessmentScheduleOverview
+    | null
+  >(
     null,
   );
 
 const rows =
-  ref<ClassScheduleRow[]>([]);
+  ref<ClassScheduleRow[]>(
+    [],
+  );
 
-const isLoading = ref(true);
-const isSaving = ref(false);
-const closingId = ref<string | null>(null);
-const errorMessage = ref("");
+const isLoading =
+  ref(true);
+
+const isSaving =
+  ref(false);
+
+const closingId =
+  ref<string | null>(
+    null,
+  );
+
+const errorMessage =
+  ref("");
 
 const saveConfirmationOpen =
   ref(false);
@@ -62,44 +92,44 @@ const closeConfirmationOpen =
   ref(false);
 
 const pendingCloseSchedule =
-  ref<AssessmentScheduleItem | null>(
+  ref<
+    AssessmentScheduleItem
+    | null
+  >(
     null,
   );
 
-const selectedRows = computed(
-  () => rows.value.filter(
-    (row) => row.selected,
-  ),
-);
+const selectedRows =
+  computed(
+    () =>
+      rows.value.filter(
+        (row) =>
+          row.selected,
+      ),
+  );
 
-const historicalSchedules = computed(
-  () => (
-    overview.value?.schedules
-    ?? []
-  ).filter(
-    (schedule) =>
-      schedule.status === "closed"
-      || schedule.status === "cancelled",
-  ),
-);
-
-const canEdit = computed(
-  () =>
-    overview.value?.assessment.status
-    === "published",
-);
+const canEdit =
+  computed(
+    () =>
+      overview.value
+        ?.assessment.status
+      === "published",
+  );
 
 function pad(
   value: number,
 ): string {
-  return String(value).padStart(
-    2,
-    "0",
-  );
+  return String(value)
+    .padStart(
+      2,
+      "0",
+    );
 }
 
 function localInputValue(
-  value: Date | string,
+  value:
+    | Date
+    | string,
 ): string {
   const date =
     value instanceof Date
@@ -109,20 +139,25 @@ function localInputValue(
   return [
     date.getFullYear(),
     "-",
-    pad(date.getMonth() + 1),
+    pad(
+      date.getMonth() + 1,
+    ),
     "-",
-    pad(date.getDate()),
+    pad(
+      date.getDate(),
+    ),
     "T",
-    pad(date.getHours()),
+    pad(
+      date.getHours(),
+    ),
     ":",
-    pad(date.getMinutes()),
+    pad(
+      date.getMinutes(),
+    ),
   ].join("");
 }
 
-function defaultWindow(): {
-  startsAtLocal: string;
-  endsAtLocal: string;
-} {
+function defaultWindow() {
   const startsAt =
     new Date();
 
@@ -132,34 +167,128 @@ function defaultWindow(): {
   );
 
   startsAt.setMinutes(
-    startsAt.getMinutes() + 15,
+    startsAt.getMinutes()
+    + 15,
   );
 
   const endsAt =
     new Date(
       startsAt.getTime()
-      + 60 * 60 * 1000,
+      + 2 * 60 * 60 * 1000,
     );
 
   return {
     startsAtLocal:
-      localInputValue(startsAt),
+      localInputValue(
+        startsAt,
+      ),
     endsAtLocal:
-      localInputValue(endsAt),
+      localInputValue(
+        endsAt,
+      ),
   };
 }
 
 function formatDate(
   value: string,
 ): string {
-  return new Intl.DateTimeFormat(
-    "en-PH",
-    {
-      dateStyle: "medium",
-      timeStyle: "short",
+  return new Intl
+    .DateTimeFormat(
+      "en-PH",
+      {
+        dateStyle:
+          "medium",
+        timeStyle:
+          "short",
+      },
+    )
+    .format(
+      new Date(value),
+    );
+}
+
+function buildRows(
+  classes:
+    AssessmentClassOption[],
+  schedules:
+    AssessmentScheduleItem[],
+): ClassScheduleRow[] {
+  const activeMap =
+    new Map(
+      schedules
+        .filter(
+          (schedule) =>
+            [
+              "upcoming",
+              "open",
+            ].includes(
+              schedule.status,
+            ),
+        )
+        .map(
+          (schedule) => [
+            schedule.classroomId,
+            schedule,
+          ],
+        ),
+    );
+
+  return classes.map(
+    (classroom) => {
+      const existing =
+        activeMap.get(
+          classroom.id,
+        )
+        ?? null;
+
+      const defaults =
+        defaultWindow();
+
+      const defaultSeconds =
+        overview.value
+          ?.assessment
+          .defaultTimeLimitSeconds
+        ?? 3600;
+
+      return {
+        classroom,
+        selected:
+          Boolean(existing),
+        startsAtLocal:
+          existing
+            ? localInputValue(
+                existing.startsAt,
+              )
+            : defaults
+              .startsAtLocal,
+        endsAtLocal:
+          existing
+            ? localInputValue(
+                existing.endsAt,
+              )
+            : defaults
+              .endsAtLocal,
+        timeLimitMinutes:
+          Math.round(
+            (
+              existing
+                ?.timeLimitSeconds
+              ?? defaultSeconds
+            ) / 60,
+          ),
+        showLeaderboard:
+          existing
+            ?.showLeaderboard
+          ?? overview.value
+            ?.assessment
+            .defaultLeaderboardEnabled
+          ?? true,
+        maxAttempts:
+          existing?.maxAttempts
+          ?? 1,
+        existing,
+      };
     },
-  ).format(
-    new Date(value),
   );
 }
 
@@ -174,93 +303,29 @@ function toggleRow(
     !row.selected;
 }
 
-function buildRows(
-  classes: AssessmentClassOption[],
-  schedules: AssessmentScheduleItem[],
-): ClassScheduleRow[] {
-  const activeScheduleMap =
-    new Map(
-      schedules
-        .filter(
-          (schedule) =>
-            schedule.status === "scheduled"
-            || schedule.status === "open",
-        )
-        .map(
-          (schedule) => [
-            schedule.classroomId,
-            schedule,
-          ],
-        ),
-    );
-
-  return classes.map(
-    (classroom) => {
-      const existing =
-        activeScheduleMap.get(
-          classroom.id,
-        )
-        ?? null;
-
-      const defaults =
-        defaultWindow();
-
-      return {
-        classroom,
-        selected:
-          Boolean(existing),
-        startsAtLocal:
-          existing
-            ? localInputValue(
-                existing.startsAt,
-              )
-            : defaults.startsAtLocal,
-        endsAtLocal:
-          existing
-            ? localInputValue(
-                existing.endsAt,
-              )
-            : defaults.endsAtLocal,
-        existing,
-      };
-    },
-  );
-}
-
-function validateRows(): string | null {
-  const classroomIds =
-    selectedRows.value.map(
-      (row) =>
-        row.classroom.id,
-    );
-
-  if (
-    new Set(classroomIds).size
-    !== classroomIds.length
-  ) {
-    return "Each class can be selected only once.";
-  }
-
+function validateRows():
+  string | null {
   for (
     const row
     of selectedRows.value
   ) {
-    if (
-      !row.startsAtLocal
-      || !row.endsAtLocal
-    ) {
-      return `Complete both dates for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
-    }
-
     const startsAt =
-      new Date(row.startsAtLocal);
+      new Date(
+        row.startsAtLocal,
+      );
 
     const endsAt =
-      new Date(row.endsAtLocal);
+      new Date(
+        row.endsAtLocal,
+      );
 
     if (
-      Number.isNaN(startsAt.getTime())
-      || Number.isNaN(endsAt.getTime())
+      Number.isNaN(
+        startsAt.getTime(),
+      )
+      || Number.isNaN(
+        endsAt.getTime(),
+      )
     ) {
       return `Enter valid dates for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
     }
@@ -269,33 +334,46 @@ function validateRows(): string | null {
       endsAt.getTime()
       <= startsAt.getTime()
     ) {
-      return `The end date must be later than the start date for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
+      return `The closing time must be later than the opening time for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
     }
 
     if (
       endsAt.getTime()
       <= Date.now()
     ) {
-      return `The end date must be in the future for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
+      return `The closing time must be in the future for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
+    }
+
+    if (
+      !row.timeLimitMinutes
+      || row.timeLimitMinutes < 1
+      || row.timeLimitMinutes > 360
+    ) {
+      return `Set a duration from 1 to 360 minutes for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
     }
   }
 
   return null;
 }
 
-async function loadData(): Promise<void> {
-  isLoading.value = true;
-  errorMessage.value = "";
+async function loadData():
+  Promise<void> {
+  isLoading.value =
+    true;
+
+  errorMessage.value =
+    "";
 
   const [
     scheduleResult,
     classResult,
-  ] = await Promise.all([
-    getInstructorSchedule(
-      assessmentId.value,
-    ),
-    listClassOptions(),
-  ]);
+  ] =
+    await Promise.all([
+      getInstructorSchedule(
+        assessmentId.value,
+      ),
+      listClassOptions(),
+    ]);
 
   if (
     scheduleResult.error
@@ -305,7 +383,9 @@ async function loadData(): Promise<void> {
       scheduleResult.error
       || "Unable to load the assessment schedule.";
 
-    isLoading.value = false;
+    isLoading.value =
+      false;
+
     return;
   }
 
@@ -317,7 +397,9 @@ async function loadData(): Promise<void> {
       classResult.error
       || "Unable to load your active classes.";
 
-    isLoading.value = false;
+    isLoading.value =
+      false;
+
     return;
   }
 
@@ -327,20 +409,15 @@ async function loadData(): Promise<void> {
   rows.value =
     buildRows(
       classResult.data.classes,
-      scheduleResult.data.schedules,
+      scheduleResult.data
+        .schedules,
     );
 
-  isLoading.value = false;
+  isLoading.value =
+    false;
 }
 
 function requestSave(): void {
-  if (
-    !overview.value
-    || !canEdit.value
-  ) {
-    return;
-  }
-
   const validationError =
     validateRows();
 
@@ -355,46 +432,12 @@ function requestSave(): void {
     true;
 }
 
-function requestCloseEarly(
-  schedule: AssessmentScheduleItem,
-): void {
-  pendingCloseSchedule.value =
-    schedule;
-
-  closeConfirmationOpen.value =
-    true;
-}
-
-async function confirmCloseEarly(): Promise<void> {
-  if (!pendingCloseSchedule.value) {
-    return;
-  }
-
-  await closeEarly(
-    pendingCloseSchedule.value,
-  );
-
-  closeConfirmationOpen.value =
-    false;
-
-  pendingCloseSchedule.value =
-    null;
-}
-
-async function save(): Promise<void> {
+async function save():
+  Promise<void> {
   if (
     !overview.value
     || !canEdit.value
   ) {
-    return;
-  }
-
-  const validationError =
-    validateRows();
-
-  if (validationError) {
-    errorMessage.value =
-      validationError;
     return;
   }
 
@@ -412,11 +455,23 @@ async function save(): Promise<void> {
           new Date(
             row.endsAtLocal,
           ).toISOString(),
+        timeLimitSeconds:
+          row.timeLimitMinutes
+            ? row.timeLimitMinutes
+              * 60
+            : null,
+        showLeaderboard:
+          row.showLeaderboard,
+        maxAttempts:
+          row.maxAttempts,
       }),
     );
 
-  isSaving.value = true;
-  errorMessage.value = "";
+  isSaving.value =
+    true;
+
+  errorMessage.value =
+    "";
 
   const result =
     await saveSchedules(
@@ -430,32 +485,57 @@ async function save(): Promise<void> {
   ) {
     errorMessage.value =
       result.error
-      || "Unable to save the schedules.";
+      || "Unable to save the class schedules.";
 
-    isSaving.value = false;
+    isSaving.value =
+      false;
+
     return;
   }
 
+  saveConfirmationOpen.value =
+    false;
+
   toast.add({
-    title: "Assessment schedule saved",
+    title:
+      "Assessment assigned",
     description:
-      result.data.message,
-    color: "success",
+      "Students will receive access automatically during the selected schedule.",
+    color:
+      "success",
   });
 
   await loadData();
-  isSaving.value = false;
+
+  isSaving.value =
+    false;
 }
 
-async function closeEarly(
-  schedule: AssessmentScheduleItem,
-): Promise<void> {
+function requestClose(
+  schedule:
+    AssessmentScheduleItem,
+): void {
+  pendingCloseSchedule.value =
+    schedule;
+
+  closeConfirmationOpen.value =
+    true;
+}
+
+async function confirmClose():
+  Promise<void> {
+  if (
+    !pendingCloseSchedule.value
+  ) {
+    return;
+  }
+
   closingId.value =
-    schedule.id;
+    pendingCloseSchedule.value.id;
 
   const result =
     await closeSchedule(
-      schedule.id,
+      pendingCloseSchedule.value.id,
     );
 
   if (
@@ -463,37 +543,56 @@ async function closeEarly(
     || !result.data
   ) {
     toast.add({
-      title: "Schedule could not be closed",
+      title:
+        "Schedule could not be closed",
       description:
         result.error
-        || "The schedule could not be updated.",
-      color: "error",
+        || "The assessment access could not be closed.",
+      color:
+        "error",
     });
 
-    closingId.value = null;
+    closingId.value =
+      null;
+
     return;
   }
 
+  closeConfirmationOpen.value =
+    false;
+
+  pendingCloseSchedule.value =
+    null;
+
   toast.add({
-    title: "Schedule closed",
+    title:
+      "Assessment access closed",
     description:
       result.data.message,
-    color: "success",
+    color:
+      "success",
   });
 
   await loadData();
-  closingId.value = null;
+
+  closingId.value =
+    null;
 }
 
-onMounted(loadData);
+onMounted(
+  loadData,
+);
 </script>
 
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="Automatic class access"
-      :title="overview?.assessment.title || 'Schedule assessment'"
-      description="Choose one or more classes and set when the assessment automatically opens and closes. No instructor session code or manual start is required."
+      eyebrow="Classroom delivery"
+      :title="
+        overview?.assessment.title
+        || 'Assign Assessment'
+      "
+      description="Select classes and configure when students can begin, how long each attempt lasts, and whether ranking is available."
     >
       <template #actions>
         <UButton
@@ -511,7 +610,7 @@ onMounted(loadData);
       v-if="errorMessage"
       color="error"
       variant="soft"
-      title="Schedule could not be updated"
+      title="Class assignment could not be updated"
       :description="errorMessage"
     />
 
@@ -523,34 +622,49 @@ onMounted(loadData);
       <USkeleton class="h-96 rounded-xl" />
     </div>
 
-    <template v-else-if="overview">
+    <template
+      v-else-if="overview"
+    >
       <UAlert
         v-if="!canEdit"
         color="warning"
         variant="soft"
-        title="Publish before scheduling"
-        description="Only published assessments can be scheduled for automatic student access."
+        title="Publish before assigning"
+        description="Only published assessments can be opened for student answering."
       />
 
       <section class="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Questions"
-          :value="String(overview.assessment.questionCount)"
+          :value="
+            String(
+              overview.assessment
+                .questionCount,
+            )
+          "
           icon="i-lucide-list-checks"
-          tone="primary"
         />
 
         <StatCard
           label="Total points"
-          :value="String(overview.assessment.totalPoints)"
+          :value="
+            String(
+              overview.assessment
+                .totalPoints,
+            )
+          "
           icon="i-lucide-award"
           tone="info"
         />
 
         <StatCard
-          label="Scheduled classes"
-          :value="String(selectedRows.length)"
-          icon="i-lucide-calendar-clock"
+          label="Selected classes"
+          :value="
+            String(
+              selectedRows.length,
+            )
+          "
+          icon="i-lucide-school"
           tone="success"
         />
       </section>
@@ -559,28 +673,30 @@ onMounted(loadData);
         color="info"
         variant="soft"
         icon="i-lucide-clock-3"
-        title="Server-controlled availability"
-        description="Students enrolled in a selected class see the assessment automatically. Access opens at the start date and closes at the end date using server time."
+        title="Automatic student access"
+        description="No session code or instructor Start button is required. Enrolled students can start or continue when the schedule is open."
       />
 
       <UCard>
         <template #header>
           <div>
-            <h2 class="font-bold text-highlighted">
-              Class schedules
+            <h2 class="font-black text-highlighted">
+              Classroom schedules
             </h2>
 
             <p class="mt-1 text-sm text-muted">
-              Select a class, then enter its availability window. Different classes may use different dates.
+              Each class may use a different opening time, closing time, and attempt duration.
             </p>
           </div>
         </template>
 
         <EmptyPanel
-          v-if="rows.length === 0"
+          v-if="
+            rows.length === 0
+          "
           icon="i-lucide-school"
           title="No active classes"
-          description="Create or reactivate a class before scheduling this assessment."
+          description="Create or reactivate a class before assigning this assessment."
         />
 
         <div
@@ -597,12 +713,16 @@ onMounted(loadData);
                 : 'border-default bg-default'
             "
           >
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-start">
+            <div class="flex flex-col gap-4">
               <button
                 type="button"
-                class="flex min-w-0 flex-1 items-start gap-3 text-left disabled:cursor-not-allowed disabled:opacity-60"
+                class="flex items-start gap-3 text-left"
                 :disabled="!canEdit"
-                @click="toggleRow(row)"
+                @click="
+                  toggleRow(
+                    row,
+                  )
+                "
               >
                 <span
                   class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border"
@@ -618,7 +738,7 @@ onMounted(loadData);
                   />
                 </span>
 
-                <span class="min-w-0">
+                <span>
                   <span class="block font-black text-highlighted">
                     {{ row.classroom.subjectCode }}
                     ·
@@ -637,145 +757,93 @@ onMounted(loadData);
 
               <div
                 v-if="row.selected"
-                class="grid gap-3 sm:grid-cols-2 xl:w-[560px]"
+                class="grid gap-4 border-t border-default pt-4 md:grid-cols-2 xl:grid-cols-4"
               >
-                <UFormField label="Starts">
+                <UFormField label="Opens">
                   <UInput
                     v-model="row.startsAtLocal"
                     type="datetime-local"
                     class="w-full"
-                    :disabled="!canEdit"
                   />
                 </UFormField>
 
-                <UFormField label="Ends and closes">
+                <UFormField label="Closes">
                   <UInput
                     v-model="row.endsAtLocal"
                     type="datetime-local"
                     class="w-full"
-                    :disabled="!canEdit"
                   />
                 </UFormField>
+
+                <UFormField
+                  label="Attempt duration"
+                  description="Minutes"
+                >
+                  <UInput
+                    v-model.number="row.timeLimitMinutes"
+                    type="number"
+                    min="1"
+                    max="360"
+                    class="w-full"
+                  />
+                </UFormField>
+
+                <div class="flex items-end">
+                  <USwitch
+                    v-model="row.showLeaderboard"
+                    label="Show leaderboard"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-if="
+                  row.existing
+                  && row.selected
+                "
+                class="flex justify-end"
+              >
+                <UButton
+                  color="error"
+                  variant="soft"
+                  size="sm"
+                  icon="i-lucide-lock"
+                  :loading="
+                    closingId
+                    === row.existing.id
+                  "
+                  @click="
+                    requestClose(
+                      row.existing,
+                    )
+                  "
+                >
+                  Close Access Early
+                </UButton>
               </div>
             </div>
           </article>
         </div>
       </UCard>
 
-      <UCard
-        v-if="historicalSchedules.length > 0"
-      >
-        <template #header>
-          <div>
-            <h2 class="font-bold text-highlighted">
-              Closed schedule history
-            </h2>
-
-            <p class="mt-1 text-sm text-muted">
-              These class windows have ended or were cancelled. Rescheduling the same class creates a new active window on the existing assignment record.
-            </p>
-          </div>
-        </template>
-
-        <div class="space-y-3">
-          <div
-            v-for="schedule in historicalSchedules"
-            :key="schedule.id"
-            class="flex flex-col gap-3 rounded-xl border border-default p-4 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div>
-              <p class="font-bold text-highlighted">
-                {{ schedule.classroom.subjectCode }}
-                ·
-                {{ schedule.classroom.section }}
-              </p>
-
-              <p class="mt-1 text-sm text-muted">
-                {{ formatDate(schedule.startsAt) }}
-                —
-                {{ formatDate(schedule.endsAt) }}
-              </p>
-            </div>
-
-            <StatusPill :status="schedule.status" />
-          </div>
-        </div>
-      </UCard>
-
-      <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+      <div class="flex justify-end">
         <UButton
-          to="/instructor/assessments"
-          color="neutral"
-          variant="outline"
-          size="lg"
-        >
-          Cancel
-        </UButton>
-
-        <UButton
-          size="lg"
-          icon="i-lucide-save"
-          :loading="isSaving"
+          icon="i-lucide-calendar-check"
           :disabled="!canEdit"
           @click="requestSave"
         >
-          Save Class Schedules
+          Review and Save
         </UButton>
       </div>
-
-      <UCard
-        v-if="overview.schedules.some((schedule) => schedule.status === 'open')"
-      >
-        <template #header>
-          <h2 class="font-bold text-highlighted">
-            Open class access
-          </h2>
-        </template>
-
-        <div class="space-y-3">
-          <div
-            v-for="schedule in overview.schedules.filter((item) => item.status === 'open')"
-            :key="schedule.id"
-            class="flex flex-col gap-3 rounded-xl border border-default p-4 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div>
-              <p class="font-bold text-highlighted">
-                {{ schedule.classroom.subjectCode }}
-                ·
-                {{ schedule.classroom.section }}
-              </p>
-
-              <p class="mt-1 text-sm text-muted">
-                Closes {{ formatDate(schedule.endsAt) }}
-              </p>
-            </div>
-
-            <UButton
-              color="error"
-              variant="soft"
-              icon="i-lucide-lock"
-              :loading="closingId === schedule.id"
-              @click="
-                requestCloseEarly(
-                  schedule,
-                )
-              "
-            >
-              Close Early
-            </UButton>
-          </div>
-        </div>
-      </UCard>
     </template>
 
     <ConfirmationModal
       v-model:open="
         saveConfirmationOpen
       "
-      title="Save class schedules?"
-      description="Students in the selected classes will receive automatic access when the opening time is reached, and access will close at the ending time."
+      title="Save classroom assessment schedules?"
+      description="Students in the selected classes will be able to start independently when the opening time is reached. Their answers and timer will be controlled by the server."
       confirm-label="Save Schedules"
-      confirm-color="primary"
       icon="i-lucide-calendar-check"
       :loading="isSaving"
       @confirm="save"
@@ -785,8 +853,8 @@ onMounted(loadData);
       v-model:open="
         closeConfirmationOpen
       "
-      title="Close this class schedule early?"
-      description="Student access to this scheduled assessment will close immediately for the selected class."
+      title="Close assessment access now?"
+      description="Students will no longer be able to start. In-progress attempts will be submitted and graded safely."
       confirm-label="Close Access"
       confirm-color="error"
       icon="i-lucide-lock"
@@ -795,9 +863,7 @@ onMounted(loadData);
           closingId,
         )
       "
-      @confirm="
-        confirmCloseEarly
-      "
+      @confirm="confirmClose"
     />
   </div>
 </template>

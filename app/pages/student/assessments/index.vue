@@ -1,150 +1,293 @@
 <script setup lang="ts">
 import type {
-  AssessmentAvailabilityStatus,
-  StudentScheduledAssessment,
-} from "~/types/assessment-schedule";
+  DeliveryAvailabilityStatus,
+  StudentAssessmentDelivery,
+} from "~/types/assessment-delivery";
 
 definePageMeta({
-  layout: "student",
+  layout:
+    "student",
 });
 
 useSeoMeta({
-  title: "Assessments",
+  title:
+    "Assessments",
 });
 
 const {
-  listStudentAssessments,
-} = useAssessmentSchedules();
+  listStudentDeliveries,
+} = useAssessmentDelivery();
 
-const assessments =
-  ref<StudentScheduledAssessment[]>([]);
+const deliveries =
+  ref<StudentAssessmentDelivery[]>(
+    [],
+  );
+
+const isLoading =
+  ref(true);
+
+const errorMessage =
+  ref("");
 
 const activeFilter =
-  ref<"all" | AssessmentAvailabilityStatus>(
+  ref<
+    | "all"
+    | "open"
+    | "upcoming"
+    | "completed"
+    | "closed"
+  >(
     "all",
   );
 
-const isLoading = ref(true);
-const errorMessage = ref("");
+const filterItems = [
+  {
+    label:
+      "All",
+    value:
+      "all",
+  },
+  {
+    label:
+      "Open",
+    value:
+      "open",
+  },
+  {
+    label:
+      "Upcoming",
+    value:
+      "upcoming",
+  },
+  {
+    label:
+      "Completed",
+    value:
+      "completed",
+  },
+  {
+    label:
+      "Closed",
+    value:
+      "closed",
+  },
+] as const;
 
-const filterItems: Array<{
-  label: string;
-  value: "all" | AssessmentAvailabilityStatus;
-}> = [
-  {
-    label: "All",
-    value: "all",
-  },
-  {
-    label: "Open",
-    value: "open",
-  },
-  {
-    label: "Upcoming",
-    value: "scheduled",
-  },
-  {
-    label: "Closed",
-    value: "closed",
-  },
+const completedStatuses = [
+  "submitted",
+  "auto_submitted",
 ];
 
-const filteredAssessments = computed(
-  () => {
-    if (
-      activeFilter.value
-      === "all"
-    ) {
-      return assessments.value;
-    }
+const filteredDeliveries =
+  computed(
+    () => {
+      if (
+        activeFilter.value
+        === "all"
+      ) {
+        return deliveries.value;
+      }
 
-    return assessments.value.filter(
-      (assessment) =>
-        assessment.status
-        === activeFilter.value,
-    );
-  },
-);
+      if (
+        activeFilter.value
+        === "completed"
+      ) {
+        return deliveries.value
+          .filter(
+            (delivery) =>
+              delivery.attempt
+              && completedStatuses
+                .includes(
+                  delivery.attempt.status,
+                ),
+          );
+      }
 
-const counts = computed(
-  () => ({
-    open:
-      assessments.value.filter(
-        (item) =>
-          item.status === "open",
-      ).length,
-    scheduled:
-      assessments.value.filter(
-        (item) =>
-          item.status === "scheduled",
-      ).length,
-    closed:
-      assessments.value.filter(
-        (item) =>
-          item.status === "closed",
-      ).length,
-  }),
-);
+      return deliveries.value
+        .filter(
+          (delivery) => {
+            const completed =
+              delivery.attempt
+              && completedStatuses
+                .includes(
+                  delivery.attempt.status,
+                );
 
-function setFilter(
-  value: "all" | AssessmentAvailabilityStatus,
-): void {
-  activeFilter.value = value;
-}
+            if (completed) {
+              return false;
+            }
+
+            return (
+              delivery.status
+              === activeFilter.value
+            );
+          },
+        );
+    },
+  );
+
+const counts =
+  computed(
+    () => ({
+      open:
+        deliveries.value.filter(
+          (delivery) =>
+            delivery.status
+            === "open"
+            && !(
+              delivery.attempt
+              && completedStatuses
+                .includes(
+                  delivery.attempt.status,
+                )
+            ),
+        ).length,
+
+      upcoming:
+        deliveries.value.filter(
+          (delivery) =>
+            delivery.status
+            === "upcoming",
+        ).length,
+
+      completed:
+        deliveries.value.filter(
+          (delivery) =>
+            delivery.attempt
+            && completedStatuses
+              .includes(
+                delivery.attempt.status,
+              ),
+        ).length,
+
+      closed:
+        deliveries.value.filter(
+          (delivery) =>
+            delivery.status
+            === "closed"
+            && !delivery.attempt,
+        ).length,
+    }),
+  );
 
 function formatDate(
   value: string,
 ): string {
-  return new Intl.DateTimeFormat(
-    "en-PH",
-    {
-      dateStyle: "medium",
-      timeStyle: "short",
-    },
-  ).format(
-    new Date(value),
-  );
-}
-
-function typeLabel(
-  value: string,
-): string {
-  return value
-    .split("_")
-    .map(
-      (part) =>
-        part.charAt(0).toUpperCase()
-        + part.slice(1),
+  return new Intl
+    .DateTimeFormat(
+      "en-PH",
+      {
+        dateStyle:
+          "medium",
+        timeStyle:
+          "short",
+      },
     )
-    .join(" ");
+    .format(
+      new Date(value),
+    );
 }
 
-function availabilityMessage(
-  assessment: StudentScheduledAssessment,
+function formatDuration(
+  seconds: number | null,
+): string {
+  if (!seconds) {
+    return "Until the class schedule closes";
+  }
+
+  const minutes =
+    Math.round(
+      seconds / 60,
+    );
+
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+}
+
+function displayStatus(
+  delivery:
+    StudentAssessmentDelivery,
 ): string {
   if (
-    assessment.status
-    === "open"
+    delivery.attempt
+    && completedStatuses
+      .includes(
+        delivery.attempt.status,
+      )
   ) {
-    return `Open now · Closes ${formatDate(assessment.endsAt)}`;
+    return delivery.attempt.status;
   }
 
   if (
-    assessment.status
-    === "scheduled"
+    delivery.attempt?.status
+    === "in_progress"
   ) {
-    return `Opens ${formatDate(assessment.startsAt)}`;
+    return "in_progress";
   }
 
-  return `Closed ${formatDate(assessment.endsAt)}`;
+  return delivery.status;
 }
 
-async function loadAssessments(): Promise<void> {
-  isLoading.value = true;
-  errorMessage.value = "";
+function actionLabel(
+  delivery:
+    StudentAssessmentDelivery,
+): string {
+  if (
+    delivery.canResume
+  ) {
+    return "Continue Assessment";
+  }
+
+  if (
+    delivery.canViewResult
+  ) {
+    return "View Result";
+  }
+
+  if (
+    delivery.canStart
+  ) {
+    return "View Instructions";
+  }
+
+  if (
+    delivery.status
+    === "upcoming"
+  ) {
+    return "View Schedule";
+  }
+
+  return "View Details";
+}
+
+function actionRoute(
+  delivery:
+    StudentAssessmentDelivery,
+): string {
+  if (
+    delivery.canResume
+  ) {
+    return `/student/assessments/${delivery.assignmentId}/play`;
+  }
+
+  if (
+    delivery.canViewResult
+  ) {
+    return `/student/assessments/${delivery.assignmentId}/completed`;
+  }
+
+  return `/student/assessments/${delivery.assignmentId}/instructions`;
+}
+
+async function loadDeliveries():
+  Promise<void> {
+  isLoading.value =
+    true;
+
+  errorMessage.value =
+    "";
 
   const result =
-    await listStudentAssessments();
+    await listStudentDeliveries();
 
   if (
     result.error
@@ -152,27 +295,32 @@ async function loadAssessments(): Promise<void> {
   ) {
     errorMessage.value =
       result.error
-      || "Unable to load scheduled assessments.";
+      || "Unable to load your assigned assessments.";
 
-    isLoading.value = false;
+    isLoading.value =
+      false;
+
     return;
   }
 
-  assessments.value =
-    result.data.assessments;
+  deliveries.value =
+    result.data.deliveries;
 
-  isLoading.value = false;
+  isLoading.value =
+    false;
 }
 
-onMounted(loadAssessments);
+onMounted(
+  loadDeliveries,
+);
 </script>
 
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="Class assessments"
+      eyebrow="Classroom assessments"
       title="Assessments"
-      description="Published assessments assigned to your classes appear here automatically. No session code is required for scheduled access."
+      description="Assessments assigned to your classes open automatically according to the schedule set by your instructor."
     >
       <template #actions>
         <UButton
@@ -180,7 +328,7 @@ onMounted(loadAssessments);
           variant="outline"
           icon="i-lucide-refresh-cw"
           :loading="isLoading"
-          @click="loadAssessments"
+          @click="loadDeliveries"
         >
           Refresh
         </UButton>
@@ -195,24 +343,47 @@ onMounted(loadAssessments);
       :description="errorMessage"
     />
 
-    <section class="grid gap-4 sm:grid-cols-3">
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard
         label="Open now"
-        :value="String(counts.open)"
+        :value="
+          String(
+            counts.open,
+          )
+        "
         icon="i-lucide-unlock"
         tone="success"
       />
 
       <StatCard
         label="Upcoming"
-        :value="String(counts.scheduled)"
+        :value="
+          String(
+            counts.upcoming,
+          )
+        "
         icon="i-lucide-calendar-clock"
         tone="info"
       />
 
       <StatCard
-        label="Closed"
-        :value="String(counts.closed)"
+        label="Completed"
+        :value="
+          String(
+            counts.completed,
+          )
+        "
+        icon="i-lucide-circle-check-big"
+        tone="primary"
+      />
+
+      <StatCard
+        label="Closed without attempt"
+        :value="
+          String(
+            counts.closed,
+          )
+        "
         icon="i-lucide-lock"
         tone="neutral"
       />
@@ -223,9 +394,17 @@ onMounted(loadAssessments);
         <UButton
           v-for="item in filterItems"
           :key="item.value"
-          :color="activeFilter === item.value ? 'primary' : 'neutral'"
-          :variant="activeFilter === item.value ? 'soft' : 'ghost'"
-          @click="setFilter(item.value)"
+          color="neutral"
+          :variant="
+            activeFilter
+            === item.value
+              ? 'soft'
+              : 'ghost'
+          "
+          @click="
+            activeFilter =
+              item.value
+          "
         >
           {{ item.label }}
         </UButton>
@@ -244,10 +423,13 @@ onMounted(loadAssessments);
     </div>
 
     <EmptyPanel
-      v-else-if="filteredAssessments.length === 0"
+      v-else-if="
+        filteredDeliveries.length
+        === 0
+      "
       icon="i-lucide-clipboard-list"
       title="No assessments in this view"
-      description="Scheduled assessments from your approved classes will appear here."
+      description="Assigned classroom assessments will appear here when your instructor publishes and schedules them."
     />
 
     <div
@@ -255,8 +437,8 @@ onMounted(loadAssessments);
       class="grid gap-4 xl:grid-cols-2"
     >
       <UCard
-        v-for="assessment in filteredAssessments"
-        :key="assessment.assignmentId"
+        v-for="delivery in filteredDeliveries"
+        :key="delivery.assignmentId"
       >
         <div class="flex items-start gap-4">
           <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -269,30 +451,38 @@ onMounted(loadAssessments);
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 class="font-black text-highlighted">
-                  {{ assessment.title }}
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-primary">
+                  {{ delivery.subjectCode }}
+                  ·
+                  {{ delivery.classroom.section }}
+                </p>
+
+                <h2 class="mt-2 text-lg font-black text-highlighted">
+                  {{ delivery.title }}
                 </h2>
 
                 <p class="mt-1 text-sm text-muted">
-                  {{ assessment.subjectCode }}
-                  ·
-                  {{ assessment.classroom.section }}
-                  ·
-                  {{ typeLabel(assessment.assessmentType) }}
+                  {{ delivery.classroom.name }}
                 </p>
               </div>
 
-              <StatusPill :status="assessment.status" />
+              <StatusPill
+                :status="
+                  displayStatus(
+                    delivery,
+                  )
+                "
+              />
             </div>
 
-            <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div class="mt-5 grid gap-3 sm:grid-cols-3">
               <div class="rounded-lg bg-elevated p-3">
                 <p class="text-xs text-muted">
                   Questions
                 </p>
 
                 <p class="mt-1 font-black text-highlighted">
-                  {{ assessment.questionCount }}
+                  {{ delivery.questionCount }}
                 </p>
               </div>
 
@@ -302,34 +492,122 @@ onMounted(loadAssessments);
                 </p>
 
                 <p class="mt-1 font-black text-highlighted">
-                  {{ assessment.totalPoints }}
+                  {{ delivery.totalPoints }}
                 </p>
               </div>
 
-              <div class="rounded-lg bg-elevated p-3 sm:col-span-1 col-span-2">
+              <div class="rounded-lg bg-elevated p-3">
                 <p class="text-xs text-muted">
-                  Availability
+                  Duration
                 </p>
 
-                <p class="mt-1 text-xs font-bold text-highlighted">
-                  {{ availabilityMessage(assessment) }}
+                <p class="mt-1 text-sm font-black text-highlighted">
+                  {{
+                    formatDuration(
+                      delivery.timeLimitSeconds,
+                    )
+                  }}
                 </p>
               </div>
             </div>
 
-            <UButton
-              :to="`/student/assignments/${assessment.assignmentId}`"
-              class="mt-5"
-              :color="assessment.status === 'open' ? 'primary' : 'neutral'"
-              :variant="assessment.status === 'open' ? 'solid' : 'outline'"
-              :icon="assessment.status === 'open' ? 'i-lucide-play' : 'i-lucide-eye'"
+            <div class="mt-4 rounded-lg border border-default p-3 text-sm">
+              <div class="flex justify-between gap-4">
+                <span class="text-muted">
+                  Opens
+                </span>
+
+                <span class="text-right font-semibold text-highlighted">
+                  {{
+                    formatDate(
+                      delivery.startsAt,
+                    )
+                  }}
+                </span>
+              </div>
+
+              <div class="mt-2 flex justify-between gap-4">
+                <span class="text-muted">
+                  Closes
+                </span>
+
+                <span class="text-right font-semibold text-highlighted">
+                  {{
+                    formatDate(
+                      delivery.endsAt,
+                    )
+                  }}
+                </span>
+              </div>
+            </div>
+
+            <div
+              v-if="
+                delivery.attempt
+                && delivery.attempt.status
+                === 'in_progress'
+              "
+              class="mt-4"
             >
-              {{
-                assessment.status === "open"
-                  ? "Open Assessment"
-                  : "View Details"
-              }}
-            </UButton>
+              <div class="flex justify-between text-xs text-muted">
+                <span>
+                  Progress
+                </span>
+
+                <span>
+                  {{ delivery.attempt.answeredCount }}
+                  /
+                  {{ delivery.questionCount }}
+                </span>
+              </div>
+
+              <UProgress
+                class="mt-2"
+                :model-value="
+                  delivery.questionCount
+                    ? (
+                        delivery.attempt.answeredCount
+                        / delivery.questionCount
+                      ) * 100
+                    : 0
+                "
+              />
+            </div>
+
+            <div class="mt-5 flex justify-end">
+              <UButton
+                :to="
+                  actionRoute(
+                    delivery,
+                  )
+                "
+                :color="
+                  delivery.canStart
+                  || delivery.canResume
+                    ? 'primary'
+                    : 'neutral'
+                "
+                :variant="
+                  delivery.canStart
+                  || delivery.canResume
+                    ? 'solid'
+                    : 'outline'
+                "
+                :icon="
+                  delivery.canResume
+                    ? 'i-lucide-play'
+                    : delivery.canViewResult
+                      ? 'i-lucide-chart-column'
+                      : 'i-lucide-eye'
+                "
+              >
+                {{
+                  actionLabel(
+                    delivery,
+                  )
+                }}
+              </UButton>
+            </div>
           </div>
         </div>
       </UCard>

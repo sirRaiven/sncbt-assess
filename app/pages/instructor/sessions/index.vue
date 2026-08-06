@@ -1,23 +1,39 @@
 <script setup lang="ts">
 import type {
-  AssessmentSessionStatus,
-  InstructorSessionItem,
-} from "~/types/assessment-session";
+  InstructorDeliveryListItem,
+} from "~/types/assessment-delivery";
 
 definePageMeta({
-  layout: "instructor",
+  layout:
+    "instructor",
 });
 
 useSeoMeta({
-  title: "Live sessions",
+  title:
+    "Live Sessions",
 });
 
 const {
-  listInstructorSessions,
-} = useAssessmentSessions();
+  listInstructorDeliveries,
+} = useAssessmentDelivery();
 
-const sessions =
-  ref<InstructorSessionItem[]>([]);
+const deliveries =
+  ref<
+    InstructorDeliveryListItem[]
+  >(
+    [],
+  );
+
+const activeFilter =
+  ref<
+    | "all"
+    | "open"
+    | "upcoming"
+    | "closed"
+    | "cancelled"
+  >(
+    "all",
+  );
 
 const isLoading =
   ref(true);
@@ -25,124 +41,107 @@ const isLoading =
 const errorMessage =
   ref("");
 
-const query =
-  ref("");
+const filterItems = [
+  {
+    label:
+      "All",
+    value:
+      "all",
+  },
+  {
+    label:
+      "Open",
+    value:
+      "open",
+  },
+  {
+    label:
+      "Upcoming",
+    value:
+      "upcoming",
+  },
+  {
+    label:
+      "Ended",
+    value:
+      "closed",
+  },
+  {
+    label:
+      "Cancelled",
+    value:
+      "cancelled",
+  },
+] as const;
 
-const statusFilter =
-  ref("All statuses");
-
-const counts = computed(() => ({
-  all:
-    sessions.value.length,
-
-  lobby:
-    sessions.value.filter(
-      (item) =>
-        item.session.status
-        === "lobby",
-    ).length,
-
-  active:
-    sessions.value.filter(
-      (item) =>
-        item.session.status
-        === "active",
-    ).length,
-
-  closed:
-    sessions.value.filter(
-      (item) =>
-        [
-          "ended",
-          "cancelled",
-        ].includes(
-          item.session.status,
-        ),
-    ).length,
-}));
-
-const openSession = computed(
-  () =>
-    sessions.value.find(
-      (item) =>
-        [
-          "lobby",
-          "active",
-        ].includes(
-          item.session.status,
-        ),
-    )
-    ?? null,
-);
-
-const filteredSessions = computed(() => {
-  const keyword =
-    query.value
-      .trim()
-      .toLowerCase();
-
-  return sessions.value.filter(
-    (item) => {
-      const matchesQuery =
-        !keyword
-        || [
-          item.assessment.title,
-          item.assessment.subjectCode,
-          item.classroom.name,
-          item.classroom.section,
-          item.session.session_code,
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(keyword);
-
-      const matchesStatus =
-        statusFilter.value
-        === "All statuses"
-        || item.session.status
-        === statusFilter.value
-          .toLowerCase();
-
-      return (
-        matchesQuery
-        && matchesStatus
-      );
-    },
+const filteredDeliveries =
+  computed(
+    () =>
+      activeFilter.value
+      === "all"
+        ? deliveries.value
+        : deliveries.value
+          .filter(
+            (delivery) =>
+              delivery.status
+              === activeFilter.value,
+          ),
   );
-});
 
-function sessionRoute(
-  item: InstructorSessionItem,
-): string {
-  if (
-    item.session.status
-    === "lobby"
-  ) {
-    return `/instructor/sessions/${item.session.id}/lobby`;
-  }
+const counts =
+  computed(
+    () => ({
+      open:
+        deliveries.value.filter(
+          (delivery) =>
+            delivery.status
+            === "open",
+        ).length,
+      upcoming:
+        deliveries.value.filter(
+          (delivery) =>
+            delivery.status
+            === "upcoming",
+        ).length,
+      closed:
+        deliveries.value.filter(
+          (delivery) =>
+            delivery.status
+            === "closed",
+        ).length,
+      participants:
+        deliveries.value.reduce(
+          (
+            total,
+            delivery,
+          ) =>
+            total
+            + delivery.startedCount,
+          0,
+        ),
+    }),
+  );
 
-  return `/instructor/sessions/${item.session.id}/monitor`;
-}
-
-function modeLabel(
+function formatDate(
   value: string,
 ): string {
-  return value
-    === "teacher_led"
-    ? "Teacher-led"
-    : "Student-paced";
+  return new Intl
+    .DateTimeFormat(
+      "en-PH",
+      {
+        dateStyle:
+          "medium",
+        timeStyle:
+          "short",
+      },
+    )
+    .format(
+      new Date(value),
+    );
 }
 
-function statusLabel(
-  value: AssessmentSessionStatus,
-): string {
-  return value
-    .charAt(0)
-    .toUpperCase()
-    + value.slice(1);
-}
-
-async function loadSessions(): Promise<void> {
+async function loadDeliveries():
+  Promise<void> {
   isLoading.value =
     true;
 
@@ -150,7 +149,7 @@ async function loadSessions(): Promise<void> {
     "";
 
   const result =
-    await listInstructorSessions();
+    await listInstructorDeliveries();
 
   if (
     result.error
@@ -158,7 +157,7 @@ async function loadSessions(): Promise<void> {
   ) {
     errorMessage.value =
       result.error
-      || "Unable to load live sessions.";
+      || "Unable to load the assessment sessions.";
 
     isLoading.value =
       false;
@@ -166,32 +165,34 @@ async function loadSessions(): Promise<void> {
     return;
   }
 
-  sessions.value =
-    result.data.sessions;
+  deliveries.value =
+    result.data.deliveries;
 
   isLoading.value =
     false;
 }
 
 onMounted(
-  loadSessions,
+  loadDeliveries,
 );
 </script>
 
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="Live assessment delivery"
-      title="Live sessions"
-      description="Start an assessment in real time, share a six-digit code, and manage the student waiting lobby."
+      eyebrow="Assessment monitoring"
+      title="Live Sessions"
+      description="Open and ended classroom assessment deliveries appear here automatically. Use the monitor to view student progress, scoring, and ranking."
     >
       <template #actions>
         <UButton
-          to="/instructor/sessions/create"
-          icon="i-lucide-radio-tower"
-          :disabled="Boolean(openSession)"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-refresh-cw"
+          :loading="isLoading"
+          @click="loadDeliveries"
         >
-          Start Live Session
+          Refresh
         </UButton>
       </template>
     </PageHeader>
@@ -204,244 +205,205 @@ onMounted(
       :description="errorMessage"
     />
 
-    <UAlert
-      v-if="openSession"
-      color="info"
-      variant="soft"
-      title="An open live session already exists"
-      description="Continue or close the current session before starting another."
-    >
-      <template #actions>
-        <UButton
-          :to="sessionRoute(openSession)"
-          color="info"
-          variant="soft"
-        >
-          Open Current Session
-        </UButton>
-      </template>
-    </UAlert>
-
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard
-        label="All sessions"
-        :value="String(counts.all)"
+        label="Open now"
+        :value="
+          String(
+            counts.open,
+          )
+        "
         icon="i-lucide-radio-tower"
-        tone="primary"
-      />
-
-      <StatCard
-        label="Waiting lobbies"
-        :value="String(counts.lobby)"
-        icon="i-lucide-door-open"
-        tone="warning"
-      />
-
-      <StatCard
-        label="Live now"
-        :value="String(counts.active)"
-        icon="i-lucide-activity"
         tone="success"
       />
 
       <StatCard
-        label="Closed"
-        :value="String(counts.closed)"
+        label="Upcoming"
+        :value="
+          String(
+            counts.upcoming,
+          )
+        "
+        icon="i-lucide-calendar-clock"
+        tone="info"
+      />
+
+      <StatCard
+        label="Ended"
+        :value="
+          String(
+            counts.closed,
+          )
+        "
         icon="i-lucide-history"
         tone="neutral"
+      />
+
+      <StatCard
+        label="Students started"
+        :value="
+          String(
+            counts.participants,
+          )
+        "
+        icon="i-lucide-users"
+        tone="primary"
       />
     </section>
 
     <UCard>
-      <div class="grid gap-3 lg:grid-cols-[1fr_220px_auto]">
-        <UInput
-          v-model="query"
-          icon="i-lucide-search"
-          placeholder="Search assessment, class, or code"
-          class="w-full"
-        />
-
-        <USelect
-          v-model="statusFilter"
-          :items="[
-            'All statuses',
-            'Lobby',
-            'Active',
-            'Ended',
-            'Cancelled',
-          ]"
-          class="w-full"
-        />
-
+      <div class="flex flex-wrap gap-2">
         <UButton
+          v-for="item in filterItems"
+          :key="item.value"
           color="neutral"
-          variant="outline"
-          icon="i-lucide-refresh-cw"
-          :loading="isLoading"
-          @click="loadSessions"
+          :variant="
+            activeFilter
+            === item.value
+              ? 'soft'
+              : 'ghost'
+          "
+          @click="
+            activeFilter =
+              item.value
+          "
         >
-          Refresh
+          {{ item.label }}
         </UButton>
       </div>
     </UCard>
 
     <div
       v-if="isLoading"
-      class="grid gap-4 xl:grid-cols-2"
+      class="space-y-4"
     >
       <USkeleton
         v-for="number in 4"
         :key="number"
-        class="h-72 rounded-xl"
+        class="h-36 rounded-xl"
       />
     </div>
 
     <EmptyPanel
       v-else-if="
-        filteredSessions.length === 0
+        filteredDeliveries.length
+        === 0
       "
       icon="i-lucide-radio-tower"
-      title="No live sessions found"
-      description="Publish an assessment and start a session for one of your active classes."
+      title="No assessment sessions"
+      description="Publish an assessment and assign it to a class with a schedule. The delivery will appear here automatically."
     >
       <template #actions>
         <UButton
-          to="/instructor/sessions/create"
-          icon="i-lucide-plus"
-          :disabled="Boolean(openSession)"
+          to="/instructor/assessments"
+          icon="i-lucide-clipboard-list"
         >
-          Start Live Session
+          Open Assessments
         </UButton>
       </template>
     </EmptyPanel>
 
     <div
       v-else
-      class="grid gap-4 xl:grid-cols-2"
+      class="space-y-4"
     >
       <UCard
-        v-for="item in filteredSessions"
-        :key="item.session.id"
+        v-for="delivery in filteredDeliveries"
+        :key="delivery.assignmentId"
       >
-        <div class="flex items-start gap-4">
-          <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <UIcon
-              name="i-lucide-radio-tower"
-              class="size-5"
-            />
-          </div>
-
+        <div class="flex flex-col gap-5 xl:flex-row xl:items-center">
           <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 class="font-black text-highlighted">
-                  {{ item.assessment.title }}
-                </h2>
-
-                <p class="mt-1 text-sm text-muted">
-                  {{ item.assessment.subjectCode }}
-                  ·
-                  {{ item.classroom.section }}
-                </p>
-              </div>
-
+            <div class="flex flex-wrap items-center gap-2">
               <StatusPill
                 :status="
-                  statusLabel(
-                    item.session.status,
-                  )
+                  delivery.status
                 "
               />
-            </div>
-
-            <div class="mt-4 flex flex-wrap gap-2">
-              <UBadge
-                color="info"
-                variant="soft"
-              >
-                {{
-                  modeLabel(
-                    item.session.session_mode,
-                  )
-                }}
-              </UBadge>
 
               <UBadge
                 color="neutral"
                 variant="soft"
-                class="font-mono tracking-[0.12em]"
               >
-                {{
-                  item.session.session_code
-                    .replace(
-                      /(\d{3})(\d{3})/,
-                      "$1 $2",
-                    )
-                }}
+                {{ delivery.subjectCode }}
+                ·
+                {{ delivery.classroom.section }}
               </UBadge>
             </div>
 
-            <div class="mt-5 grid grid-cols-3 gap-3">
-              <div class="rounded-lg bg-elevated p-3">
-                <p class="text-xs text-muted">
-                  Waiting
-                </p>
+            <h2 class="mt-3 text-xl font-black text-highlighted">
+              {{ delivery.title }}
+            </h2>
 
-                <p class="mt-1 font-black text-highlighted">
-                  {{ item.participantCounts.waiting }}
-                </p>
-              </div>
+            <p class="mt-1 text-sm text-muted">
+              {{ delivery.classroom.name }}
+              ·
+              {{ formatDate(delivery.startsAt) }}
+              —
+              {{ formatDate(delivery.endsAt) }}
+            </p>
+          </div>
 
-              <div class="rounded-lg bg-elevated p-3">
-                <p class="text-xs text-muted">
-                  Active
-                </p>
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-5 xl:min-w-[560px]">
+            <div class="rounded-lg bg-elevated p-3 text-center">
+              <p class="text-xs text-muted">
+                Class
+              </p>
 
-                <p class="mt-1 font-black text-highlighted">
-                  {{ item.participantCounts.active }}
-                </p>
-              </div>
-
-              <div class="rounded-lg bg-elevated p-3">
-                <p class="text-xs text-muted">
-                  Finished
-                </p>
-
-                <p class="mt-1 font-black text-highlighted">
-                  {{ item.participantCounts.finished }}
-                </p>
-              </div>
+              <p class="mt-1 font-black text-highlighted">
+                {{ delivery.classMemberCount }}
+              </p>
             </div>
 
-            <div class="mt-5 flex flex-wrap gap-2">
-              <UButton
-                :to="sessionRoute(item)"
-                variant="soft"
-                :icon="
-                  item.session.status
-                  === 'lobby'
-                    ? 'i-lucide-door-open'
-                    : 'i-lucide-monitor-dot'
-                "
-              >
-                {{
-                  item.session.status
-                  === "lobby"
-                    ? "Open Lobby"
-                    : "View Session"
-                }}
-              </UButton>
+            <div class="rounded-lg bg-elevated p-3 text-center">
+              <p class="text-xs text-muted">
+                Started
+              </p>
 
-              <UButton
-                :to="`/instructor/assessments/${item.assessment.id}/preview`"
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-eye"
-              >
-                Assessment
-              </UButton>
+              <p class="mt-1 font-black text-highlighted">
+                {{ delivery.startedCount }}
+              </p>
+            </div>
+
+            <div class="rounded-lg bg-elevated p-3 text-center">
+              <p class="text-xs text-muted">
+                In progress
+              </p>
+
+              <p class="mt-1 font-black text-highlighted">
+                {{ delivery.inProgressCount }}
+              </p>
+            </div>
+
+            <div class="rounded-lg bg-elevated p-3 text-center">
+              <p class="text-xs text-muted">
+                Submitted
+              </p>
+
+              <p class="mt-1 font-black text-highlighted">
+                {{
+                  delivery.submittedCount
+                  + delivery.autoSubmittedCount
+                }}
+              </p>
+            </div>
+
+            <div class="rounded-lg bg-elevated p-3 text-center">
+              <p class="text-xs text-muted">
+                Not started
+              </p>
+
+              <p class="mt-1 font-black text-highlighted">
+                {{ delivery.notStartedCount }}
+              </p>
             </div>
           </div>
+
+          <UButton
+            :to="`/instructor/sessions/${delivery.assignmentId}/monitor`"
+            icon="i-lucide-chart-no-axes-combined"
+          >
+            Open Monitor
+          </UButton>
         </div>
       </UCard>
     </div>

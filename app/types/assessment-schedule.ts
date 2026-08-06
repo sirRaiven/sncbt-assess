@@ -1,40 +1,24 @@
 import type {
   AssessmentType,
-  AssessmentResultVisibility,
 } from "~/types/assessment";
 
+import type {
+  AssessmentScheduleInput,
+  AssessmentScheduleItem,
+  DeliveryAvailabilityStatus,
+  DeliveryClassSummary,
+} from "~/types/assessment-delivery";
+
 export type AssessmentAvailabilityStatus =
-  | "scheduled"
-  | "open"
-  | "closed"
-  | "cancelled";
+  DeliveryAvailabilityStatus;
 
-export interface AssessmentScheduleClass {
-  id: string;
-  name: string;
-  subjectCode: string;
-  section: string;
-  schoolYear: string;
-  semester: string;
-}
+export type AssessmentScheduleClass =
+  DeliveryClassSummary;
 
-export interface AssessmentScheduleItem {
-  id: string;
-  assessmentId: string;
-  classroomId: string;
-  startsAt: string;
-  endsAt: string;
-  closedAt: string | null;
-  cancelledAt: string | null;
-  status: AssessmentAvailabilityStatus;
-  classroom: AssessmentScheduleClass;
-}
-
-export interface AssessmentScheduleInput {
-  classroomId: string;
-  startsAt: string;
-  endsAt: string;
-}
+export type {
+  AssessmentScheduleInput,
+  AssessmentScheduleItem,
+};
 
 export interface InstructorAssessmentScheduleOverview {
   serverNow: string;
@@ -43,36 +27,15 @@ export interface InstructorAssessmentScheduleOverview {
     title: string;
     subjectName: string;
     subjectCode: string;
-    status: "draft" | "published" | "archived";
+    status:
+      | "draft"
+      | "published"
+      | "archived";
     assessmentType: AssessmentType;
     questionCount: number;
     totalPoints: number;
+    defaultTimeLimitSeconds: number | null;
+    defaultLeaderboardEnabled: boolean;
   };
   schedules: AssessmentScheduleItem[];
-}
-
-export interface StudentScheduledAssessment {
-  assignmentId: string;
-  assessmentId: string;
-  title: string;
-  subjectName: string;
-  subjectCode: string;
-  assessmentType: AssessmentType;
-  instructions: string | null;
-  questionCount: number;
-  totalPoints: number;
-  overallTimeLimitSeconds: number | null;
-  resultVisibility: AssessmentResultVisibility;
-  startsAt: string;
-  endsAt: string;
-  closedAt: string | null;
-  cancelledAt: string | null;
-  status: AssessmentAvailabilityStatus;
-  classroom: AssessmentScheduleClass;
-  canBegin: boolean;
-}
-
-export interface StudentAssessmentScheduleDetail {
-  serverNow: string;
-  assignment: StudentScheduledAssessment;
 }
