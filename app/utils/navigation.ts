@@ -58,14 +58,6 @@ const items: Record<
     },
     {
       label:
-        "My Profile",
-      icon:
-        "i-lucide-user-round",
-      to:
-        "/admin/profile",
-    },
-    {
-      label:
         "System Settings",
       icon:
         "i-lucide-settings",
@@ -123,14 +115,6 @@ const items: Record<
       to:
         "/instructor/reports",
     },
-    {
-      label:
-        "My Profile",
-      icon:
-        "i-lucide-user-round",
-      to:
-        "/instructor/profile",
-    },
   ],
 
   student: [
@@ -165,14 +149,6 @@ const items: Record<
         "i-lucide-trophy",
       to:
         "/student/results",
-    },
-    {
-      label:
-        "My Profile",
-      icon:
-        "i-lucide-user-round",
-      to:
-        "/student/profile",
     },
   ],
 };

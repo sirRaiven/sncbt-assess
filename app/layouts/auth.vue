@@ -1,5 +1,5 @@
 <template>
-  <div class="academic-grid min-h-screen bg-muted/30">
+  <div class="academic-grid flex min-h-screen flex-col bg-muted/30">
     <header class="safe-area-top border-b border-default bg-default/90 backdrop-blur-xl">
       <UContainer class="flex min-h-16 items-center justify-between px-3 sm:px-6">
         <NuxtLink
@@ -17,10 +17,16 @@
       </UContainer>
     </header>
 
-    <main class="safe-area-bottom flex min-h-[calc(100vh-4rem)] items-center py-5 sm:py-10">
+    <main class="flex flex-1 items-center py-5 sm:py-10">
       <UContainer class="w-full px-3 sm:px-6">
         <slot />
       </UContainer>
     </main>
+
+    <footer class="safe-area-bottom border-t border-default bg-default/80 backdrop-blur-xl">
+      <UContainer class="flex min-h-12 items-center justify-center px-3 sm:px-6">
+        <AppVersion class="max-w-40" />
+      </UContainer>
+    </footer>
   </div>
 </template>

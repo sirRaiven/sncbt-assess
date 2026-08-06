@@ -220,20 +220,41 @@ const currentNavigationItem =
         ),
   );
 
-const currentPageLabel =
+const isProfilePage =
   computed(
     () =>
-      currentNavigationItem.value
-        ?.label
-      || roleLabel.value,
+      route.path
+      === profilePath.value,
+  );
+
+const currentPageLabel =
+  computed(
+    () => {
+      if (isProfilePage.value) {
+        return "My Profile";
+      }
+
+      return (
+        currentNavigationItem.value
+          ?.label
+        || roleLabel.value
+      );
+    },
   );
 
 const currentPageIcon =
   computed(
-    () =>
-      currentNavigationItem.value
-        ?.icon
-      || "i-lucide-layout-dashboard",
+    () => {
+      if (isProfilePage.value) {
+        return "i-lucide-user-round";
+      }
+
+      return (
+        currentNavigationItem.value
+          ?.icon
+        || "i-lucide-layout-dashboard"
+      );
+    },
   );
 
 const navigationItems =
@@ -371,77 +392,20 @@ onBeforeUnmount(
       </template>
 
       <template #footer="{ state }">
-        <div
-          v-if="
+        <AccountMenu
+          :display-name="displayName"
+          :account-detail="accountDetail"
+          :initials="initials"
+          :avatar-url="profile?.avatar_url"
+          :profile-path="profilePath"
+          :placement="
             state
             === 'expanded'
+              ? 'sidebar'
+              : 'compact'
           "
-          class="space-y-3"
-        >
-          <NuxtLink
-            :to="profilePath"
-            class="flex min-h-14 items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/8 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
-          >
-            <UAvatar
-              :src="
-                profile?.avatar_url
-                || undefined
-              "
-              :text="initials"
-              size="md"
-            />
-
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-sm font-bold text-white">
-                {{ displayName }}
-              </p>
-
-              <p class="truncate text-xs text-slate-400">
-                {{ accountDetail }}
-              </p>
-            </div>
-
-            <UIcon
-              name="i-lucide-chevron-right"
-              class="size-4 text-slate-500"
-            />
-          </NuxtLink>
-
-          <SignOutButton
-            block
-            variant="ghost"
-          />
-        </div>
-
-        <div
-          v-else
-          class="flex flex-col items-center gap-3"
-        >
-          <UTooltip text="Open my profile">
-            <UButton
-              :to="profilePath"
-              color="neutral"
-              variant="ghost"
-              square
-              size="lg"
-              aria-label="Open my profile"
-            >
-              <UAvatar
-                :src="
-                  profile?.avatar_url
-                  || undefined
-                "
-                :text="initials"
-                size="xs"
-              />
-            </UButton>
-          </UTooltip>
-
-          <SignOutButton
-            compact
-            variant="ghost"
-          />
-        </div>
+          inverse
+        />
       </template>
     </USidebar>
 
@@ -486,25 +450,14 @@ onBeforeUnmount(
               variant="ghost"
             />
 
-            <UTooltip text="Open my profile">
-              <UButton
-                :to="profilePath"
-                color="neutral"
-                variant="ghost"
-                square
-                size="lg"
-                aria-label="Open my profile"
-              >
-                <UAvatar
-                  :src="
-                    profile?.avatar_url
-                    || undefined
-                  "
-                  :text="initials"
-                  size="xs"
-                />
-              </UButton>
-            </UTooltip>
+            <AccountMenu
+              :display-name="displayName"
+              :account-detail="accountDetail"
+              :initials="initials"
+              :avatar-url="profile?.avatar_url"
+              :profile-path="profilePath"
+              placement="header"
+            />
           </div>
         </div>
       </header>
