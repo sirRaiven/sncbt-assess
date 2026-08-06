@@ -50,6 +50,60 @@ const busyAction =
 const errorMessage =
   ref("");
 
+const monitorActionModalOpen =
+  ref(false);
+
+const pendingMonitorAction =
+  ref<
+    | {
+        type:
+          "end";
+      }
+    | {
+        type:
+          "remove";
+        participant:
+          SessionParticipant;
+      }
+    | null
+  >(
+    null,
+  );
+
+const monitorActionTitle =
+  computed(
+    () =>
+      pendingMonitorAction.value
+        ?.type
+      === "end"
+        ? "End this live session?"
+        : "Remove this student?",
+  );
+
+const monitorActionDescription =
+  computed(
+    () => {
+      const pending =
+        pendingMonitorAction.value;
+
+      if (
+        pending?.type
+        === "end"
+      ) {
+        return "The session code will stop working and all active participants will be moved to the final closed state.";
+      }
+
+      if (
+        pending?.type
+        === "remove"
+      ) {
+        return `Remove ${pending.participant.student.name} from this active session?`;
+      }
+
+      return "";
+    },
+  );
+
 const elapsedSeconds =
   ref(0);
 
@@ -200,17 +254,57 @@ async function loadSession(
   }
 }
 
-async function end(): Promise<void> {
-  if (!detail.value) {
+function requestEnd(): void {
+  pendingMonitorAction.value = {
+    type:
+      "end",
+  };
+
+  monitorActionModalOpen.value =
+    true;
+}
+
+function requestParticipantRemoval(
+  participant: SessionParticipant,
+): void {
+  pendingMonitorAction.value = {
+    type:
+      "remove",
+    participant,
+  };
+
+  monitorActionModalOpen.value =
+    true;
+}
+
+async function confirmMonitorAction(): Promise<void> {
+  const pending =
+    pendingMonitorAction.value;
+
+  if (!pending) {
     return;
   }
 
-  const confirmed =
-    window.confirm(
-      "End this live session? The session code will stop working.",
+  if (
+    pending.type
+    === "end"
+  ) {
+    await end();
+  } else {
+    await remove(
+      pending.participant,
     );
+  }
 
-  if (!confirmed) {
+  monitorActionModalOpen.value =
+    false;
+
+  pendingMonitorAction.value =
+    null;
+}
+
+async function end(): Promise<void> {
+  if (!detail.value) {
     return;
   }
 
@@ -425,7 +519,7 @@ onBeforeUnmount(
               busyAction
               === 'end'
             "
-            @click="end"
+            @click="requestEnd"
           >
             End Session
           </UButton>
@@ -598,7 +692,7 @@ onBeforeUnmount(
                       === participant.id
                     "
                     @click="
-                      remove(
+                      requestParticipantRemoval(
                         participant,
                       )
                     "
@@ -638,5 +732,38 @@ onBeforeUnmount(
         description="The session code is no longer valid and the final participant states were preserved."
       />
     </template>
+
+    <ConfirmationModal
+      v-model:open="
+        monitorActionModalOpen
+      "
+      :title="
+        monitorActionTitle
+      "
+      :description="
+        monitorActionDescription
+      "
+      :confirm-label="
+        pendingMonitorAction?.type
+        === 'end'
+          ? 'End Session'
+          : 'Remove Student'
+      "
+      confirm-color="error"
+      :icon="
+        pendingMonitorAction?.type
+        === 'end'
+          ? 'i-lucide-circle-stop'
+          : 'i-lucide-user-x'
+      "
+      :loading="
+        Boolean(
+          busyAction,
+        )
+      "
+      @confirm="
+        confirmMonitorAction
+      "
+    />
   </div>
 </template>

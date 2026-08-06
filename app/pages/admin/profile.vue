@@ -1,7 +1,7 @@
 <script setup lang="ts">
 definePageMeta({
   layout:
-    "instructor",
+    "admin",
 });
 
 useSeoMeta({
@@ -11,5 +11,5 @@ useSeoMeta({
 </script>
 
 <template>
-  <PortalProfilePage role="instructor" />
+  <PortalProfilePage role="admin" />
 </template>

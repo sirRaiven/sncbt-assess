@@ -48,6 +48,9 @@ const isLeaving =
 const errorMessage =
   ref("");
 
+const leaveLobbyModalOpen =
+  ref(false);
+
 async function loadSession(
   silent = false,
 ): Promise<void> {
@@ -336,7 +339,9 @@ onMounted(
               class="mt-7"
               icon="i-lucide-log-out"
               :loading="isLeaving"
-              @click="leave"
+              @click="
+                leaveLobbyModalOpen = true
+              "
             >
               Leave Lobby
             </UButton>
@@ -410,5 +415,18 @@ onMounted(
         description="The server verified your active student account and approved membership in the class selected by the instructor."
       />
     </div>
+
+    <ConfirmationModal
+      v-model:open="
+        leaveLobbyModalOpen
+      "
+      title="Leave the live-session lobby?"
+      description="You will be removed from the waiting lobby. You may need to enter the session code again if rejoining is still permitted."
+      confirm-label="Leave Lobby"
+      confirm-color="error"
+      icon="i-lucide-log-out"
+      :loading="isLeaving"
+      @confirm="leave"
+    />
   </div>
 </template>

@@ -1,29 +1,49 @@
 <script setup lang="ts">
-withDefaults(
+const props = withDefaults(
   defineProps<{
     block?: boolean;
-    variant?: "solid" | "outline" | "soft" | "ghost";
+    compact?: boolean;
+    variant?:
+      | "solid"
+      | "outline"
+      | "soft"
+      | "ghost";
   }>(),
   {
-    block: false,
-    variant: "outline",
+    block:
+      false,
+    compact:
+      false,
+    variant:
+      "ghost",
   },
 );
 
-const supabase = useSupabaseClient();
+const supabase =
+  useSupabaseClient();
 
-const isSigningOut = ref(false);
-const errorMessage = ref("");
+const modalOpen =
+  ref(false);
+
+const isSigningOut =
+  ref(false);
+
+const errorMessage =
+  ref("");
 
 async function signOut(): Promise<void> {
-  isSigningOut.value = true;
-  errorMessage.value = "";
+  isSigningOut.value =
+    true;
+
+  errorMessage.value =
+    "";
 
   try {
     const {
       error,
     } = await supabase.auth.signOut({
-      scope: "local",
+      scope:
+        "local",
     });
 
     if (error) {
@@ -36,6 +56,9 @@ async function signOut(): Promise<void> {
 
     clearProfile();
 
+    modalOpen.value =
+      false;
+
     await navigateTo("/");
   } catch (error) {
     errorMessage.value =
@@ -43,29 +66,66 @@ async function signOut(): Promise<void> {
         ? error.message
         : "Unable to sign out.";
   } finally {
-    isSigningOut.value = false;
+    isSigningOut.value =
+      false;
   }
 }
 </script>
 
 <template>
   <div>
-    <UButton
-      color="neutral"
-      :variant="variant"
-      icon="i-lucide-log-out"
-      :block="block"
-      :loading="isSigningOut"
-      @click="signOut"
+    <UTooltip
+      :text="
+        compact
+          ? 'Sign out'
+          : undefined
+      "
+      :disabled="
+        !compact
+      "
     >
-      Sign Out
-    </UButton>
+      <UButton
+        color="neutral"
+        :variant="variant"
+        icon="i-lucide-log-out"
+        :block="block"
+        :square="compact"
+        :aria-label="
+          compact
+            ? 'Sign out'
+            : undefined
+        "
+        @click="
+          modalOpen = true
+        "
+      >
+        <span v-if="!compact">
+          Sign out
+        </span>
+      </UButton>
+    </UTooltip>
 
-    <p
-      v-if="errorMessage"
-      class="mt-2 text-sm text-error"
+    <ConfirmationModal
+      v-model:open="modalOpen"
+      title="Sign out of SNCBT Assess?"
+      description="You will return to the sign-in page. Unsaved information on the current page may be lost."
+      confirm-label="Yes, Sign Out"
+      confirm-color="error"
+      icon="i-lucide-log-out"
+      :loading="isSigningOut"
+      :dismissible="
+        !isSigningOut
+      "
+      @confirm="signOut"
     >
-      {{ errorMessage }}
-    </p>
+      <UAlert
+        v-if="errorMessage"
+        class="mt-4"
+        color="error"
+        variant="soft"
+        title="Sign-out unsuccessful"
+        :description="errorMessage"
+      />
+    </ConfirmationModal>
   </div>
 </template>

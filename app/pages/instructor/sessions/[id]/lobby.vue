@@ -51,6 +51,81 @@ const busyAction =
 const errorMessage =
   ref("");
 
+const sessionActionModalOpen =
+  ref(false);
+
+const pendingSessionAction =
+  ref<
+    | {
+        type:
+          "start"
+          | "cancel";
+      }
+    | {
+        type:
+          "remove";
+        participant:
+          SessionParticipant;
+      }
+    | null
+  >(
+    null,
+  );
+
+const sessionActionTitle =
+  computed(
+    () => {
+      if (
+        pendingSessionAction.value
+          ?.type
+        === "start"
+      ) {
+        return "Start the live session?";
+      }
+
+      if (
+        pendingSessionAction.value
+          ?.type
+        === "cancel"
+      ) {
+        return "Cancel this waiting lobby?";
+      }
+
+      return "Remove this student?";
+    },
+  );
+
+const sessionActionDescription =
+  computed(
+    () => {
+      const pending =
+        pendingSessionAction.value;
+
+      if (
+        pending?.type
+        === "start"
+      ) {
+        return "All waiting students will be moved into the active assessment flow.";
+      }
+
+      if (
+        pending?.type
+        === "cancel"
+      ) {
+        return "The six-digit session code will stop working and waiting students will be removed from the lobby.";
+      }
+
+      if (
+        pending?.type
+        === "remove"
+      ) {
+        return `Remove ${pending.participant.student.name} from this session?`;
+      }
+
+      return "";
+    },
+  );
+
 const joinedParticipants = computed(
   () =>
     detail.value
@@ -180,6 +255,70 @@ async function copyJoinLink(): Promise<void> {
   });
 }
 
+function requestStart(): void {
+  pendingSessionAction.value = {
+    type:
+      "start",
+  };
+
+  sessionActionModalOpen.value =
+    true;
+}
+
+function requestCancel(): void {
+  pendingSessionAction.value = {
+    type:
+      "cancel",
+  };
+
+  sessionActionModalOpen.value =
+    true;
+}
+
+function requestRemove(
+  participant: SessionParticipant,
+): void {
+  pendingSessionAction.value = {
+    type:
+      "remove",
+    participant,
+  };
+
+  sessionActionModalOpen.value =
+    true;
+}
+
+async function confirmSessionAction(): Promise<void> {
+  const pending =
+    pendingSessionAction.value;
+
+  if (!pending) {
+    return;
+  }
+
+  if (
+    pending.type
+    === "start"
+  ) {
+    await start();
+  } else if (
+    pending.type
+    === "cancel"
+  ) {
+    await cancel();
+  } else {
+    await remove(
+      pending.participant,
+    );
+  }
+
+  sessionActionModalOpen.value =
+    false;
+
+  pendingSessionAction.value =
+    null;
+}
+
 async function start(): Promise<void> {
   if (!detail.value) {
     return;
@@ -232,15 +371,6 @@ async function cancel(): Promise<void> {
     return;
   }
 
-  const confirmed =
-    window.confirm(
-      "Cancel this waiting lobby? The session code will stop working.",
-    );
-
-  if (!confirmed) {
-    return;
-  }
-
   busyAction.value =
     "cancel";
 
@@ -287,15 +417,6 @@ async function remove(
   participant: SessionParticipant,
 ): Promise<void> {
   if (!detail.value) {
-    return;
-  }
-
-  const confirmed =
-    window.confirm(
-      `Remove ${participant.student.name} from this session?`,
-    );
-
-  if (!confirmed) {
     return;
   }
 
@@ -650,7 +771,7 @@ onMounted(
               joinedParticipants.length
               === 0
             "
-            @click="start"
+            @click="requestStart"
           >
             Start Session
           </UButton>
@@ -665,7 +786,7 @@ onMounted(
               busyAction
               === 'cancel'
             "
-            @click="cancel"
+            @click="requestCancel"
           >
             Cancel Lobby
           </UButton>
@@ -683,5 +804,49 @@ onMounted(
         </div>
       </div>
     </template>
+
+    <ConfirmationModal
+      v-model:open="
+        sessionActionModalOpen
+      "
+      :title="
+        sessionActionTitle
+      "
+      :description="
+        sessionActionDescription
+      "
+      :confirm-label="
+        pendingSessionAction?.type
+        === 'start'
+          ? 'Start Session'
+          : pendingSessionAction?.type
+            === 'cancel'
+            ? 'Cancel Lobby'
+            : 'Remove Student'
+      "
+      :confirm-color="
+        pendingSessionAction?.type
+        === 'start'
+          ? 'primary'
+          : 'error'
+      "
+      :icon="
+        pendingSessionAction?.type
+        === 'start'
+          ? 'i-lucide-play'
+          : pendingSessionAction?.type
+            === 'cancel'
+            ? 'i-lucide-circle-x'
+            : 'i-lucide-user-x'
+      "
+      :loading="
+        Boolean(
+          busyAction,
+        )
+      "
+      @confirm="
+        confirmSessionAction
+      "
+    />
   </div>
 </template>

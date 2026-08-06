@@ -5,8 +5,8 @@ import type {
 } from "~/types/classroom";
 
 import type {
-  StudentScheduledAssessment,
-} from "~/types/assessment-schedule";
+  StudentPublishedAssessment,
+} from "~/types/assessment";
 
 definePageMeta({
   layout: "student",
@@ -29,8 +29,8 @@ const {
 } = useClassrooms();
 
 const {
-  listStudentAssessments,
-} = useAssessmentSchedules();
+  listStudentClassAssessments,
+} = useAssessments();
 
 const classroom =
   ref<Classroom | null>(null);
@@ -39,12 +39,15 @@ const membership =
   ref<StudentClassMembership | null>(null);
 
 const assessments =
-  ref<StudentScheduledAssessment[]>([]);
+  ref<StudentPublishedAssessment[]>([]);
 
 const instructorName = ref("");
 const isLoading = ref(true);
 const isLeaving = ref(false);
 const errorMessage = ref("");
+
+const leaveClassModalOpen =
+  ref(false);
 
 function typeLabel(
   value: string,
@@ -70,7 +73,7 @@ async function loadClass(): Promise<void> {
     getStudentClass(
       classroomId.value,
     ),
-    listStudentAssessments(
+    listStudentClassAssessments(
       classroomId.value,
     ),
   ]);
@@ -227,20 +230,20 @@ onMounted(
             <template #header>
               <div>
                 <h2 class="font-bold text-highlighted">
-                  Scheduled assessments
+                  Published assessments
                 </h2>
 
                 <p class="mt-1 text-sm text-muted">
-                  Assessments open and close automatically according to the schedule set by your instructor.
+                  An assessment session must be opened by the instructor before answering is allowed.
                 </p>
               </div>
             </template>
 
             <EmptyPanel
               v-if="assessments.length === 0"
-              icon="i-lucide-calendar-clock"
-              title="No scheduled assessments"
-              description="Upcoming and available assessments for this class will appear here."
+              icon="i-lucide-clipboard-list"
+              title="No published assessments"
+              description="Published quizzes and examinations assigned to this class will appear here."
             />
 
             <div
@@ -249,7 +252,7 @@ onMounted(
             >
               <div
                 v-for="assessment in assessments"
-                :key="assessment.assignmentId"
+                :key="assessment.id"
                 class="rounded-xl border border-default p-4"
               >
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
@@ -276,32 +279,23 @@ onMounted(
                         </p>
                       </div>
 
-                      <StatusPill :status="assessment.status" />
+                      <StatusPill status="Published" />
                     </div>
 
-                    <p class="mt-3 text-sm text-muted">
-                      <template v-if="assessment.status === 'scheduled'">
-                        Opens {{ new Date(assessment.startsAt).toLocaleString() }}
-                      </template>
-
-                      <template v-else-if="assessment.status === 'open'">
-                        Open now · Closes {{ new Date(assessment.endsAt).toLocaleString() }}
-                      </template>
-
-                      <template v-else>
-                        Closed {{ new Date(assessment.endsAt).toLocaleString() }}
-                      </template>
+                    <p
+                      v-if="assessment.instructions"
+                      class="mt-3 line-clamp-2 text-sm leading-6 text-muted"
+                    >
+                      {{ assessment.instructions }}
                     </p>
 
-                    <UButton
-                      :to="`/student/assignments/${assessment.assignmentId}`"
+                    <UAlert
                       class="mt-4"
-                      :color="assessment.status === 'open' ? 'primary' : 'neutral'"
-                      :variant="assessment.status === 'open' ? 'solid' : 'outline'"
-                      :icon="assessment.status === 'open' ? 'i-lucide-play' : 'i-lucide-eye'"
-                    >
-                      {{ assessment.status === "open" ? "Open Assessment" : "View Details" }}
-                    </UButton>
+                      color="info"
+                      variant="soft"
+                      title="Waiting for an assessment session"
+                      description="Session creation and secure student attempts begin in Phase 5."
+                    />
                   </div>
                 </div>
               </div>
@@ -357,7 +351,9 @@ onMounted(
               class="mt-5"
               icon="i-lucide-log-out"
               :loading="isLeaving"
-              @click="leave"
+              @click="
+                leaveClassModalOpen = true
+              "
             >
               Leave Class
             </UButton>
@@ -372,5 +368,18 @@ onMounted(
         </div>
       </div>
     </template>
+
+    <ConfirmationModal
+      v-model:open="
+        leaveClassModalOpen
+      "
+      title="Leave this class?"
+      description="Your active membership will be removed. The instructor must approve a new request if you join this class again."
+      confirm-label="Leave Class"
+      confirm-color="error"
+      icon="i-lucide-log-out"
+      :loading="isLeaving"
+      @confirm="leave"
+    />
   </div>
 </template>

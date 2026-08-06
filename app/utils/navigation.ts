@@ -9,110 +9,178 @@ const items: Record<
 > = {
   admin: [
     {
-      label: "Overview",
-      icon: "i-lucide-layout-dashboard",
-      to: "/admin/dashboard",
+      label:
+        "Overview",
+      icon:
+        "i-lucide-layout-dashboard",
+      to:
+        "/admin/dashboard",
     },
     {
-      label: "User Accounts",
-      icon: "i-lucide-users",
-      to: "/admin/users",
+      label:
+        "User Accounts",
+      icon:
+        "i-lucide-users",
+      to:
+        "/admin/users",
     },
     {
-      label: "Classes",
-      icon: "i-lucide-school",
-      to: "/admin/classes",
+      label:
+        "Classes",
+      icon:
+        "i-lucide-school",
+      to:
+        "/admin/classes",
     },
     {
-      label: "Assessments",
-      icon: "i-lucide-clipboard-check",
-      to: "/admin/assessments",
+      label:
+        "Assessments",
+      icon:
+        "i-lucide-clipboard-check",
+      to:
+        "/admin/assessments",
     },
     {
-      label: "Live Sessions",
-      icon: "i-lucide-radio",
-      to: "/admin/live-sessions",
+      label:
+        "Live Sessions",
+      icon:
+        "i-lucide-radio",
+      to:
+        "/admin/live-sessions",
     },
     {
-      label: "Audit Logs",
-      icon: "i-lucide-scroll-text",
-      to: "/admin/audit-logs",
+      label:
+        "Audit Logs",
+      icon:
+        "i-lucide-scroll-text",
+      to:
+        "/admin/audit-logs",
     },
     {
-      label: "System Settings",
-      icon: "i-lucide-settings",
-      to: "/admin/settings",
+      label:
+        "My Profile",
+      icon:
+        "i-lucide-user-round",
+      to:
+        "/admin/profile",
+    },
+    {
+      label:
+        "System Settings",
+      icon:
+        "i-lucide-settings",
+      to:
+        "/admin/settings",
     },
   ],
 
   instructor: [
     {
-      label: "Overview",
-      icon: "i-lucide-layout-dashboard",
-      to: "/instructor/dashboard",
+      label:
+        "Overview",
+      icon:
+        "i-lucide-layout-dashboard",
+      to:
+        "/instructor/dashboard",
     },
     {
-      label: "My Classes",
-      icon: "i-lucide-school",
-      to: "/instructor/classes",
+      label:
+        "My Classes",
+      icon:
+        "i-lucide-school",
+      to:
+        "/instructor/classes",
     },
     {
-      label: "Assessments",
-      icon: "i-lucide-clipboard-list",
-      to: "/instructor/assessments",
+      label:
+        "Assessments",
+      icon:
+        "i-lucide-clipboard-list",
+      to:
+        "/instructor/assessments",
     },
     {
-      label: "Live Sessions",
-      icon: "i-lucide-radio-tower",
-      to: "/instructor/sessions",
+      label:
+        "Live Sessions",
+      icon:
+        "i-lucide-radio-tower",
+      to:
+        "/instructor/sessions",
     },
     {
-      label: "Archive",
-      icon: "i-lucide-archive",
-      to: "/instructor/archive",
+      label:
+        "Archive",
+      icon:
+        "i-lucide-archive",
+      to:
+        "/instructor/archive",
     },
     {
-      label: "Reports",
-      icon: "i-lucide-chart-no-axes-combined",
-      to: "/instructor/reports",
+      label:
+        "Reports",
+      icon:
+        "i-lucide-chart-no-axes-combined",
+      to:
+        "/instructor/reports",
     },
     {
-      label: "My Profile",
-      icon: "i-lucide-user-round",
-      to: "/instructor/profile",
+      label:
+        "My Profile",
+      icon:
+        "i-lucide-user-round",
+      to:
+        "/instructor/profile",
     },
   ],
 
   student: [
     {
-      label: "Overview",
-      icon: "i-lucide-layout-dashboard",
-      to: "/student/dashboard",
+      label:
+        "Overview",
+      icon:
+        "i-lucide-layout-dashboard",
+      to:
+        "/student/dashboard",
     },
     {
-      label: "My Classes",
-      icon: "i-lucide-book-open",
-      to: "/student/classes",
+      label:
+        "My Classes",
+      icon:
+        "i-lucide-book-open",
+      to:
+        "/student/classes",
     },
     {
-      label: "Assessments",
-      icon: "i-lucide-clipboard-list",
-      to: "/student/assessments",
+      label:
+        "Assessments",
+      icon:
+        "i-lucide-clipboard-list",
+      to:
+        "/student/assessments",
     },
     {
-      label: "Join Session",
-      icon: "i-lucide-log-in",
-      to: "/student/sessions/join",
+      label:
+        "Join Session",
+      icon:
+        "i-lucide-log-in",
+      to:
+        "/student/sessions/join",
     },
     {
-      label: "My Results",
-      icon: "i-lucide-trophy",
-      to: "/student/results",
+      label:
+        "My Results",
+      icon:
+        "i-lucide-trophy",
+      to:
+        "/student/results",
     },
     {
-      label: "My Profile",
-      icon: "i-lucide-user-round",
-      to: "/student/profile",
+      label:
+        "My Profile",
+      icon:
+        "i-lucide-user-round",
+      to:
+        "/student/profile",
     },
   ],
 };

@@ -55,6 +55,17 @@ const isSaving = ref(false);
 const closingId = ref<string | null>(null);
 const errorMessage = ref("");
 
+const saveConfirmationOpen =
+  ref(false);
+
+const closeConfirmationOpen =
+  ref(false);
+
+const pendingCloseSchedule =
+  ref<AssessmentScheduleItem | null>(
+    null,
+  );
+
 const selectedRows = computed(
   () => rows.value.filter(
     (row) => row.selected,
@@ -320,6 +331,54 @@ async function loadData(): Promise<void> {
     );
 
   isLoading.value = false;
+}
+
+function requestSave(): void {
+  if (
+    !overview.value
+    || !canEdit.value
+  ) {
+    return;
+  }
+
+  const validationError =
+    validateRows();
+
+  if (validationError) {
+    errorMessage.value =
+      validationError;
+
+    return;
+  }
+
+  saveConfirmationOpen.value =
+    true;
+}
+
+function requestCloseEarly(
+  schedule: AssessmentScheduleItem,
+): void {
+  pendingCloseSchedule.value =
+    schedule;
+
+  closeConfirmationOpen.value =
+    true;
+}
+
+async function confirmCloseEarly(): Promise<void> {
+  if (!pendingCloseSchedule.value) {
+    return;
+  }
+
+  await closeEarly(
+    pendingCloseSchedule.value,
+  );
+
+  closeConfirmationOpen.value =
+    false;
+
+  pendingCloseSchedule.value =
+    null;
 }
 
 async function save(): Promise<void> {
@@ -658,7 +717,7 @@ onMounted(loadData);
           icon="i-lucide-save"
           :loading="isSaving"
           :disabled="!canEdit"
-          @click="save"
+          @click="requestSave"
         >
           Save Class Schedules
         </UButton>
@@ -696,7 +755,11 @@ onMounted(loadData);
               variant="soft"
               icon="i-lucide-lock"
               :loading="closingId === schedule.id"
-              @click="closeEarly(schedule)"
+              @click="
+                requestCloseEarly(
+                  schedule,
+                )
+              "
             >
               Close Early
             </UButton>
@@ -704,5 +767,37 @@ onMounted(loadData);
         </div>
       </UCard>
     </template>
+
+    <ConfirmationModal
+      v-model:open="
+        saveConfirmationOpen
+      "
+      title="Save class schedules?"
+      description="Students in the selected classes will receive automatic access when the opening time is reached, and access will close at the ending time."
+      confirm-label="Save Schedules"
+      confirm-color="primary"
+      icon="i-lucide-calendar-check"
+      :loading="isSaving"
+      @confirm="save"
+    />
+
+    <ConfirmationModal
+      v-model:open="
+        closeConfirmationOpen
+      "
+      title="Close this class schedule early?"
+      description="Student access to this scheduled assessment will close immediately for the selected class."
+      confirm-label="Close Access"
+      confirm-color="error"
+      icon="i-lucide-lock"
+      :loading="
+        Boolean(
+          closingId,
+        )
+      "
+      @confirm="
+        confirmCloseEarly
+      "
+    />
   </div>
 </template>

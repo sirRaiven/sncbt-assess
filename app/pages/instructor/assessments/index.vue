@@ -33,6 +33,48 @@ const statusFilter = ref(
   "All statuses",
 );
 
+const assessmentActionModalOpen =
+  ref(false);
+
+const pendingAssessmentAction =
+  ref<{
+    assessment:
+      AssessmentWithClassroom;
+    action:
+      | "archive"
+      | "draft";
+  } | null>(
+    null,
+  );
+
+const pendingAssessmentTitle =
+  computed(
+    () =>
+      pendingAssessmentAction.value
+        ?.assessment.title
+      || "this assessment",
+  );
+
+const assessmentActionTitle =
+  computed(
+    () =>
+      pendingAssessmentAction.value
+        ?.action
+      === "archive"
+        ? "Archive assessment?"
+        : "Return assessment to draft?",
+  );
+
+const assessmentActionDescription =
+  computed(
+    () =>
+      pendingAssessmentAction.value
+        ?.action
+      === "archive"
+        ? `Archive ${pendingAssessmentTitle.value}? Scheduled class access will close and linked open live sessions will be cancelled safely.`
+        : `Return ${pendingAssessmentTitle.value} to draft? Students will no longer receive published access until it is published again.`,
+  );
+
 const counts = computed(() => ({
   all:
     assessments.value.length,
@@ -150,6 +192,41 @@ async function loadAssessments(): Promise<void> {
     result.data.assessments;
 
   isLoading.value = false;
+}
+
+function requestAssessmentAction(
+  assessment: AssessmentWithClassroom,
+  action:
+    | "archive"
+    | "draft",
+): void {
+  pendingAssessmentAction.value = {
+    assessment,
+    action,
+  };
+
+  assessmentActionModalOpen.value =
+    true;
+}
+
+async function confirmAssessmentAction(): Promise<void> {
+  const pending =
+    pendingAssessmentAction.value;
+
+  if (!pending) {
+    return;
+  }
+
+  await runAction(
+    pending.assessment,
+    pending.action,
+  );
+
+  assessmentActionModalOpen.value =
+    false;
+
+  pendingAssessmentAction.value =
+    null;
 }
 
 async function runAction(
@@ -514,7 +591,12 @@ onMounted(
                 variant="ghost"
                 icon="i-lucide-undo-2"
                 :disabled="busyAssessmentId === assessment.id"
-                @click="runAction(assessment, 'draft')"
+                @click="
+                  requestAssessmentAction(
+                    assessment,
+                    'draft',
+                  )
+                "
               >
                 Return to Draft
               </UButton>
@@ -524,7 +606,12 @@ onMounted(
                 variant="ghost"
                 icon="i-lucide-archive"
                 :disabled="busyAssessmentId === assessment.id"
-                @click="runAction(assessment, 'archive')"
+                @click="
+                  requestAssessmentAction(
+                    assessment,
+                    'archive',
+                  )
+                "
               >
                 Archive
               </UButton>
@@ -533,5 +620,43 @@ onMounted(
         </div>
       </UCard>
     </div>
+
+    <ConfirmationModal
+      v-model:open="
+        assessmentActionModalOpen
+      "
+      :title="
+        assessmentActionTitle
+      "
+      :description="
+        assessmentActionDescription
+      "
+      :confirm-label="
+        pendingAssessmentAction?.action
+        === 'archive'
+          ? 'Archive Assessment'
+          : 'Return to Draft'
+      "
+      :confirm-color="
+        pendingAssessmentAction?.action
+        === 'archive'
+          ? 'warning'
+          : 'neutral'
+      "
+      :icon="
+        pendingAssessmentAction?.action
+        === 'archive'
+          ? 'i-lucide-archive'
+          : 'i-lucide-undo-2'
+      "
+      :loading="
+        Boolean(
+          busyAssessmentId,
+        )
+      "
+      @confirm="
+        confirmAssessmentAction
+      "
+    />
   </div>
 </template>
