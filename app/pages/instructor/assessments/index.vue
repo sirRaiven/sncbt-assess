@@ -511,6 +511,16 @@ onMounted(
               </UButton>
 
               <UButton
+                v-if="assessment.status === 'draft'"
+                :to="`/instructor/assessments/${assessment.id}/import`"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-file-spreadsheet"
+              >
+                Import Excel
+              </UButton>
+
+              <UButton
                 :to="`/instructor/assessments/${assessment.id}/assign`"
                 color="neutral"
                 variant="outline"
