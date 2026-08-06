@@ -5,7 +5,8 @@ import type {
 import type {
   Assessment,
   AssessmentClassOption,
-  AssessmentFormInput,
+  AssessmentCreateInput,
+  AssessmentDetailsInput,
   AssessmentWithClassroom,
   StudentPublishedAssessment,
 } from "~/types/assessment";
@@ -63,7 +64,6 @@ export function useAssessments() {
         message:
           body.message
           || fallback,
-
         code:
           body.code
           || null,
@@ -100,7 +100,9 @@ export function useAssessments() {
 
       if (error) {
         const parsed =
-          await parseFunctionError(error);
+          await parseFunctionError(
+            error,
+          );
 
         return {
           data: null,
@@ -116,7 +118,9 @@ export function useAssessments() {
       };
     } catch (error) {
       const parsed =
-        await parseFunctionError(error);
+        await parseFunctionError(
+          error,
+        );
 
       return {
         data: null,
@@ -156,11 +160,11 @@ export function useAssessments() {
   }
 
   async function createAssessment(
-    input: AssessmentFormInput,
+    input: AssessmentCreateInput,
   ) {
     return await invoke<
       MessageResponse & {
-        assessment: Assessment;
+        assessment: AssessmentWithClassroom;
       }
     >(
       "create-assessment",
@@ -170,17 +174,34 @@ export function useAssessments() {
 
   async function updateAssessment(
     assessmentId: string,
-    input: AssessmentFormInput,
+    input: AssessmentDetailsInput,
   ) {
     return await invoke<
       MessageResponse & {
-        assessment: Assessment;
+        assessment: AssessmentWithClassroom;
       }
     >(
       "update-assessment",
       {
         assessmentId,
         ...input,
+      },
+    );
+  }
+
+  async function setAssessmentAssignments(
+    assessmentId: string,
+    classroomIds: string[],
+  ) {
+    return await invoke<
+      MessageResponse & {
+        assessment: AssessmentWithClassroom;
+      }
+    >(
+      "set-assessment-assignments",
+      {
+        assessmentId,
+        classroomIds,
       },
     );
   }
@@ -279,6 +300,7 @@ export function useAssessments() {
     getInstructorAssessment,
     createAssessment,
     updateAssessment,
+    setAssessmentAssignments,
     publishAssessment,
     returnAssessmentToDraft,
     archiveAssessment,

@@ -73,6 +73,22 @@ const progress = computed(
       : 0,
 );
 
+const assignmentLabel = computed(() => {
+  const assignedClassrooms =
+    assessment.value?.assignedClassrooms
+    ?? [];
+
+  if (assignedClassrooms.length === 0) {
+    return "Assessment Library";
+  }
+
+  if (assignedClassrooms.length === 1) {
+    return assignedClassrooms[0].section;
+  }
+
+  return `${assignedClassrooms.length} classes`;
+});
+
 function isSelected(
   optionId: string,
 ): boolean {
@@ -214,6 +230,17 @@ onMounted(
     >
       <template #actions>
         <UButton
+          v-if="
+            assessment?.status
+            === 'published'
+          "
+          :to="`/instructor/sessions/create?assessmentId=${assessmentId}`"
+          icon="i-lucide-radio-tower"
+        >
+          Start Live
+        </UButton>
+
+        <UButton
           :to="`/instructor/assessments/${assessmentId}/edit`"
           color="neutral"
           variant="outline"
@@ -279,7 +306,7 @@ onMounted(
           <p class="text-xs font-bold uppercase tracking-[0.16em] text-primary">
             {{ assessment.subject_code }}
             ·
-            {{ assessment.classroom.section }}
+            {{ assignmentLabel }}
           </p>
 
           <p class="mt-1 text-sm text-muted">

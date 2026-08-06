@@ -34,10 +34,13 @@ const isSubmitting = ref(false);
 const errorMessage = ref("");
 
 const schema = z.object({
-  classroomId: z
-    .string()
-    .uuid(
-      "Select an assigned class.",
+  classroomIds: z
+    .array(
+      z.string().uuid(),
+    )
+    .max(
+      100,
+      "Select no more than 100 classes.",
     ),
 
   title: z
@@ -114,7 +117,7 @@ type CreateAssessmentSchema =
   z.output<typeof schema>;
 
 const state = reactive<CreateAssessmentSchema>({
-  classroomId: "",
+  classroomIds: [],
   title: "",
   subjectName: "",
   subjectCode: "",
@@ -129,41 +132,32 @@ const state = reactive<CreateAssessmentSchema>({
   overallTimeLimitMinutes: null,
 });
 
-const selectedClass = computed(
-  () =>
-    classOptions.value.find(
-      (item) =>
-        item.id
-        === state.classroomId,
-    )
-    || null,
-);
-
-const classItems = computed(
-  () =>
-    classOptions.value.map(
-      (item) => ({
-        label:
-          `${item.subjectCode} · ${item.section} · ${item.name}`,
-
-        value:
-          item.id,
-      }),
-    ),
-);
-
 watch(
-  selectedClass,
-  (classroom) => {
-    if (!classroom) {
+  () => state.classroomIds,
+  (classroomIds) => {
+    const firstClass =
+      classOptions.value.find(
+        (classroom) =>
+          classroom.id
+          === classroomIds[0],
+      );
+
+    if (!firstClass) {
       return;
     }
 
-    state.subjectName =
-      classroom.name;
+    if (!state.subjectName.trim()) {
+      state.subjectName =
+        firstClass.name;
+    }
 
-    state.subjectCode =
-      classroom.subjectCode;
+    if (!state.subjectCode.trim()) {
+      state.subjectCode =
+        firstClass.subjectCode;
+    }
+  },
+  {
+    deep: true,
   },
 );
 
@@ -199,43 +193,31 @@ async function submit(
 
   const result =
     await createAssessment({
-      classroomId:
-        event.data.classroomId,
-
+      classroomIds:
+        event.data.classroomIds,
       title:
         event.data.title,
-
       subjectName:
         event.data.subjectName,
-
       subjectCode:
         event.data.subjectCode,
-
       instructions:
         event.data.instructions
         || null,
-
       assessmentType:
         event.data.assessmentType,
-
       scoringMode:
         event.data.scoringMode,
-
       randomizeQuestions:
         event.data.randomizeQuestions,
-
       randomizeOptions:
         event.data.randomizeOptions,
-
       resultVisibility:
         event.data.resultVisibility,
-
       leaderboardEnabled:
         event.data.leaderboardEnabled,
-
       allowBacktracking:
         event.data.allowBacktracking,
-
       overallTimeLimitMinutes:
         event.data.overallTimeLimitMinutes,
     });
@@ -274,9 +256,9 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="New assessment"
+      eyebrow="New reusable assessment"
       title="Create an assessment"
-      description="Set the assigned class, academic information, and default assessment behavior."
+      description="Create the assessment once, keep it in your library, and make it available to any class now or later."
     />
 
     <UAlert
@@ -287,135 +269,131 @@ onMounted(
       :description="errorMessage"
     />
 
-    <UAlert
-      v-if="!isLoadingClasses && classOptions.length === 0"
-      color="warning"
-      variant="soft"
-      title="An active class is required"
-      description="Create or reactivate a class before creating an assessment."
-    >
-      <template #actions>
-        <UButton
-          to="/instructor/classes/create"
-          color="warning"
-          variant="soft"
-        >
-          Create Class
-        </UButton>
-      </template>
-    </UAlert>
-
     <UForm
       :schema="schema"
       :state="state"
       class="grid gap-6 xl:grid-cols-[1fr_370px]"
       @submit="submit"
     >
-      <UCard>
-        <template #header>
-          <h2 class="font-bold text-highlighted">
-            Assessment information
-          </h2>
-        </template>
+      <div class="space-y-6">
+        <UCard>
+          <template #header>
+            <div>
+              <h2 class="font-bold text-highlighted">
+                Assessment information
+              </h2>
 
-        <div class="space-y-5">
-          <UFormField
-            label="Assigned class"
-            name="classroomId"
-            required
-          >
-            <USelect
-              v-model="state.classroomId"
-              :items="classItems"
-              value-key="value"
-              label-key="label"
-              class="w-full"
-              :loading="isLoadingClasses"
-              placeholder="Select an active class"
-            />
-          </UFormField>
+              <p class="mt-1 text-sm text-muted">
+                These details describe the reusable assessment, not a specific class delivery.
+              </p>
+            </div>
+          </template>
 
-          <UFormField
-            label="Assessment title"
-            name="title"
-            required
-          >
-            <UInput
-              v-model="state.title"
-              placeholder="Mobile Development Prelim Examination"
-              class="w-full"
-            />
-          </UFormField>
-
-          <div class="grid gap-5 sm:grid-cols-2">
+          <div class="space-y-5">
             <UFormField
-              label="Subject name"
-              name="subjectName"
+              label="Assessment title"
+              name="title"
               required
             >
               <UInput
-                v-model="state.subjectName"
+                v-model="state.title"
+                placeholder="Mobile Development Prelim Examination"
+                class="w-full"
+              />
+            </UFormField>
+
+            <div class="grid gap-5 sm:grid-cols-2">
+              <UFormField
+                label="Subject name"
+                name="subjectName"
+                required
+              >
+                <UInput
+                  v-model="state.subjectName"
+                  placeholder="Introduction to Mobile Development"
+                  class="w-full"
+                />
+              </UFormField>
+
+              <UFormField
+                label="Subject code"
+                name="subjectCode"
+                required
+              >
+                <UInput
+                  v-model="state.subjectCode"
+                  placeholder="IT216"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+
+            <UFormField
+              label="Assessment type"
+              name="assessmentType"
+              required
+            >
+              <USelect
+                v-model="state.assessmentType"
+                :items="[
+                  {
+                    label: 'Quiz',
+                    value: 'quiz',
+                  },
+                  {
+                    label: 'Examination',
+                    value: 'examination',
+                  },
+                  {
+                    label: 'Activity',
+                    value: 'activity',
+                  },
+                  {
+                    label: 'Practice',
+                    value: 'practice',
+                  },
+                ]"
+                value-key="value"
+                label-key="label"
                 class="w-full"
               />
             </UFormField>
 
             <UFormField
-              label="Subject code"
-              name="subjectCode"
-              required
+              label="Instructions"
+              name="instructions"
+              help="Students will read these instructions before taking the assessment."
             >
-              <UInput
-                v-model="state.subjectCode"
+              <UTextarea
+                v-model="state.instructions"
+                :rows="7"
                 class="w-full"
+                placeholder="Write clear assessment instructions."
               />
             </UFormField>
           </div>
+        </UCard>
 
-          <UFormField
-            label="Assessment type"
-            name="assessmentType"
-            required
-          >
-            <USelect
-              v-model="state.assessmentType"
-              :items="[
-                {
-                  label: 'Quiz',
-                  value: 'quiz',
-                },
-                {
-                  label: 'Examination',
-                  value: 'examination',
-                },
-                {
-                  label: 'Activity',
-                  value: 'activity',
-                },
-                {
-                  label: 'Practice',
-                  value: 'practice',
-                },
-              ]"
-              value-key="value"
-              label-key="label"
-              class="w-full"
-            />
-          </UFormField>
+        <UCard>
+          <template #header>
+            <div>
+              <h2 class="font-bold text-highlighted">
+                Assign to classes
+              </h2>
 
-          <UFormField
-            label="Instructions"
-            name="instructions"
-            help="Students will read these instructions before entering a future assessment session."
-          >
-            <UTextarea
-              v-model="state.instructions"
-              :rows="7"
-              class="w-full"
-              placeholder="Write clear assessment instructions."
-            />
-          </UFormField>
-        </div>
-      </UCard>
+              <p class="mt-1 text-sm text-muted">
+                Optional during creation. You can select one, several, or no classes.
+              </p>
+            </div>
+          </template>
+
+          <AssessmentClassPicker
+            v-model="state.classroomIds"
+            :classes="classOptions"
+            :loading="isLoadingClasses"
+          />
+        </UCard>
+      </div>
 
       <div class="space-y-6">
         <UCard>
@@ -542,7 +520,7 @@ onMounted(
                     Leaderboard available
                   </p>
                   <p class="mt-1 text-sm text-muted">
-                    A host may enable ranking in a later session.
+                    A host may enable ranking in a future session.
                   </p>
                 </div>
 
@@ -559,7 +537,6 @@ onMounted(
           block
           size="lg"
           :loading="isSubmitting"
-          :disabled="classOptions.length === 0"
         >
           Create Draft
         </UButton>

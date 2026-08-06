@@ -1,18 +1,45 @@
 <script setup lang="ts">
-const p = defineProps<{
-    status: string;
+const props = defineProps<{
+  status: string;
 }>();
+
 const color = computed(() => {
-    const s = p.status.toLowerCase();
-    if (/active|published|completed|approved|online|valid/.test(s))
-        return 'success';
-    if (/pending|draft|waiting|paused/.test(s))
-        return 'warning';
-    if (/live|answering|progress/.test(s))
-        return 'info';
-    if (/suspended|rejected|failed|offline|unsupported/.test(s))
-        return 'error';
-    return 'neutral';
+  const status =
+    props.status.toLowerCase();
+
+  if (
+    /active|published|completed|approved|online|valid|finished/.test(
+      status,
+    )
+  ) {
+    return "success";
+  }
+
+  if (
+    /pending|draft|waiting|paused|lobby/.test(
+      status,
+    )
+  ) {
+    return "warning";
+  }
+
+  if (
+    /live|answering|progress|student.paced|teacher.led/.test(
+      status,
+    )
+  ) {
+    return "info";
+  }
+
+  if (
+    /suspended|rejected|failed|offline|unsupported|removed|cancelled/.test(
+      status,
+    )
+  ) {
+    return "error";
+  }
+
+  return "neutral";
 });
 </script>
 
@@ -22,6 +49,9 @@ const color = computed(() => {
     variant="soft"
     class="capitalize"
   >
-    {{ status }}
+    {{
+      status
+        .replaceAll("_", " ")
+    }}
   </UBadge>
 </template>

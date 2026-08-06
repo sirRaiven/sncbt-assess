@@ -35,30 +35,23 @@ const statusFilter = ref(
   "All statuses",
 );
 
-const counts = computed(() => {
-  return {
-    all:
-      assessments.value.length,
-
-    draft:
-      assessments.value.filter(
-        (item) =>
-          item.status === "draft",
-      ).length,
-
-    published:
-      assessments.value.filter(
-        (item) =>
-          item.status === "published",
-      ).length,
-
-    archived:
-      assessments.value.filter(
-        (item) =>
-          item.status === "archived",
-      ).length,
-  };
-});
+const counts = computed(() => ({
+  all:
+    assessments.value.length,
+  draft:
+    assessments.value.filter(
+      (item) => item.status === "draft",
+    ).length,
+  published:
+    assessments.value.filter(
+      (item) => item.status === "published",
+    ).length,
+  unassigned:
+    assessments.value.filter(
+      (item) =>
+        item.assignedClassrooms.length === 0,
+    ).length,
+}));
 
 const filteredAssessments = computed(() => {
   const keyword =
@@ -68,14 +61,24 @@ const filteredAssessments = computed(() => {
 
   return assessments.value.filter(
     (assessment) => {
+      const assignedClassText =
+        assessment.assignedClassrooms
+          .map(
+            (classroom) => [
+              classroom.name,
+              classroom.subjectCode,
+              classroom.section,
+            ].join(" "),
+          )
+          .join(" ");
+
       const matchesQuery =
         !keyword
         || [
           assessment.title,
           assessment.subject_name,
           assessment.subject_code,
-          assessment.classroom.name,
-          assessment.classroom.section,
+          assignedClassText,
         ]
           .join(" ")
           .toLowerCase()
@@ -107,6 +110,23 @@ function typeLabel(
         + part.slice(1),
     )
     .join(" ");
+}
+
+function assignmentLabel(
+  assessment: AssessmentWithClassroom,
+): string {
+  const count =
+    assessment.assignedClassrooms.length;
+
+  if (count === 0) {
+    return "Assessment Library";
+  }
+
+  if (count === 1) {
+    return assessment.assignedClassrooms[0].section;
+  }
+
+  return `${count} classes`;
 }
 
 async function loadAssessments(): Promise<void> {
@@ -152,16 +172,12 @@ async function runAction(
       await duplicateAssessment(
         assessment.id,
       );
-  } else if (
-    action === "archive"
-  ) {
+  } else if (action === "archive") {
     result =
       await archiveAssessment(
         assessment.id,
       );
-  } else if (
-    action === "restore"
-  ) {
+  } else if (action === "restore") {
     result =
       await restoreAssessment(
         assessment.id,
@@ -187,9 +203,7 @@ async function runAction(
         "error",
     });
 
-    busyAssessmentId.value =
-      null;
-
+    busyAssessmentId.value = null;
     return;
   }
 
@@ -211,9 +225,7 @@ async function runAction(
   }
 
   await loadAssessments();
-
-  busyAssessmentId.value =
-    null;
+  busyAssessmentId.value = null;
 }
 
 function getStatusAction(
@@ -263,9 +275,9 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="Assessment library"
+      eyebrow="Reusable assessment library"
       title="Assessments"
-      description="Create, configure, duplicate, publish, and archive quizzes and examinations."
+      description="Create once, assign to any class, and reuse quizzes or examinations across sections."
     >
       <template #actions>
         <UButton
@@ -308,9 +320,9 @@ onMounted(
       />
 
       <StatCard
-        label="Archived"
-        :value="String(counts.archived)"
-        icon="i-lucide-archive"
+        label="Library only"
+        :value="String(counts.unassigned)"
+        icon="i-lucide-library"
         tone="neutral"
       />
     </section>
@@ -362,7 +374,7 @@ onMounted(
       v-else-if="filteredAssessments.length === 0"
       icon="i-lucide-clipboard-list"
       title="No assessments found"
-      description="Create your first assessment or adjust the current filters."
+      description="Create your first reusable assessment or adjust the current filters."
     >
       <template #actions>
         <UButton
@@ -400,15 +412,47 @@ onMounted(
                 <p class="mt-1 text-sm text-muted">
                   {{ assessment.subject_code }}
                   ·
-                  {{ assessment.classroom.section }}
-                  ·
                   {{ typeLabel(assessment.assessment_type) }}
+                  ·
+                  {{ assignmentLabel(assessment) }}
                 </p>
               </div>
 
               <StatusPill
                 :status="assessment.status"
               />
+            </div>
+
+            <div class="mt-4 flex flex-wrap gap-2">
+              <UBadge
+                v-if="assessment.assignedClassrooms.length === 0"
+                color="neutral"
+                variant="soft"
+                icon="i-lucide-library"
+              >
+                My Assessment Library
+              </UBadge>
+
+              <template v-else>
+                <UBadge
+                  v-for="classroom in assessment.assignedClassrooms.slice(0, 3)"
+                  :key="classroom.id"
+                  color="primary"
+                  variant="soft"
+                >
+                  {{ classroom.subjectCode }}
+                  ·
+                  {{ classroom.section }}
+                </UBadge>
+              </template>
+
+              <UBadge
+                v-if="assessment.assignedClassrooms.length > 3"
+                color="neutral"
+                variant="soft"
+              >
+                +{{ assessment.assignedClassrooms.length - 3 }} more
+              </UBadge>
             </div>
 
             <div class="mt-5 grid grid-cols-3 gap-3">
@@ -432,21 +476,47 @@ onMounted(
 
               <div class="rounded-lg bg-elevated p-3">
                 <p class="text-xs text-muted">
-                  Class
+                  Classes
                 </p>
-                <p class="mt-1 truncate text-xs font-black text-highlighted">
-                  {{ assessment.classroom.subjectCode }}
+                <p class="mt-1 font-black text-highlighted">
+                  {{ assessment.assignedClassrooms.length }}
                 </p>
               </div>
             </div>
 
             <div class="mt-5 flex flex-wrap gap-2">
               <UButton
+                v-if="assessment.status === 'published'"
+                :to="`/instructor/sessions/create?assessmentId=${assessment.id}`"
+                icon="i-lucide-radio-tower"
+              >
+                Start Live
+              </UButton>
+
+              <UButton
                 :to="`/instructor/assessments/${assessment.id}/edit`"
-                variant="soft"
+                :color="
+                  assessment.status === 'published'
+                    ? 'neutral'
+                    : 'primary'
+                "
+                :variant="
+                  assessment.status === 'published'
+                    ? 'outline'
+                    : 'soft'
+                "
                 icon="i-lucide-list-plus"
               >
                 Questions
+              </UButton>
+
+              <UButton
+                :to="`/instructor/assessments/${assessment.id}/assign`"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-users-round"
+              >
+                Assign Classes
               </UButton>
 
               <UButton
@@ -461,7 +531,7 @@ onMounted(
               <UButton
                 :to="`/instructor/assessments/${assessment.id}/preview`"
                 color="neutral"
-                variant="outline"
+                variant="ghost"
                 icon="i-lucide-eye"
               >
                 Preview

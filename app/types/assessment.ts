@@ -31,7 +31,7 @@ export interface AssessmentClassroomSummary {
 export interface Assessment {
   id: string;
   instructor_id: string;
-  classroom_id: string;
+  classroom_id: string | null;
   source_assessment_id: string | null;
   title: string;
   subject_name: string;
@@ -57,7 +57,8 @@ export interface Assessment {
 
 export interface AssessmentWithClassroom
   extends Assessment {
-  classroom: AssessmentClassroomSummary;
+  classroom: AssessmentClassroomSummary | null;
+  assignedClassrooms: AssessmentClassroomSummary[];
 }
 
 export interface AssessmentClassOption {
@@ -69,8 +70,7 @@ export interface AssessmentClassOption {
   semester: string;
 }
 
-export interface AssessmentFormInput {
-  classroomId: string;
+export interface AssessmentDetailsInput {
   title: string;
   subjectName: string;
   subjectCode: string;
@@ -83,6 +83,11 @@ export interface AssessmentFormInput {
   leaderboardEnabled: boolean;
   allowBacktracking: boolean;
   overallTimeLimitMinutes: number | null;
+}
+
+export interface AssessmentCreateInput
+  extends AssessmentDetailsInput {
+  classroomIds: string[];
 }
 
 export interface StudentPublishedAssessment {
