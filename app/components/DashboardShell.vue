@@ -258,7 +258,7 @@ watch(
           class="w-full"
           :ui="{
             link:
-              'min-h-10 text-slate-300 hover:bg-white/8 hover:text-white data-[active]:bg-primary data-[active]:text-white',
+              'min-h-10 text-slate-300 hover:bg-white/8 hover:text-white data-[active]:bg-primary/12 data-[active]:rounded-lg data-[active]:text-white',
             linkLabel:
               'font-semibold',
             linkLeadingIcon:
