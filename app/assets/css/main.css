@@ -31,12 +31,48 @@
 
 html {
   scroll-behavior: smooth;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
+  min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
   background: var(--ui-bg);
   color: var(--ui-text);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom:
+    max(
+      1rem,
+      env(safe-area-inset-bottom)
+    );
 }
 
 .academic-grid {
@@ -57,10 +93,12 @@ body {
 .page-stack {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
+  min-width: 0;
 }
 
 .surface-panel {
+  min-width: 0;
   border: 1px solid var(--ui-border);
   border-radius: 0.75rem;
   background: var(--ui-bg);
@@ -70,6 +108,7 @@ body {
 }
 
 .table-shell {
+  min-width: 0;
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: 0.75rem;
@@ -78,6 +117,8 @@ body {
 
 .table-scroll {
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .app-table {
@@ -94,12 +135,14 @@ body {
   letter-spacing: 0.06em;
   text-align: left;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .app-table td {
   padding: 0.95rem 1rem;
   border-top: 1px solid var(--ui-border);
   font-size: 0.875rem;
+  vertical-align: middle;
 }
 
 .app-table tbody tr {
@@ -110,8 +153,61 @@ body {
   background: var(--ui-bg-elevated);
 }
 
+.mobile-action-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mobile-action-row > * {
+  width: 100%;
+}
+
+.break-mobile {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (min-width: 640px) {
+  .page-stack {
+    gap: 1.5rem;
+  }
+
+  .mobile-action-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .mobile-action-row > * {
+    width: auto;
+  }
+}
+
 @media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
   .app-table {
     min-width: 760px;
+  }
+
+  .app-table th,
+  .app-table td {
+    padding-inline: 0.8rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

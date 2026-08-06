@@ -737,7 +737,7 @@ async function confirmPasswordChange(): Promise<void> {
             class="space-y-5"
             @submit="requestProfileSave"
           >
-            <div class="grid gap-5 md:grid-cols-3">
+            <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               <UFormField
                 label="First name"
                 name="firstName"
@@ -787,7 +787,7 @@ async function confirmPasswordChange(): Promise<void> {
               />
             </UFormField>
 
-            <div class="grid gap-5 md:grid-cols-2">
+            <div class="grid gap-5 sm:grid-cols-2">
               <UFormField label="Email address">
                 <UInput
                   :model-value="profile.email || ''"
@@ -811,6 +811,7 @@ async function confirmPasswordChange(): Promise<void> {
               <UButton
                 type="submit"
                 icon="i-lucide-save"
+                class="w-full sm:w-auto"
               >
                 Review Profile Changes
               </UButton>
@@ -842,11 +843,10 @@ async function confirmPasswordChange(): Promise<void> {
               name="currentPassword"
               required
             >
-              <UInput
+              <PasswordField
                 v-model="passwordState.currentPassword"
-                type="password"
-                class="w-full"
                 icon="i-lucide-lock-keyhole"
+                placeholder="Enter your current password"
                 autocomplete="current-password"
               />
             </UFormField>
@@ -857,11 +857,10 @@ async function confirmPasswordChange(): Promise<void> {
                 name="newPassword"
                 required
               >
-                <UInput
+                <PasswordField
                   v-model="passwordState.newPassword"
-                  type="password"
-                  class="w-full"
                   icon="i-lucide-key-round"
+                  placeholder="Create a new password"
                   autocomplete="new-password"
                 />
               </UFormField>
@@ -871,22 +870,19 @@ async function confirmPasswordChange(): Promise<void> {
                 name="confirmPassword"
                 required
               >
-                <UInput
+                <PasswordField
                   v-model="passwordState.confirmPassword"
-                  type="password"
-                  class="w-full"
                   icon="i-lucide-key-round"
+                  placeholder="Enter the new password again"
                   autocomplete="new-password"
                 />
               </UFormField>
             </div>
 
-            <UAlert
-              color="info"
-              variant="soft"
-              icon="i-lucide-shield-check"
-              title="Password requirements"
-              description="Use at least eight characters with an uppercase letter, lowercase letter, and number."
+            <PasswordRequirements
+              :password="passwordState.newPassword"
+              :confirm-password="passwordState.confirmPassword"
+              show-match
             />
 
             <div class="flex justify-end">
@@ -895,6 +891,7 @@ async function confirmPasswordChange(): Promise<void> {
                 color="warning"
                 variant="soft"
                 icon="i-lucide-key-round"
+                class="w-full sm:w-auto"
               >
                 Review Password Change
               </UButton>
@@ -918,6 +915,7 @@ async function confirmPasswordChange(): Promise<void> {
               color="error"
               variant="soft"
               icon="i-lucide-log-out"
+              class="w-full sm:w-auto"
               @click="
                 signOutModalOpen = true
               "

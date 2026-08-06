@@ -196,8 +196,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-lg">
-    <UCard>
+  <div class="mx-auto w-full max-w-lg">
+    <UCard
+      :ui="{
+        header:
+          'p-5 sm:p-6',
+        body:
+          'p-5 sm:p-6',
+        footer:
+          'p-4 sm:p-5',
+      }"
+    >
       <template #header>
         <div>
           <h1 class="text-2xl font-black text-highlighted">
@@ -227,7 +236,7 @@ onBeforeUnmount(() => {
         </p>
 
         <p class="mt-2 text-sm text-muted">
-          Please wait while Supabase restores the recovery session.
+          Please wait while we verify your secure reset link.
         </p>
       </div>
 
@@ -263,14 +272,12 @@ onBeforeUnmount(() => {
           label="New password"
           name="password"
           required
-          help="Use at least eight characters with an uppercase letter, lowercase letter, and number."
         >
-          <UInput
+          <PasswordField
             v-model="state.password"
-            type="password"
             size="lg"
             icon="i-lucide-lock-keyhole"
-            class="w-full"
+            placeholder="Create a new password"
             autocomplete="new-password"
           />
         </UFormField>
@@ -280,15 +287,20 @@ onBeforeUnmount(() => {
           name="confirmPassword"
           required
         >
-          <UInput
+          <PasswordField
             v-model="state.confirmPassword"
-            type="password"
             size="lg"
             icon="i-lucide-lock-keyhole"
-            class="w-full"
+            placeholder="Enter the new password again"
             autocomplete="new-password"
           />
         </UFormField>
+
+        <PasswordRequirements
+          :password="state.password"
+          :confirm-password="state.confirmPassword"
+          show-match
+        />
 
         <UButton
           type="submit"

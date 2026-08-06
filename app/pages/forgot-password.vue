@@ -74,8 +74,17 @@ async function requestPasswordReset(
 </script>
 
 <template>
-  <div class="mx-auto max-w-lg">
-    <UCard>
+  <div class="mx-auto w-full max-w-lg">
+    <UCard
+      :ui="{
+        header:
+          'p-5 sm:p-6',
+        body:
+          'p-5 sm:p-6',
+        footer:
+          'p-4 sm:p-5',
+      }"
+    >
       <template #header>
         <div class="text-center">
           <div class="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -101,7 +110,7 @@ async function requestPasswordReset(
         variant="soft"
         icon="i-lucide-mail-check"
         title="Check your email"
-        description="When an account matches the submitted address, Supabase will send a password-reset link."
+        description="If the email address matches an account, a password-reset link will be sent."
       />
 
       <UForm

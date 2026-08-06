@@ -61,6 +61,110 @@ const isRunningAction = ref(false);
 const errorMessage = ref("");
 const formError = ref("");
 
+const deleteModalOpen = ref(false);
+const duplicateModalOpen = ref(false);
+const publishModalOpen = ref(false);
+const feedbackModalOpen = ref(false);
+
+type FeedbackTone =
+  | "primary"
+  | "success"
+  | "warning"
+  | "error"
+  | "neutral";
+
+const feedback = reactive<{
+  title: string;
+  description: string;
+  icon: string;
+  color: FeedbackTone;
+}>({
+  title: "Notice",
+  description: "",
+  icon: "i-lucide-info",
+  color: "primary",
+});
+
+function showFeedback(
+  title: string,
+  description: string,
+  color: FeedbackTone = "primary",
+  icon = "i-lucide-info",
+): void {
+  feedback.title = title;
+  feedback.description = description;
+  feedback.color = color;
+  feedback.icon = icon;
+  feedbackModalOpen.value = true;
+}
+
+function friendlyError(
+  message: string | null | undefined,
+  fallback: string,
+): string {
+  const normalized = String(
+    message || "",
+  ).toLowerCase();
+
+  if (
+    normalized.includes(
+      "attempt_question_states",
+    )
+    || normalized.includes(
+      "attempt_answers",
+    )
+    || normalized.includes(
+      "foreign key constraint",
+    )
+    || normalized.includes(
+      "already been used in a student assessment",
+    )
+    || normalized.includes(
+      "already been included in a student attempt",
+    )
+    || normalized.includes(
+      "already part of a student attempt",
+    )
+  ) {
+    return "This question has already been used in a student assessment. It cannot be changed or deleted because previous student results must remain accurate. Create a new assessment or duplicate this assessment before making major changes.";
+  }
+
+  if (
+    normalized.includes(
+      "only draft",
+    )
+    || normalized.includes(
+      "not draft",
+    )
+  ) {
+    return "This assessment is no longer editable. Return it to draft from Assessment Settings before changing its questions.";
+  }
+
+  if (
+    normalized.includes(
+      "failed to fetch",
+    )
+    || normalized.includes(
+      "network",
+    )
+    || normalized.includes(
+      "connection",
+    )
+  ) {
+    return "The request could not be completed. Check your internet connection, then try again.";
+  }
+
+  if (
+    normalized.includes(
+      "not found",
+    )
+  ) {
+    return "The selected question or assessment is no longer available. Refresh the page and try again.";
+  }
+
+  return fallback;
+}
+
 const editor = reactive<{
   questionType: AssessmentQuestionType;
   questionText: string;
@@ -481,9 +585,17 @@ async function loadData(
     assessmentResult.error
     || !assessmentResult.data
   ) {
-    errorMessage.value =
-      assessmentResult.error
-      || "Unable to load the assessment.";
+    errorMessage.value = friendlyError(
+      assessmentResult.error,
+      "The assessment could not be opened. Please try again.",
+    );
+
+    showFeedback(
+      "Assessment could not be opened",
+      errorMessage.value,
+      "error",
+      "i-lucide-circle-alert",
+    );
 
     isLoading.value =
       false;
@@ -495,9 +607,17 @@ async function loadData(
     questionResult.error
     || !questionResult.data
   ) {
-    errorMessage.value =
-      questionResult.error
-      || "Unable to load the questions.";
+    errorMessage.value = friendlyError(
+      questionResult.error,
+      "The questions could not be loaded. Please try again.",
+    );
+
+    showFeedback(
+      "Questions could not be loaded",
+      errorMessage.value,
+      "error",
+      "i-lucide-circle-alert",
+    );
 
     isLoading.value =
       false;
@@ -550,6 +670,13 @@ async function save(): Promise<void> {
     formError.value =
       validationMessage;
 
+    showFeedback(
+      "Complete the question",
+      validationMessage,
+      "warning",
+      "i-lucide-list-checks",
+    );
+
     return;
   }
 
@@ -578,6 +705,13 @@ async function save(): Promise<void> {
       formError.value =
         "Select a saved question before updating it.";
 
+      showFeedback(
+        "Select a question",
+        formError.value,
+        "warning",
+        "i-lucide-mouse-pointer-click",
+      );
+
       isSaving.value =
         false;
 
@@ -596,9 +730,17 @@ async function save(): Promise<void> {
     result.error
     || !result.data
   ) {
-    formError.value =
-      result.error
-      || "The question could not be saved.";
+    formError.value = friendlyError(
+      result.error,
+      "The question could not be saved. Review the information and try again.",
+    );
+
+    showFeedback(
+      "Question was not saved",
+      formError.value,
+      "error",
+      "i-lucide-circle-alert",
+    );
 
     isSaving.value =
       false;
@@ -608,6 +750,8 @@ async function save(): Promise<void> {
 
   selectedQuestionId.value =
     result.data.question.id;
+
+  duplicateModalOpen.value = false;
 
   toast.add({
     title:
@@ -630,6 +774,17 @@ async function save(): Promise<void> {
     false;
 }
 
+function requestDuplicateSelected(): void {
+  if (
+    !selectedQuestion.value
+    || !isDraft.value
+  ) {
+    return;
+  }
+
+  duplicateModalOpen.value = true;
+}
+
 async function duplicateSelected(): Promise<void> {
   if (
     !selectedQuestion.value
@@ -650,15 +805,17 @@ async function duplicateSelected(): Promise<void> {
     result.error
     || !result.data
   ) {
-    toast.add({
-      title:
-        "Question could not be duplicated",
-      description:
-        result.error
-        || "The action could not be completed.",
-      color:
-        "error",
-    });
+    duplicateModalOpen.value = false;
+
+    showFeedback(
+      "Question was not duplicated",
+      friendlyError(
+        result.error,
+        "The question could not be copied. Please try again.",
+      ),
+      "error",
+      "i-lucide-circle-alert",
+    );
 
     isRunningAction.value =
       false;
@@ -686,7 +843,7 @@ async function duplicateSelected(): Promise<void> {
     false;
 }
 
-async function removeSelected(): Promise<void> {
+function requestRemoveSelected(): void {
   if (
     !selectedQuestion.value
     || !isDraft.value
@@ -694,12 +851,14 @@ async function removeSelected(): Promise<void> {
     return;
   }
 
-  const confirmed =
-    window.confirm(
-      "Delete this question and all of its choices?",
-    );
+  deleteModalOpen.value = true;
+}
 
-  if (!confirmed) {
+async function removeSelected(): Promise<void> {
+  if (
+    !selectedQuestion.value
+    || !isDraft.value
+  ) {
     return;
   }
 
@@ -715,15 +874,17 @@ async function removeSelected(): Promise<void> {
     result.error
     || !result.data
   ) {
-    toast.add({
-      title:
-        "Question could not be deleted",
-      description:
-        result.error
-        || "The action could not be completed.",
-      color:
-        "error",
-    });
+    deleteModalOpen.value = false;
+
+    showFeedback(
+      "Question was not deleted",
+      friendlyError(
+        result.error,
+        "The question could not be deleted. Please try again.",
+      ),
+      "error",
+      "i-lucide-circle-alert",
+    );
 
     isRunningAction.value =
       false;
@@ -733,6 +894,8 @@ async function removeSelected(): Promise<void> {
 
   selectedQuestionId.value =
     null;
+
+  deleteModalOpen.value = false;
 
   toast.add({
     title:
@@ -803,15 +966,15 @@ async function moveQuestion(
     result.error
     || !result.data
   ) {
-    toast.add({
-      title:
-        "Question order could not be saved",
-      description:
-        result.error
-        || "The action could not be completed.",
-      color:
-        "error",
-    });
+    showFeedback(
+      "Question order was not saved",
+      friendlyError(
+        result.error,
+        "The question could not be moved. The previous order has been restored.",
+      ),
+      "error",
+      "i-lucide-circle-alert",
+    );
 
     await loadData(
       true,
@@ -823,6 +986,17 @@ async function moveQuestion(
   await loadData(
     true,
   );
+}
+
+function requestPublish(): void {
+  if (
+    !assessment.value
+    || !isDraft.value
+  ) {
+    return;
+  }
+
+  publishModalOpen.value = true;
 }
 
 async function publish(): Promise<void> {
@@ -845,15 +1019,17 @@ async function publish(): Promise<void> {
     validation.error
     || !validation.data
   ) {
-    toast.add({
-      title:
-        "Assessment is not ready",
-      description:
-        validation.error
-        || "Complete all questions before publishing.",
-      color:
-        "error",
-    });
+    publishModalOpen.value = false;
+
+    showFeedback(
+      "Assessment is not ready",
+      friendlyError(
+        validation.error,
+        "Review every question and make sure each one has complete answer choices, a correct answer, points, and a time limit.",
+      ),
+      "warning",
+      "i-lucide-list-checks",
+    );
 
     isRunningAction.value =
       false;
@@ -870,21 +1046,25 @@ async function publish(): Promise<void> {
     result.error
     || !result.data
   ) {
-    toast.add({
-      title:
-        "Assessment could not be published",
-      description:
-        result.error
-        || "The action could not be completed.",
-      color:
-        "error",
-    });
+    publishModalOpen.value = false;
+
+    showFeedback(
+      "Assessment was not published",
+      friendlyError(
+        result.error,
+        "The assessment could not be published. Please review the questions and try again.",
+      ),
+      "error",
+      "i-lucide-circle-alert",
+    );
 
     isRunningAction.value =
       false;
 
     return;
   }
+
+  publishModalOpen.value = false;
 
   toast.add({
     title:
@@ -914,12 +1094,12 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="Manual question builder"
+      eyebrow="Question Builder"
       :title="
         assessment?.title
         || 'Assessment questions'
       "
-      description="Create, edit, duplicate, reorder, and validate questions before publishing."
+      description="Create and organize questions, answer choices, points, and time limits before publishing."
     >
       <template #actions>
         <UButton
@@ -947,7 +1127,7 @@ onMounted(
           variant="outline"
           icon="i-lucide-eye"
         >
-          Student Preview
+          Preview as Student
         </UButton>
 
         <UButton
@@ -958,41 +1138,45 @@ onMounted(
           :disabled="
             questions.length === 0
           "
-          @click="publish"
+          @click="requestPublish"
         >
-          Publish
+          Publish Assessment
         </UButton>
       </template>
     </PageHeader>
 
-    <UAlert
-      v-if="errorMessage"
-      color="error"
-      variant="soft"
-      title="Question builder could not be loaded"
-      :description="errorMessage"
-    />
-
-    <UAlert
+    <div
       v-if="
         assessment
         && !isDraft
       "
-      :color="
-        assessment.status
-          === 'published'
-          ? 'success'
-          : 'warning'
-      "
-      variant="soft"
-      :title="
-        assessment.status
-          === 'published'
-          ? 'Published assessment'
-          : 'Archived assessment'
-      "
-      description="Question content is read-only. Return or restore the assessment to draft from its settings before editing."
-    />
+      class="flex items-start gap-3 rounded-xl border border-default bg-elevated/60 p-4"
+    >
+      <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <UIcon
+          :name="
+            assessment.status === 'published'
+              ? 'i-lucide-circle-check'
+              : 'i-lucide-archive'
+          "
+          class="size-5"
+        />
+      </div>
+
+      <div>
+        <p class="font-bold text-highlighted">
+          {{
+            assessment.status === 'published'
+              ? 'This assessment is published'
+              : 'This assessment is archived'
+          }}
+        </p>
+
+        <p class="mt-1 text-sm text-muted">
+          Questions are currently view-only. Open Assessment Settings to return the assessment to draft before editing.
+        </p>
+      </div>
+    </div>
 
     <div
       v-if="isLoading"
@@ -1002,6 +1186,26 @@ onMounted(
       <USkeleton class="h-[620px] rounded-xl" />
       <USkeleton class="h-96 rounded-xl" />
     </div>
+
+    <EmptyPanel
+      v-else-if="errorMessage"
+      icon="i-lucide-circle-alert"
+      title="Question builder unavailable"
+      description="The assessment could not be opened. Try loading the page again."
+    >
+      <template #actions>
+        <UButton
+          icon="i-lucide-refresh-cw"
+          @click="
+            loadData(
+              false,
+            )
+          "
+        >
+          Try Again
+        </UButton>
+      </template>
+    </EmptyPanel>
 
     <div
       v-else-if="assessment"
@@ -1187,7 +1391,7 @@ onMounted(
                 variant="ghost"
                 icon="i-lucide-copy-plus"
                 :loading="isRunningAction"
-                @click="duplicateSelected"
+                @click="requestDuplicateSelected"
               >
                 Duplicate
               </UButton>
@@ -1197,7 +1401,7 @@ onMounted(
                 variant="ghost"
                 icon="i-lucide-trash-2"
                 :disabled="isRunningAction"
-                @click="removeSelected"
+                @click="requestRemoveSelected"
               >
                 Delete
               </UButton>
@@ -1209,14 +1413,6 @@ onMounted(
           class="space-y-6"
           :disabled="!isDraft"
         >
-          <UAlert
-            v-if="formError"
-            color="error"
-            variant="soft"
-            title="Question is incomplete"
-            :description="formError"
-          />
-
           <UFormField
             label="Question type"
             required
@@ -1287,14 +1483,19 @@ onMounted(
               </UButton>
             </div>
 
-            <UAlert
+            <div
               v-if="duplicateOptionWarning"
-              class="mb-3"
-              color="warning"
-              variant="soft"
-              title="Duplicate choice text"
-              description="Two or more choices currently contain the same text."
-            />
+              class="mb-3 flex items-center gap-2 text-sm text-warning"
+            >
+              <UIcon
+                name="i-lucide-triangle-alert"
+                class="size-4 shrink-0"
+              />
+
+              <span>
+                Each answer choice should use different text.
+              </span>
+            </div>
 
             <div class="space-y-3">
               <div
@@ -1355,8 +1556,8 @@ onMounted(
           </div>
 
           <UFormField
-            label="Question image URL"
-            help="Optional. Use a direct HTTPS image address."
+            label="Question image"
+            help="Optional. Paste the web address of an image for this question."
           >
             <UInput
               v-model="editor.imageUrl"
@@ -1380,7 +1581,7 @@ onMounted(
 
           <UFormField
             label="Answer explanation"
-            help="Shown only when result-review settings permit it."
+            help="Optional. Students may see this after submitting when results are released."
           >
             <UTextarea
               v-model="editor.explanation"
@@ -1433,7 +1634,8 @@ onMounted(
             </UFormField>
 
             <UFormField
-              label="Time limit in seconds"
+              label="Time allowed"
+              help="Enter the number of seconds for this question."
             >
               <UInput
                 v-model.number="editor.timeLimitSeconds"
@@ -1487,13 +1689,113 @@ onMounted(
           </dl>
         </UCard>
 
-        <UAlert
-          color="info"
-          variant="soft"
-          title="Correct answers are protected"
-          description="Students will receive a separate safe question payload during the examination phase. Correct-answer flags and explanations will not be included."
-        />
+        <UCard>
+          <div class="flex items-start gap-3">
+            <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <UIcon
+                name="i-lucide-eye"
+                class="size-5"
+              />
+            </div>
+
+            <div>
+              <h2 class="font-bold text-highlighted">
+                Student view
+              </h2>
+
+              <p class="mt-1 text-sm leading-6 text-muted">
+                While answering, students see only the question and answer choices. Correct answers and explanations appear only when your result settings allow them.
+              </p>
+            </div>
+          </div>
+        </UCard>
       </div>
     </div>
+
+    <ConfirmationModal
+      v-model:open="duplicateModalOpen"
+      title="Duplicate this question?"
+      description="A new copy will be added at the end of the question list. You can edit the copy without changing the original question."
+      confirm-label="Duplicate Question"
+      confirm-color="primary"
+      icon="i-lucide-copy-plus"
+      :loading="isRunningAction"
+      :dismissible="!isRunningAction"
+      @confirm="duplicateSelected"
+    />
+
+    <ConfirmationModal
+      v-model:open="deleteModalOpen"
+      title="Delete this question?"
+      description="The question and its answer choices will be removed. Questions already used in a student assessment cannot be deleted because previous results must remain accurate."
+      confirm-label="Delete Question"
+      confirm-color="error"
+      icon="i-lucide-trash-2"
+      :loading="isRunningAction"
+      :dismissible="!isRunningAction"
+      @confirm="removeSelected"
+    />
+
+    <ConfirmationModal
+      v-model:open="publishModalOpen"
+      title="Publish this assessment?"
+      description="Publishing makes the assessment ready to assign to classes. Return it to draft later when you need to make changes."
+      confirm-label="Publish Assessment"
+      confirm-color="success"
+      icon="i-lucide-send"
+      :loading="isRunningAction"
+      :dismissible="!isRunningAction"
+      @confirm="publish"
+    />
+
+    <UModal
+      v-model:open="feedbackModalOpen"
+      :dismissible="true"
+      :ui="{
+        content: 'sm:max-w-lg',
+      }"
+    >
+      <template #content>
+        <div class="p-6">
+          <div class="flex items-start gap-4">
+            <div
+              class="flex size-11 shrink-0 items-center justify-center rounded-xl"
+              :class="{
+                'bg-error/10 text-error': feedback.color === 'error',
+                'bg-warning/10 text-warning': feedback.color === 'warning',
+                'bg-success/10 text-success': feedback.color === 'success',
+                'bg-primary/10 text-primary': feedback.color === 'primary',
+                'bg-elevated text-muted': feedback.color === 'neutral',
+              }"
+            >
+              <UIcon
+                :name="feedback.icon"
+                class="size-5"
+              />
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <h2 class="text-lg font-black text-highlighted">
+                {{ feedback.title }}
+              </h2>
+
+              <p class="mt-2 text-sm leading-6 text-muted">
+                {{ feedback.description }}
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-6 flex justify-end">
+            <UButton
+              color="neutral"
+              variant="outline"
+              @click="feedbackModalOpen = false"
+            >
+              Close
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

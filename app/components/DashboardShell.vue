@@ -19,7 +19,7 @@ const props = defineProps<{
 const route =
   useRoute();
 
-const sidebarOpen =
+const desktopSidebarOpen =
   useCookie<boolean>(
     "sncbt-assess-sidebar-open",
     {
@@ -29,6 +29,51 @@ const sidebarOpen =
         "lax",
     },
   );
+
+const mobileSidebarOpen =
+  ref(false);
+
+const isMobile =
+  ref(false);
+
+const sidebarOpen =
+  computed({
+    get: () =>
+      isMobile.value
+        ? mobileSidebarOpen.value
+        : desktopSidebarOpen.value,
+
+    set: (value: boolean) => {
+      if (isMobile.value) {
+        mobileSidebarOpen.value =
+          value;
+
+        return;
+      }
+
+      desktopSidebarOpen.value =
+        value;
+    },
+  });
+
+let mobileMediaQuery:
+  | MediaQueryList
+  | null =
+    null;
+
+function updateViewportMode(
+  event?: MediaQueryListEvent,
+): void {
+  isMobile.value =
+    event?.matches
+    ?? mobileMediaQuery?.matches
+    ?? false;
+
+  if (isMobile.value) {
+    mobileSidebarOpen.value =
+      false;
+  }
+}
 
 const navigation =
   computed(
@@ -109,7 +154,8 @@ const accountDetail =
   computed(
     () => {
       if (
-        props.role === "student"
+        props.role
+        === "student"
       ) {
         return (
           profile.value
@@ -137,7 +183,8 @@ function isActive(
   path: string,
 ): boolean {
   if (
-    route.path === path
+    route.path
+    === path
   ) {
     return true;
   }
@@ -152,6 +199,42 @@ function isActive(
     )
   );
 }
+
+const currentNavigationItem =
+  computed(
+    () =>
+      [...navigation.value]
+        .sort(
+          (
+            first,
+            second,
+          ) =>
+            second.to.length
+            - first.to.length,
+        )
+        .find(
+          (item) =>
+            isActive(
+              item.to,
+            ),
+        ),
+  );
+
+const currentPageLabel =
+  computed(
+    () =>
+      currentNavigationItem.value
+        ?.label
+      || roleLabel.value,
+  );
+
+const currentPageIcon =
+  computed(
+    () =>
+      currentNavigationItem.value
+        ?.icon
+      || "i-lucide-layout-dashboard",
+  );
 
 const navigationItems =
   computed<
@@ -177,21 +260,41 @@ const navigationItems =
 watch(
   () => route.fullPath,
   () => {
-    if (
-      import.meta.client
-      && window.matchMedia(
-        "(max-width: 1023px)",
-      ).matches
-    ) {
-      sidebarOpen.value =
+    if (isMobile.value) {
+      mobileSidebarOpen.value =
         false;
     }
+  },
+);
+
+onMounted(
+  () => {
+    mobileMediaQuery =
+      window.matchMedia(
+        "(max-width: 1023px)",
+      );
+
+    updateViewportMode();
+
+    mobileMediaQuery.addEventListener(
+      "change",
+      updateViewportMode,
+    );
+  },
+);
+
+onBeforeUnmount(
+  () => {
+    mobileMediaQuery?.removeEventListener(
+      "change",
+      updateViewportMode,
+    );
   },
 );
 </script>
 
 <template>
-  <div class="flex min-h-screen bg-muted/30">
+  <div class="min-h-screen bg-muted/30 lg:flex">
     <USidebar
       v-model:open="sidebarOpen"
       variant="sidebar"
@@ -218,7 +321,7 @@ watch(
         body:
           'px-3 py-4',
         footer:
-          'border-t border-white/10 px-3 py-3',
+          'border-t border-white/10 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]',
         rail:
           'after:bg-white/15 hover:after:bg-primary',
       }"
@@ -258,7 +361,7 @@ watch(
           class="w-full"
           :ui="{
             link:
-              'min-h-10 text-slate-300 hover:bg-white/8 hover:text-white data-[active]:bg-primary/12 data-[active]:rounded-lg data-[active]:text-white',
+              'min-h-11 text-slate-300 hover:bg-white/8 hover:text-white data-[active]:bg-primary/12 data-[active]:rounded-lg data-[active]:text-white',
             linkLabel:
               'font-semibold',
             linkLeadingIcon:
@@ -277,7 +380,7 @@ watch(
         >
           <NuxtLink
             :to="profilePath"
-            class="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/8"
+            class="flex min-h-14 items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/8 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
           >
             <UAvatar
               :src="
@@ -320,6 +423,7 @@ watch(
               color="neutral"
               variant="ghost"
               square
+              size="lg"
               aria-label="Open my profile"
             >
               <UAvatar
@@ -342,41 +446,44 @@ watch(
     </USidebar>
 
     <div class="min-w-0 flex-1">
-      <header class="sticky top-0 z-30 border-b border-default bg-default/90 backdrop-blur-xl">
-        <div class="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
+      <header class="safe-area-top sticky top-0 z-30 border-b border-default bg-default/90 backdrop-blur-xl">
+        <div class="flex min-h-16 items-center gap-3 px-3 sm:px-5 lg:px-8">
           <UButton
             color="neutral"
             variant="ghost"
             icon="i-lucide-panel-left"
-            aria-label="Toggle side navigation"
+            size="lg"
+            square
+            aria-label="Open side navigation"
             @click="
               sidebarOpen =
                 !sidebarOpen
             "
           />
 
-          <div class="hidden min-w-0 flex-1 md:block">
-            <div class="relative max-w-lg">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <div class="hidden size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:flex">
               <UIcon
-                name="i-lucide-search"
-                class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"
+                :name="currentPageIcon"
+                class="size-4.5"
               />
+            </div>
 
-              <input
-                class="h-10 w-full rounded-lg border border-default bg-elevated/60 pl-10 pr-4 text-sm outline-none transition placeholder:text-dimmed focus:border-primary focus:ring-3 focus:ring-primary/10"
-                placeholder="Search classes, assessments, or students"
-              >
+            <div class="min-w-0">
+              <p class="truncate text-sm font-black text-highlighted sm:text-base">
+                {{ currentPageLabel }}
+              </p>
+
+              <p class="hidden truncate text-xs text-muted sm:block">
+                {{ roleLabel }} portal
+              </p>
             </div>
           </div>
 
-          <div class="ml-auto flex items-center gap-2">
-            <UColorModeButton />
-
-            <UButton
-              color="neutral"
+          <div class="ml-auto flex items-center gap-1 sm:gap-2">
+            <UColorModeButton
+              size="lg"
               variant="ghost"
-              icon="i-lucide-bell"
-              aria-label="Notifications"
             />
 
             <UTooltip text="Open my profile">
@@ -385,6 +492,7 @@ watch(
                 color="neutral"
                 variant="ghost"
                 square
+                size="lg"
                 aria-label="Open my profile"
               >
                 <UAvatar
@@ -401,7 +509,7 @@ watch(
         </div>
       </header>
 
-      <main class="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <main class="safe-area-bottom mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-6 lg:px-8 lg:py-8">
         <slot />
       </main>
     </div>

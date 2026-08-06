@@ -245,8 +245,17 @@ async function register(
 </script>
 
 <template>
-  <div class="mx-auto max-w-4xl">
-    <UCard>
+  <div class="mx-auto w-full max-w-4xl">
+    <UCard
+      :ui="{
+        header:
+          'p-5 sm:p-6',
+        body:
+          'p-5 sm:p-6',
+        footer:
+          'p-4 sm:p-5',
+      }"
+    >
       <template #header>
         <PageHeader
           eyebrow="Account registration"
@@ -280,7 +289,7 @@ async function register(
           :description="errorMessage"
         />
 
-        <div class="grid gap-5 md:grid-cols-3">
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <UFormField
             label="First name"
             name="firstName"
@@ -320,7 +329,7 @@ async function register(
           </UFormField>
         </div>
 
-        <div class="grid gap-5 md:grid-cols-2">
+        <div class="grid gap-5 sm:grid-cols-2">
           <UFormField
             label="Account type"
             name="accountType"
@@ -383,19 +392,17 @@ async function register(
           />
         </UFormField>
 
-        <div class="grid gap-5 md:grid-cols-2">
+        <div class="grid gap-5 lg:grid-cols-2">
           <UFormField
             label="Password"
             name="password"
             required
-            help="Use at least eight characters with an uppercase letter, lowercase letter, and number."
           >
-            <UInput
+            <PasswordField
               v-model="state.password"
-              type="password"
               size="lg"
               icon="i-lucide-lock-keyhole"
-              class="w-full"
+              placeholder="Create a password"
               autocomplete="new-password"
             />
           </UFormField>
@@ -405,16 +412,21 @@ async function register(
             name="confirmPassword"
             required
           >
-            <UInput
+            <PasswordField
               v-model="state.confirmPassword"
-              type="password"
               size="lg"
               icon="i-lucide-lock-keyhole"
-              class="w-full"
+              placeholder="Enter the password again"
               autocomplete="new-password"
             />
           </UFormField>
         </div>
+
+        <PasswordRequirements
+          :password="state.password"
+          :confirm-password="state.confirmPassword"
+          show-match
+        />
 
         <UFormField
           name="acceptedPolicy"
@@ -431,6 +443,7 @@ async function register(
             color="neutral"
             variant="outline"
             size="lg"
+            class="w-full sm:w-auto"
           >
             Return to Sign In
           </UButton>
@@ -438,6 +451,7 @@ async function register(
           <UButton
             type="submit"
             size="lg"
+            class="w-full sm:w-auto"
             :loading="isSubmitting"
           >
             Create Account

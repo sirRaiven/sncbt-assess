@@ -8,6 +8,7 @@ import type {
 } from "~/types/question";
 
 interface FunctionErrorBody {
+  ok?: boolean;
   code?: string;
   message?: string;
   issues?: unknown;
@@ -105,6 +106,27 @@ export function useQuestions() {
           data: null,
           error: parsed.message,
           code: parsed.code,
+        };
+      }
+
+      const responseBody =
+        data as (
+          T
+          & FunctionErrorBody
+        ) | null;
+
+      if (
+        responseBody
+        && responseBody.ok === false
+      ) {
+        return {
+          data: null,
+          error:
+            responseBody.message
+            || "The question request could not be completed.",
+          code:
+            responseBody.code
+            || null,
         };
       }
 

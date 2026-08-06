@@ -106,7 +106,7 @@ async function signIn(
 
     if (!userId) {
       throw new Error(
-        "Supabase did not return a valid user account.",
+        "We could not complete the sign-in. Please try again.",
       );
     }
 
@@ -136,7 +136,7 @@ async function signIn(
       });
 
       throw new Error(
-        `Your account profile could not be loaded: ${profileError.message}`,
+        "Your account information could not be loaded. Please try again or contact the system administrator.",
       );
     }
 
@@ -146,7 +146,7 @@ async function signIn(
       });
 
       throw new Error(
-        "Your authentication account exists, but its SNCBT Assess profile is missing.",
+        "Your account setup is incomplete. Please contact the system administrator.",
       );
     }
 
@@ -179,17 +179,26 @@ async function signIn(
 
 <template>
   <div class="mx-auto w-full max-w-md">
-    <UCard class="shadow-xl shadow-slate-950/5">
+    <UCard
+      class="shadow-xl shadow-slate-950/5"
+      :ui="{
+        header:
+          'p-5 sm:p-6',
+        body:
+          'p-5 sm:p-6',
+        footer:
+          'p-4 sm:p-5',
+      }"
+    >
       <template #header>
         <div class="text-center">
-          <div class="mx-auto flex size-12 items-center justify-center rounded-xl bg-brand-700 text-white">
-            <UIcon
-              name="i-lucide-graduation-cap"
-              class="size-6"
-            />
-          </div>
+          <InstitutionLogo
+            size="xl"
+            class="mx-auto"
+            eager
+          />
 
-          <p class="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-primary">
+          <p class="mt-4 text-xs font-bold uppercase tracking-[0.16em] text-primary">
             St. Nicolas College of Business and Technology
           </p>
 
@@ -250,13 +259,11 @@ async function signIn(
           name="password"
           required
         >
-          <UInput
+          <PasswordField
             v-model="state.password"
-            type="password"
             size="lg"
             icon="i-lucide-lock-keyhole"
             placeholder="Enter your password"
-            class="w-full"
             autocomplete="current-password"
           />
         </UFormField>

@@ -60,11 +60,9 @@ async function signOut(): Promise<void> {
       false;
 
     await navigateTo("/");
-  } catch (error) {
+  } catch {
     errorMessage.value =
-      error instanceof Error
-        ? error.message
-        : "Unable to sign out.";
+      "Your account could not be signed out. Check your connection and try again.";
   } finally {
     isSigningOut.value =
       false;
@@ -88,6 +86,7 @@ async function signOut(): Promise<void> {
         color="neutral"
         :variant="variant"
         icon="i-lucide-log-out"
+        size="lg"
         :block="block"
         :square="compact"
         :aria-label="
@@ -96,7 +95,8 @@ async function signOut(): Promise<void> {
             : undefined
         "
         @click="
-          modalOpen = true
+          modalOpen =
+            true
         "
       >
         <span v-if="!compact">
@@ -118,14 +118,13 @@ async function signOut(): Promise<void> {
       "
       @confirm="signOut"
     >
-      <UAlert
+      <p
         v-if="errorMessage"
-        class="mt-4"
-        color="error"
-        variant="soft"
-        title="Sign-out unsuccessful"
-        :description="errorMessage"
-      />
+        class="mt-4 rounded-xl border border-error/30 bg-error/10 p-3 text-sm leading-6 text-error"
+        role="alert"
+      >
+        {{ errorMessage }}
+      </p>
     </ConfirmationModal>
   </div>
 </template>

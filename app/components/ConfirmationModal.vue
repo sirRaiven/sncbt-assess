@@ -2,7 +2,8 @@
 const open = defineModel<boolean>(
   "open",
   {
-    default: false,
+    default:
+      false,
   },
 );
 
@@ -73,17 +74,19 @@ function confirm(): void {
     "
     :ui="{
       content:
-        'sm:max-w-lg',
+        'w-[calc(100%-1rem)] sm:max-w-lg',
       header:
-        'border-b border-default',
+        'border-b border-default px-4 py-4 sm:px-6',
+      body:
+        'px-4 py-5 sm:px-6',
       footer:
-        'justify-end border-t border-default',
+        'flex-col-reverse gap-2 border-t border-default px-4 py-4 sm:flex-row sm:justify-end sm:px-6 [&>*]:w-full sm:[&>*]:w-auto',
     }"
   >
     <template #body>
-      <div class="flex items-start gap-4">
+      <div class="flex items-start gap-3 sm:gap-4">
         <div
-          class="flex size-11 shrink-0 items-center justify-center rounded-xl"
+          class="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
           :class="{
             'bg-primary/10 text-primary':
               confirmColor === 'primary',
@@ -103,12 +106,12 @@ function confirm(): void {
           />
         </div>
 
-        <div class="min-w-0">
+        <div class="min-w-0 flex-1">
           <p class="text-sm font-bold text-highlighted">
             Review before continuing
           </p>
 
-          <p class="mt-1 text-sm leading-6 text-muted">
+          <p class="mt-1 break-words text-sm leading-6 text-muted">
             {{ description }}
           </p>
 
@@ -121,6 +124,7 @@ function confirm(): void {
       <UButton
         color="neutral"
         variant="outline"
+        size="lg"
         :disabled="loading"
         @click="cancel"
       >
@@ -129,6 +133,7 @@ function confirm(): void {
 
       <UButton
         :color="confirmColor"
+        size="lg"
         :loading="loading"
         @click="confirm"
       >

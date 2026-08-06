@@ -1,33 +1,52 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
+const props = withDefaults(
+  defineProps<{
     inverse?: boolean;
     compact?: boolean;
-}>(), { inverse: false, compact: false });
+  }>(),
+  {
+    inverse:
+      false,
+    compact:
+      false,
+  },
+);
 </script>
 
 <template>
   <div class="flex min-w-0 items-center gap-3">
+    <InstitutionLogo
+      size="md"
+      :alt="
+        props.compact
+          ? 'St. Nicolas College of Business and Technology'
+          : ''
+      "
+      eager
+    />
+
     <div
-      class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-800 text-white shadow-lg"
-    >
-      <UIcon
-        name="i-lucide-graduation-cap"
-        class="size-6"
-       />
-    </div>
-    <div
-      v-if="!compact"
+      v-if="!props.compact"
       class="min-w-0"
     >
       <p
         class="truncate font-black tracking-tight"
-        :class="inverse?'text-white':'text-highlighted'"
+        :class="
+          props.inverse
+            ? 'text-white'
+            : 'text-highlighted'
+        "
       >
         SNCBT Assess
       </p>
+
       <p
         class="truncate text-[11px]"
-        :class="inverse?'text-blue-100':'text-muted'"
+        :class="
+          props.inverse
+            ? 'text-slate-300'
+            : 'text-muted'
+        "
       >
         Assessment Classroom Management
       </p>
