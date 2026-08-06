@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type {
-  AssessmentStatus,
   AssessmentWithClassroom,
 } from "~/types/assessment";
 
@@ -18,7 +17,6 @@ const {
   listInstructorAssessments,
   duplicateAssessment,
   archiveAssessment,
-  restoreAssessment,
   returnAssessmentToDraft,
 } = useAssessments();
 
@@ -159,7 +157,6 @@ async function runAction(
   action:
     | "duplicate"
     | "archive"
-    | "restore"
     | "draft",
 ): Promise<void> {
   busyAssessmentId.value =
@@ -175,11 +172,6 @@ async function runAction(
   } else if (action === "archive") {
     result =
       await archiveAssessment(
-        assessment.id,
-      );
-  } else if (action === "restore") {
-    result =
-      await restoreAssessment(
         assessment.id,
       );
   } else {
@@ -228,45 +220,6 @@ async function runAction(
   busyAssessmentId.value = null;
 }
 
-function getStatusAction(
-  status: AssessmentStatus,
-): {
-  label: string;
-  icon: string;
-  action:
-    | "archive"
-    | "restore"
-    | "draft";
-} {
-  if (status === "archived") {
-    return {
-      label: "Restore",
-      icon:
-        "i-lucide-archive-restore",
-      action:
-        "restore",
-    };
-  }
-
-  if (status === "published") {
-    return {
-      label: "Return to Draft",
-      icon:
-        "i-lucide-undo-2",
-      action:
-        "draft",
-    };
-  }
-
-  return {
-    label: "Archive",
-    icon:
-      "i-lucide-archive",
-    action:
-      "archive",
-  };
-}
-
 onMounted(
   loadAssessments,
 );
@@ -277,9 +230,18 @@ onMounted(
     <PageHeader
       eyebrow="Reusable assessment library"
       title="Assessments"
-      description="Create once, assign to any class, and reuse quizzes or examinations across sections."
+      description="Create reusable assessments, publish them, and schedule automatic access for one or more classes."
     >
       <template #actions>
+        <UButton
+          to="/instructor/archive"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-archive"
+        >
+          Open Archive
+        </UButton>
+
         <UButton
           to="/instructor/assessments/create"
           icon="i-lucide-plus"
@@ -320,9 +282,9 @@ onMounted(
       />
 
       <StatCard
-        label="Library only"
+        label="Not scheduled"
         :value="String(counts.unassigned)"
-        icon="i-lucide-library"
+        icon="i-lucide-calendar-off"
         tone="neutral"
       />
     </section>
@@ -342,7 +304,6 @@ onMounted(
             'All statuses',
             'Draft',
             'Published',
-            'Archived',
           ]"
           class="w-full"
         />
@@ -511,22 +472,12 @@ onMounted(
               </UButton>
 
               <UButton
-                v-if="assessment.status === 'draft'"
-                :to="`/instructor/assessments/${assessment.id}/import`"
-                color="neutral"
-                variant="outline"
-                icon="i-lucide-file-spreadsheet"
-              >
-                Import Excel
-              </UButton>
-
-              <UButton
                 :to="`/instructor/assessments/${assessment.id}/assign`"
                 color="neutral"
                 variant="outline"
-                icon="i-lucide-users-round"
+                icon="i-lucide-calendar-clock"
               >
-                Assign Classes
+                Schedule Classes
               </UButton>
 
               <UButton
@@ -558,22 +509,24 @@ onMounted(
               </UButton>
 
               <UButton
-                :color="
-                  assessment.status === 'archived'
-                    ? 'success'
-                    : 'neutral'
-                "
+                v-if="assessment.status === 'published'"
+                color="neutral"
                 variant="ghost"
-                :icon="getStatusAction(assessment.status).icon"
+                icon="i-lucide-undo-2"
                 :disabled="busyAssessmentId === assessment.id"
-                @click="
-                  runAction(
-                    assessment,
-                    getStatusAction(assessment.status).action,
-                  )
-                "
+                @click="runAction(assessment, 'draft')"
               >
-                {{ getStatusAction(assessment.status).label }}
+                Return to Draft
+              </UButton>
+
+              <UButton
+                color="warning"
+                variant="ghost"
+                icon="i-lucide-archive"
+                :disabled="busyAssessmentId === assessment.id"
+                @click="runAction(assessment, 'archive')"
+              >
+                Archive
               </UButton>
             </div>
           </div>

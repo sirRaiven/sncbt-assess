@@ -5,8 +5,8 @@ import type {
 } from "~/types/classroom";
 
 import type {
-  StudentPublishedAssessment,
-} from "~/types/assessment";
+  StudentScheduledAssessment,
+} from "~/types/assessment-schedule";
 
 definePageMeta({
   layout: "student",
@@ -29,8 +29,8 @@ const {
 } = useClassrooms();
 
 const {
-  listStudentClassAssessments,
-} = useAssessments();
+  listStudentAssessments,
+} = useAssessmentSchedules();
 
 const classroom =
   ref<Classroom | null>(null);
@@ -39,7 +39,7 @@ const membership =
   ref<StudentClassMembership | null>(null);
 
 const assessments =
-  ref<StudentPublishedAssessment[]>([]);
+  ref<StudentScheduledAssessment[]>([]);
 
 const instructorName = ref("");
 const isLoading = ref(true);
@@ -70,7 +70,7 @@ async function loadClass(): Promise<void> {
     getStudentClass(
       classroomId.value,
     ),
-    listStudentClassAssessments(
+    listStudentAssessments(
       classroomId.value,
     ),
   ]);
@@ -227,20 +227,20 @@ onMounted(
             <template #header>
               <div>
                 <h2 class="font-bold text-highlighted">
-                  Published assessments
+                  Scheduled assessments
                 </h2>
 
                 <p class="mt-1 text-sm text-muted">
-                  An assessment session must be opened by the instructor before answering is allowed.
+                  Assessments open and close automatically according to the schedule set by your instructor.
                 </p>
               </div>
             </template>
 
             <EmptyPanel
               v-if="assessments.length === 0"
-              icon="i-lucide-clipboard-list"
-              title="No published assessments"
-              description="Published quizzes and examinations assigned to this class will appear here."
+              icon="i-lucide-calendar-clock"
+              title="No scheduled assessments"
+              description="Upcoming and available assessments for this class will appear here."
             />
 
             <div
@@ -249,7 +249,7 @@ onMounted(
             >
               <div
                 v-for="assessment in assessments"
-                :key="assessment.id"
+                :key="assessment.assignmentId"
                 class="rounded-xl border border-default p-4"
               >
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
@@ -276,23 +276,32 @@ onMounted(
                         </p>
                       </div>
 
-                      <StatusPill status="Published" />
+                      <StatusPill :status="assessment.status" />
                     </div>
 
-                    <p
-                      v-if="assessment.instructions"
-                      class="mt-3 line-clamp-2 text-sm leading-6 text-muted"
-                    >
-                      {{ assessment.instructions }}
+                    <p class="mt-3 text-sm text-muted">
+                      <template v-if="assessment.status === 'scheduled'">
+                        Opens {{ new Date(assessment.startsAt).toLocaleString() }}
+                      </template>
+
+                      <template v-else-if="assessment.status === 'open'">
+                        Open now · Closes {{ new Date(assessment.endsAt).toLocaleString() }}
+                      </template>
+
+                      <template v-else>
+                        Closed {{ new Date(assessment.endsAt).toLocaleString() }}
+                      </template>
                     </p>
 
-                    <UAlert
+                    <UButton
+                      :to="`/student/assignments/${assessment.assignmentId}`"
                       class="mt-4"
-                      color="info"
-                      variant="soft"
-                      title="Waiting for an assessment session"
-                      description="Session creation and secure student attempts begin in Phase 5."
-                    />
+                      :color="assessment.status === 'open' ? 'primary' : 'neutral'"
+                      :variant="assessment.status === 'open' ? 'solid' : 'outline'"
+                      :icon="assessment.status === 'open' ? 'i-lucide-play' : 'i-lucide-eye'"
+                    >
+                      {{ assessment.status === "open" ? "Open Assessment" : "View Details" }}
+                    </UButton>
                   </div>
                 </div>
               </div>

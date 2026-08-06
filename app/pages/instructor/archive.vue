@@ -181,21 +181,6 @@ function typeLabel(
 function openAssessmentDelete(
   assessment: ArchivedAssessmentItem,
 ): void {
-  if (
-    assessment.linkedSessionCount > 0
-  ) {
-    toast.add({
-      title:
-        "Assessment cannot be deleted yet",
-      description:
-        "Delete every linked ended or cancelled session before permanently deleting this assessment.",
-      color:
-        "warning",
-    });
-
-    return;
-  }
-
   deleteTarget.value = {
     kind:
       "assessment",
@@ -628,14 +613,14 @@ onMounted(
 
                 <UAlert
                   v-if="
-                    assessment.linkedSessionCount
-                    > 0
+                    assessment.linkedSessionCount > 0
+                    || assessment.assignedClassCount > 0
                   "
                   class="mt-4"
                   color="warning"
                   variant="soft"
-                  title="Session history is still linked"
-                  description="Delete the linked ended or cancelled sessions first. The assessment will then become eligible for permanent deletion."
+                  title="Linked records will also be removed"
+                  :description="`Permanent deletion will remove ${assessment.assignedClassCount} class schedule(s), ${assessment.linkedSessionCount} session record(s), their participants, and existing attempt records in one database transaction.`"
                 />
 
                 <div class="mt-5 flex flex-wrap gap-2">
@@ -652,10 +637,6 @@ onMounted(
                     color="error"
                     variant="soft"
                     icon="i-lucide-trash-2"
-                    :disabled="
-                      assessment.linkedSessionCount
-                      > 0
-                    "
                     @click="
                       openAssessmentDelete(
                         assessment,
@@ -858,7 +839,11 @@ onMounted(
             color="error"
             variant="soft"
             title="This action cannot be undone"
-            description="The selected record and its permitted dependent data will be removed from the database."
+            :description="
+              deleteTarget.kind === 'assessment'
+                ? 'The assessment, class schedules, linked sessions, participants, questions, and existing attempt records will be removed together. Any active participant will lose access immediately.'
+                : 'The closed session, participants, and existing attempt records will be removed together.'
+            "
           />
 
           <div class="mt-5">

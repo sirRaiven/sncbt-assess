@@ -10,142 +10,109 @@ const items: Record<
   admin: [
     {
       label: "Overview",
-      icon:
-        "i-lucide-layout-dashboard",
-      to:
-        "/admin/dashboard",
+      icon: "i-lucide-layout-dashboard",
+      to: "/admin/dashboard",
     },
     {
       label: "User Accounts",
-      icon:
-        "i-lucide-users",
-      to:
-        "/admin/users",
+      icon: "i-lucide-users",
+      to: "/admin/users",
     },
     {
       label: "Classes",
-      icon:
-        "i-lucide-school",
-      to:
-        "/admin/classes",
+      icon: "i-lucide-school",
+      to: "/admin/classes",
     },
     {
       label: "Assessments",
-      icon:
-        "i-lucide-clipboard-check",
-      to:
-        "/admin/assessments",
+      icon: "i-lucide-clipboard-check",
+      to: "/admin/assessments",
     },
     {
       label: "Live Sessions",
-      icon:
-        "i-lucide-radio",
-      to:
-        "/admin/live-sessions",
+      icon: "i-lucide-radio",
+      to: "/admin/live-sessions",
     },
     {
       label: "Audit Logs",
-      icon:
-        "i-lucide-scroll-text",
-      to:
-        "/admin/audit-logs",
+      icon: "i-lucide-scroll-text",
+      to: "/admin/audit-logs",
     },
     {
       label: "System Settings",
-      icon:
-        "i-lucide-settings",
-      to:
-        "/admin/settings",
+      icon: "i-lucide-settings",
+      to: "/admin/settings",
     },
   ],
 
   instructor: [
     {
       label: "Overview",
-      icon:
-        "i-lucide-layout-dashboard",
-      to:
-        "/instructor/dashboard",
+      icon: "i-lucide-layout-dashboard",
+      to: "/instructor/dashboard",
     },
     {
       label: "My Classes",
-      icon:
-        "i-lucide-school",
-      to:
-        "/instructor/classes",
+      icon: "i-lucide-school",
+      to: "/instructor/classes",
     },
     {
       label: "Assessments",
-      icon:
-        "i-lucide-clipboard-list",
-      to:
-        "/instructor/assessments",
+      icon: "i-lucide-clipboard-list",
+      to: "/instructor/assessments",
     },
     {
       label: "Live Sessions",
-      icon:
-        "i-lucide-radio-tower",
-      to:
-        "/instructor/sessions",
+      icon: "i-lucide-radio-tower",
+      to: "/instructor/sessions",
     },
     {
       label: "Archive",
-      icon:
-        "i-lucide-archive",
-      to:
-        "/instructor/archive",
+      icon: "i-lucide-archive",
+      to: "/instructor/archive",
     },
     {
       label: "Reports",
-      icon:
-        "i-lucide-chart-no-axes-combined",
-      to:
-        "/instructor/reports",
+      icon: "i-lucide-chart-no-axes-combined",
+      to: "/instructor/reports",
     },
     {
       label: "My Profile",
-      icon:
-        "i-lucide-user-round",
-      to:
-        "/instructor/profile",
+      icon: "i-lucide-user-round",
+      to: "/instructor/profile",
     },
   ],
 
   student: [
     {
       label: "Overview",
-      icon:
-        "i-lucide-layout-dashboard",
-      to:
-        "/student/dashboard",
+      icon: "i-lucide-layout-dashboard",
+      to: "/student/dashboard",
     },
     {
       label: "My Classes",
-      icon:
-        "i-lucide-book-open",
-      to:
-        "/student/classes",
+      icon: "i-lucide-book-open",
+      to: "/student/classes",
+    },
+    {
+      label: "Assessments",
+      icon: "i-lucide-clipboard-list",
+      to: "/student/assessments",
     },
     {
       label: "Join Session",
-      icon:
-        "i-lucide-log-in",
-      to:
-        "/student/sessions/join",
+      icon: "i-lucide-log-in",
+      to: "/student/sessions/join",
     },
     {
       label: "My Results",
-      icon:
-        "i-lucide-trophy",
-      to:
-        "/student/results",
+      icon: "i-lucide-trophy",
+      to: "/student/results",
     },
     {
       label: "My Profile",
-      icon:
-        "i-lucide-user-round",
-      to:
-        "/student/profile",
+      icon: "i-lucide-user-round",
+      to: "/student/profile",
     },
   ],
 };

@@ -7,9 +7,6 @@ import {
   z,
 } from "zod";
 
-import type {
-  AssessmentClassOption,
-} from "~/types/assessment";
 
 definePageMeta({
   layout: "instructor",
@@ -22,27 +19,12 @@ useSeoMeta({
 const toast = useToast();
 
 const {
-  listClassOptions,
   createAssessment,
 } = useAssessments();
-
-const classOptions =
-  ref<AssessmentClassOption[]>([]);
-
-const isLoadingClasses = ref(true);
 const isSubmitting = ref(false);
 const errorMessage = ref("");
 
 const schema = z.object({
-  classroomIds: z
-    .array(
-      z.string().uuid(),
-    )
-    .max(
-      100,
-      "Select no more than 100 classes.",
-    ),
-
   title: z
     .string()
     .trim()
@@ -117,7 +99,6 @@ type CreateAssessmentSchema =
   z.output<typeof schema>;
 
 const state = reactive<CreateAssessmentSchema>({
-  classroomIds: [],
   title: "",
   subjectName: "",
   subjectCode: "",
@@ -132,59 +113,6 @@ const state = reactive<CreateAssessmentSchema>({
   overallTimeLimitMinutes: null,
 });
 
-watch(
-  () => state.classroomIds,
-  (classroomIds) => {
-    const firstClass =
-      classOptions.value.find(
-        (classroom) =>
-          classroom.id
-          === classroomIds[0],
-      );
-
-    if (!firstClass) {
-      return;
-    }
-
-    if (!state.subjectName.trim()) {
-      state.subjectName =
-        firstClass.name;
-    }
-
-    if (!state.subjectCode.trim()) {
-      state.subjectCode =
-        firstClass.subjectCode;
-    }
-  },
-  {
-    deep: true,
-  },
-);
-
-async function loadClasses(): Promise<void> {
-  isLoadingClasses.value = true;
-
-  const result =
-    await listClassOptions();
-
-  if (
-    result.error
-    || !result.data
-  ) {
-    errorMessage.value =
-      result.error
-      || "Unable to load active classes.";
-
-    isLoadingClasses.value = false;
-    return;
-  }
-
-  classOptions.value =
-    result.data.classes;
-
-  isLoadingClasses.value = false;
-}
-
 async function submit(
   event: FormSubmitEvent<CreateAssessmentSchema>,
 ): Promise<void> {
@@ -193,8 +121,7 @@ async function submit(
 
   const result =
     await createAssessment({
-      classroomIds:
-        event.data.classroomIds,
+      classroomIds: [],
       title:
         event.data.title,
       subjectName:
@@ -248,9 +175,6 @@ async function submit(
   );
 }
 
-onMounted(
-  loadClasses,
-);
 </script>
 
 <template>
@@ -258,7 +182,7 @@ onMounted(
     <PageHeader
       eyebrow="New reusable assessment"
       title="Create an assessment"
-      description="Create the assessment once, keep it in your library, and make it available to any class now or later."
+      description="Create a reusable assessment in your library. Add questions, publish it, then schedule automatic class access."
     />
 
     <UAlert
@@ -378,20 +302,61 @@ onMounted(
           <template #header>
             <div>
               <h2 class="font-bold text-highlighted">
-                Assign to classes
+                Delivery workflow
               </h2>
 
               <p class="mt-1 text-sm text-muted">
-                Optional during creation. You can select one, several, or no classes.
+                Class scheduling is completed after the questions are ready and the assessment is published.
               </p>
             </div>
           </template>
 
-          <AssessmentClassPicker
-            v-model="state.classroomIds"
-            :classes="classOptions"
-            :loading="isLoadingClasses"
-          />
+          <div class="grid gap-4 sm:grid-cols-3">
+            <div class="rounded-xl border border-default bg-elevated p-4">
+              <UIcon
+                name="i-lucide-file-plus-2"
+                class="size-5 text-primary"
+              />
+
+              <p class="mt-3 font-bold text-highlighted">
+                1. Create draft
+              </p>
+
+              <p class="mt-1 text-sm leading-6 text-muted">
+                Save the assessment in your private library.
+              </p>
+            </div>
+
+            <div class="rounded-xl border border-default bg-elevated p-4">
+              <UIcon
+                name="i-lucide-list-checks"
+                class="size-5 text-primary"
+              />
+
+              <p class="mt-3 font-bold text-highlighted">
+                2. Add and publish
+              </p>
+
+              <p class="mt-1 text-sm leading-6 text-muted">
+                Complete the questions and publish the reusable assessment.
+              </p>
+            </div>
+
+            <div class="rounded-xl border border-default bg-elevated p-4">
+              <UIcon
+                name="i-lucide-calendar-clock"
+                class="size-5 text-primary"
+              />
+
+              <p class="mt-3 font-bold text-highlighted">
+                3. Schedule classes
+              </p>
+
+              <p class="mt-1 text-sm leading-6 text-muted">
+                Set a start and closing date for one or more classes.
+              </p>
+            </div>
+          </div>
         </UCard>
       </div>
 
