@@ -179,6 +179,9 @@ async function submit(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      fallback-to="/instructor/assessments"
+    />
     <PageHeader
       eyebrow="New reusable assessment"
       title="Create an assessment"

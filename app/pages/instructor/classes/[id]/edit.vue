@@ -191,6 +191,9 @@ onMounted(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      :fallback-to="`/instructor/classes/${classroomId}`"
+    />
     <PageHeader
       eyebrow="Class settings"
       title="Edit class information"

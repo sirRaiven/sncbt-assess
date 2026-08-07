@@ -220,6 +220,9 @@ onMounted(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      :fallback-to="`/instructor/assessments/${assessmentId}/edit`"
+    />
     <PageHeader
       eyebrow="Student-view preview"
       :title="

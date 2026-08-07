@@ -96,6 +96,9 @@ async function submit(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      fallback-to="/student/classes"
+    />
     <PageHeader
       eyebrow="Class enrollment"
       title="Join a class"

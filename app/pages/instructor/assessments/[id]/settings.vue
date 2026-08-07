@@ -360,22 +360,15 @@ onMounted(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      :fallback-to="`/instructor/assessments/${assessmentId}/edit`"
+    />
     <PageHeader
       eyebrow="Assessment settings"
       :title="assessment?.title || 'Assessment'"
       description="Manage reusable assessment content, behavior, publication, and class availability."
     >
       <template #actions>
-        <UButton
-          v-if="isDraft"
-          :to="`/instructor/assessments/${assessmentId}/import`"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-file-spreadsheet"
-        >
-          Import Excel
-        </UButton>
-
         <UButton
           :to="`/instructor/assessments/${assessmentId}/edit`"
           icon="i-lucide-list-plus"

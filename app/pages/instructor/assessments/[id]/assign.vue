@@ -586,6 +586,9 @@ onMounted(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      fallback-to="/instructor/assessments"
+    />
     <PageHeader
       eyebrow="Classroom delivery"
       :title="
@@ -593,18 +596,7 @@ onMounted(
         || 'Assign Assessment'
       "
       description="Select classes and configure when students can begin, how long each attempt lasts, and whether ranking is available."
-    >
-      <template #actions>
-        <UButton
-          to="/instructor/assessments"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-arrow-left"
-        >
-          Assessments
-        </UButton>
-      </template>
-    </PageHeader>
+    />
 
     <UAlert
       v-if="errorMessage"

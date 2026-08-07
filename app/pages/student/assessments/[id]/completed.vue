@@ -128,6 +128,10 @@ onMounted(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      fallback-to="/student/assessments"
+      :use-history="false"
+    />
     <PageHeader
       eyebrow="Assessment result"
       :title="
@@ -139,18 +143,7 @@ onMounted(
           ? `${delivery.subjectCode} · ${delivery.classroom.section}`
           : 'Loading result'
       "
-    >
-      <template #actions>
-        <UButton
-          to="/student/assessments"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-arrow-left"
-        >
-          Assessments
-        </UButton>
-      </template>
-    </PageHeader>
+    />
 
     <UAlert
       v-if="errorMessage"

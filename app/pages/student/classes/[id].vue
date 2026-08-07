@@ -304,6 +304,9 @@ onMounted(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      fallback-to="/student/classes"
+    />
     <UAlert
       v-if="errorMessage"
       color="error"

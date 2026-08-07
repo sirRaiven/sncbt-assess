@@ -56,6 +56,21 @@ const sidebarOpen =
     },
   });
 
+const sidebarToggleLabel =
+  computed(
+    () => {
+      if (isMobile.value) {
+        return mobileSidebarOpen.value
+          ? "Close side navigation"
+          : "Open side navigation";
+      }
+
+      return desktopSidebarOpen.value
+        ? "Collapse side navigation"
+        : "Expand side navigation";
+    },
+  );
+
 let mobileMediaQuery:
   | MediaQueryList
   | null =
@@ -317,6 +332,7 @@ onBeforeUnmount(
 <template>
   <div class="min-h-screen bg-muted/30 lg:flex">
     <USidebar
+      id="portal-side-navigation"
       v-model:open="sidebarOpen"
       variant="sidebar"
       collapsible="icon"
@@ -330,7 +346,21 @@ onBeforeUnmount(
         title:
           'SNCBT Assess',
         description:
-          roleLabel,
+          `${roleLabel} navigation`,
+        side:
+          'left',
+        overlay:
+          true,
+        dismissible:
+          true,
+        modal:
+          true,
+        ui: {
+          overlay:
+            'bg-slate-950/55 backdrop-blur-[1px]',
+          content:
+            'left-0 inset-y-0 w-[84vw] max-w-[20rem] border-r border-white/10 bg-slate-950 shadow-2xl',
+        },
       }"
       :ui="{
         container:
@@ -348,12 +378,34 @@ onBeforeUnmount(
       }"
     >
       <template #header="{ state }">
-        <div class="flex min-w-0 flex-1 items-center">
-          <BrandMark
-            inverse
-            :compact="
-              state
-              === 'collapsed'
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <div class="min-w-0 flex-1">
+            <BrandMark
+              inverse
+              :compact="
+                state
+                === 'collapsed'
+              "
+            />
+          </div>
+
+          <UButton
+            v-if="
+              isMobile
+              && state
+                === 'expanded'
+            "
+            type="button"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-x"
+            size="lg"
+            square
+            class="shrink-0 text-slate-300 hover:bg-white/10 hover:text-white"
+            aria-label="Close side navigation and return to the current page"
+            @click="
+              mobileSidebarOpen =
+                false
             "
           />
         </div>
@@ -413,12 +465,19 @@ onBeforeUnmount(
       <header class="safe-area-top sticky top-0 z-30 border-b border-default bg-default/90 backdrop-blur-xl">
         <div class="flex min-h-16 items-center gap-3 px-3 sm:px-5 lg:px-8">
           <UButton
+            type="button"
             color="neutral"
             variant="ghost"
-            icon="i-lucide-panel-left"
+            :icon="
+              isMobile
+                ? 'i-lucide-menu'
+                : 'i-lucide-panel-left'
+            "
             size="lg"
             square
-            aria-label="Open side navigation"
+            :aria-label="sidebarToggleLabel"
+            :aria-expanded="sidebarOpen"
+            aria-controls="portal-side-navigation"
             @click="
               sidebarOpen =
                 !sidebarOpen

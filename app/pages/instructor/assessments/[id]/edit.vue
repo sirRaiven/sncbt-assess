@@ -1093,6 +1093,9 @@ onMounted(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      fallback-to="/instructor/assessments"
+    />
     <PageHeader
       eyebrow="Question Builder"
       :title="

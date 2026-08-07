@@ -146,6 +146,9 @@ async function submit(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      fallback-to="/instructor/classes"
+    />
     <PageHeader
       eyebrow="New classroom"
       title="Create a class"

@@ -700,6 +700,9 @@ onMounted(
 
 <template>
   <div class="page-stack report-print-area">
+    <PortalBackButton
+      fallback-to="/instructor/reports"
+    />
     <InstructorReportPrintHeader
       v-if="report"
       title="Assessment Performance Report"
@@ -727,15 +730,6 @@ onMounted(
     >
       <template #actions>
         <div class="no-print flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <UButton
-            to="/instructor/reports"
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-arrow-left"
-          >
-            Reports
-          </UButton>
-
           <UButton
             color="neutral"
             variant="outline"

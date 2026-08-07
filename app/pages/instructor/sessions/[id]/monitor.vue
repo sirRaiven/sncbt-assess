@@ -465,6 +465,9 @@ onBeforeUnmount(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      fallback-to="/instructor/sessions"
+    />
     <PageHeader
       eyebrow="Live assessment monitoring"
       :title="
@@ -479,15 +482,6 @@ onBeforeUnmount(
     >
       <template #actions>
         <div class="flex gap-2">
-          <UButton
-            to="/instructor/sessions"
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-arrow-left"
-          >
-            Sessions
-          </UButton>
-
           <UButton
             color="neutral"
             variant="outline"

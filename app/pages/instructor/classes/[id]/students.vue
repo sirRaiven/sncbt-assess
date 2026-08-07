@@ -226,6 +226,9 @@ onMounted(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      :fallback-to="`/instructor/classes/${classroomId}`"
+    />
     <PageHeader
       :eyebrow="
         classroom
@@ -234,18 +237,7 @@ onMounted(
       "
       title="Class students"
       description="Review enrolled students and respond to membership requests."
-    >
-      <template #actions>
-        <UButton
-          :to="`/instructor/classes/${classroomId}`"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-arrow-left"
-        >
-          Class Details
-        </UButton>
-      </template>
-    </PageHeader>
+    />
 
     <UAlert
       v-if="errorMessage"

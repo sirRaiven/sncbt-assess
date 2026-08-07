@@ -260,6 +260,9 @@ onMounted(
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      fallback-to="/student/assessments"
+    />
     <PageHeader
       eyebrow="Assessment instructions"
       :title="
@@ -271,18 +274,7 @@ onMounted(
           ? `${delivery.subjectCode} · ${delivery.classroom.section}`
           : 'Loading assessment'
       "
-    >
-      <template #actions>
-        <UButton
-          to="/student/assessments"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-arrow-left"
-        >
-          Assessments
-        </UButton>
-      </template>
-    </PageHeader>
+    />
 
     <UAlert
       v-if="errorMessage"

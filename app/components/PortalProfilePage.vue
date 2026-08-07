@@ -587,6 +587,10 @@ async function confirmPasswordChange(): Promise<void> {
 
 <template>
   <div class="page-stack">
+    <PortalBackButton
+      :fallback-to="`/${role}/dashboard`"
+    />
+
     <PageHeader
       eyebrow="Account"
       title="My profile"
