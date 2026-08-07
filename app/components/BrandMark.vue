@@ -39,17 +39,6 @@ const props = withDefaults(
       >
         SNCBT Assess
       </p>
-
-      <p
-        class="truncate text-[11px]"
-        :class="
-          props.inverse
-            ? 'text-slate-300'
-            : 'text-muted'
-        "
-      >
-        Assessment Classroom Management
-      </p>
     </div>
   </div>
 </template>
