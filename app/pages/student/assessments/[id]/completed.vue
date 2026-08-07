@@ -294,6 +294,36 @@ onMounted(
             || 'The timer or class availability period ended.'
           "
         />
+
+        <div class="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+          <UButton
+            to="/student/assessments"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-clipboard-list"
+          >
+            Back to Assessments
+          </UButton>
+
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <UButton
+              to="/student/results"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-trophy"
+            >
+              My Results
+            </UButton>
+
+            <UButton
+              v-if="delivery.canViewResult"
+              :to="`/student/results/${delivery.assignmentId}`"
+              icon="i-lucide-chart-column"
+            >
+              View Detailed Result
+            </UButton>
+          </div>
+        </div>
       </UCard>
     </template>
   </div>

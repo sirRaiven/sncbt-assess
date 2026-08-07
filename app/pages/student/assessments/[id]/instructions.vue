@@ -201,7 +201,7 @@ function requestProceed(): void {
     delivery.value.canViewResult
   ) {
     void navigateTo(
-      `/student/assessments/${assignmentId.value}/completed`,
+      `/student/results/${assignmentId.value}`,
     );
 
     return;

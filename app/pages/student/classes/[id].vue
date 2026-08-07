@@ -147,7 +147,7 @@ function deliveryAction(
       label:
         "View Result",
       route:
-        `/student/assessments/${delivery.assignmentId}/completed`,
+        `/student/results/${delivery.assignmentId}`,
       enabled:
         true,
     };

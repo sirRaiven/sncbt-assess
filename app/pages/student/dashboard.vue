@@ -134,7 +134,7 @@ function actionRoute(
   if (
     delivery.canViewResult
   ) {
-    return `/student/assessments/${delivery.assignmentId}/completed`;
+    return `/student/results/${delivery.assignmentId}`;
   }
 
   return `/student/assessments/${delivery.assignmentId}/instructions`;

@@ -142,7 +142,7 @@ onMounted(
     <PageHeader
       eyebrow="Academic performance"
       title="My Results"
-      description="Review submitted classroom assessments whose results have been made available by your instructor."
+      description="Review your submitted classroom assessments and any scores your instructor has released."
     >
       <template #actions>
         <UButton
@@ -182,7 +182,7 @@ onMounted(
       "
       icon="i-lucide-trophy"
       title="No submitted results"
-      description="Completed assessments will appear here when the instructor allows result visibility."
+      description="Submitted assessments will appear here. Scores and answer review remain controlled by your instructor."
     />
 
     <div
@@ -291,7 +291,7 @@ onMounted(
                 v-if="
                   delivery.canViewResult
                 "
-                :to="`/student/assessments/${delivery.assignmentId}/completed`"
+                :to="`/student/results/${delivery.assignmentId}`"
                 color="neutral"
                 variant="outline"
                 icon="i-lucide-eye"

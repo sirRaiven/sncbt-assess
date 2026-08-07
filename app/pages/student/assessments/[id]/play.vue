@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import {
+  onBeforeRouteLeave,
+} from "vue-router";
+
 import type {
   DeliveryQuestionPayload,
   StudentAssessmentDelivery,
@@ -80,6 +84,22 @@ const isOnline =
 const pendingSync =
   ref(false);
 
+const lastSyncedAt =
+  ref<string | null>(
+    null,
+  );
+
+const loadedSelectedOptionIds =
+  ref<string[]>(
+    [],
+  );
+
+const allowRouteLeave =
+  ref(false);
+
+const timerWarningsShown =
+  new Set<number>();
+
 const questionTimeoutTriggered =
   ref(false);
 
@@ -136,6 +156,125 @@ const recoveryKey =
         : "",
   );
 
+const estimatedAnsweredCount =
+  computed(
+    () => {
+      const attempt =
+        delivery.value?.attempt;
+
+      if (!attempt) {
+        return 0;
+      }
+
+      let count =
+        attempt.answeredCount;
+
+      const serverHadAnswer =
+        loadedSelectedOptionIds.value
+          .length > 0;
+
+      const currentHasAnswer =
+        selectedOptionIds.value
+          .length > 0;
+
+      if (
+        currentHasAnswer
+        && !serverHadAnswer
+      ) {
+        count += 1;
+      } else if (
+        !currentHasAnswer
+        && serverHadAnswer
+      ) {
+        count -= 1;
+      }
+
+      return Math.max(
+        0,
+        Math.min(
+          attempt.questionCount,
+          count,
+        ),
+      );
+    },
+  );
+
+const estimatedUnansweredCount =
+  computed(
+    () =>
+      Math.max(
+        0,
+        (
+          questionPayload.value
+            ?.questionCount
+          || delivery.value
+            ?.questionCount
+          || 0
+        )
+        - estimatedAnsweredCount.value,
+      ),
+  );
+
+const saveStatusLabel =
+  computed(
+    () => {
+      if (!isOnline.value) {
+        return "Saved on device";
+      }
+
+      if (isSaving.value) {
+        return "Saving...";
+      }
+
+      if (pendingSync.value) {
+        return "Waiting to sync";
+      }
+
+      return "Saved";
+    },
+  );
+
+const saveStatusIcon =
+  computed(
+    () => {
+      if (!isOnline.value) {
+        return "i-lucide-cloud-off";
+      }
+
+      if (isSaving.value) {
+        return "i-lucide-refresh-cw";
+      }
+
+      if (pendingSync.value) {
+        return "i-lucide-cloud-upload";
+      }
+
+      return "i-lucide-cloud-check";
+    },
+  );
+
+const timeWarning =
+  computed(
+    () => {
+      const seconds =
+        overallSeconds.value;
+
+      if (
+        seconds === null
+        || seconds > 300
+        || seconds <= 0
+      ) {
+        return "";
+      }
+
+      if (seconds <= 60) {
+        return "Less than 1 minute remains. The assessment will submit automatically when time expires.";
+      }
+
+      return "Less than 5 minutes remain. Review your saved answers and submit before time expires.";
+    },
+  );
+
 function secondsUntil(
   value: string | null,
 ): number | null {
@@ -179,6 +318,127 @@ function formatTime(
     safe % 60;
 
   return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
+}
+
+function formatSyncTime(
+  value: string | null,
+): string {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl
+    .DateTimeFormat(
+      "en-PH",
+      {
+        hour:
+          "numeric",
+        minute:
+          "2-digit",
+        second:
+          "2-digit",
+      },
+    )
+    .format(
+      new Date(value),
+    );
+}
+
+function shouldWarnBeforeLeaving():
+  boolean {
+  return Boolean(
+    delivery.value?.attempt
+    && delivery.value.attempt.status
+      === "in_progress"
+    && !allowRouteLeave.value,
+  );
+}
+
+function handleBeforeUnload(
+  event: BeforeUnloadEvent,
+): void {
+  if (!shouldWarnBeforeLeaving()) {
+    return;
+  }
+
+  if (pendingSync.value) {
+    saveRecovery();
+  }
+
+  event.preventDefault();
+  event.returnValue =
+    "";
+}
+
+function handleVisibilityChange():
+  void {
+  if (
+    document.visibilityState
+    === "hidden"
+    && pendingSync.value
+  ) {
+    saveRecovery();
+  }
+}
+
+function showTimerWarning(
+  seconds: number | null,
+): void {
+  if (
+    seconds === null
+    || seconds <= 0
+  ) {
+    return;
+  }
+
+  const threshold =
+    seconds <= 60
+      ? 60
+      : seconds <= 300
+        ? 300
+        : seconds <= 600
+          ? 600
+          : null;
+
+  if (
+    !threshold
+    || timerWarningsShown.has(
+      threshold,
+    )
+  ) {
+    return;
+  }
+
+  timerWarningsShown.add(
+    threshold,
+  );
+
+  const label =
+    threshold === 60
+      ? "1 minute"
+      : threshold === 300
+        ? "5 minutes"
+        : "10 minutes";
+
+  toast.add({
+    title:
+      `${label} remaining`,
+    description:
+      "The overall assessment timer continues running and the server will submit the attempt when time expires.",
+    color:
+      threshold === 60
+        ? "error"
+        : "warning",
+  });
+}
+
+async function leaveAssessment(
+  path: string,
+): Promise<void> {
+  allowRouteLeave.value =
+    true;
+
+  await navigateTo(path);
 }
 
 function isSelected(
@@ -240,12 +500,10 @@ function restoreRecovery():
       Array.isArray(
         parsed.selectedOptionIds,
       )
-      && parsed
-        .selectedOptionIds
-        .length > 0
     ) {
-      selectedOptionIds.value =
-        parsed.selectedOptionIds;
+      selectedOptionIds.value = [
+        ...parsed.selectedOptionIds,
+      ];
 
       pendingSync.value =
         true;
@@ -338,7 +596,7 @@ async function loadDelivery():
     delivery.value.attempt;
 
   if (!attempt) {
-    await navigateTo(
+    await leaveAssessment(
       `/student/assessments/${assignmentId.value}/instructions`,
     );
 
@@ -353,7 +611,7 @@ async function loadDelivery():
       attempt.status,
     )
   ) {
-    await navigateTo(
+    await leaveAssessment(
       `/student/assessments/${assignmentId.value}/completed`,
     );
 
@@ -364,7 +622,7 @@ async function loadDelivery():
     attempt.status
     !== "in_progress"
   ) {
-    await navigateTo(
+    await leaveAssessment(
       `/student/assessments/${assignmentId.value}/instructions`,
     );
 
@@ -423,7 +681,7 @@ async function loadQuestion(
           "deadline",
         )
     ) {
-      await navigateTo(
+      await leaveAssessment(
         `/student/assessments/${assignmentId.value}/completed`,
       );
 
@@ -451,8 +709,17 @@ async function loadQuestion(
       .selectedOptionIds,
   ];
 
+  loadedSelectedOptionIds.value = [
+    ...result.data.payload
+      .selectedOptionIds,
+  ];
+
   pendingSync.value =
     false;
+
+  lastSyncedAt.value =
+    new Date()
+      .toISOString();
 
   questionSeconds.value =
     secondsUntil(
@@ -539,13 +806,21 @@ async function synchronizeAnswer(
   pendingSync.value =
     false;
 
+  loadedSelectedOptionIds.value = [
+    ...selectedOptionIds.value,
+  ];
+
+  lastSyncedAt.value =
+    new Date()
+      .toISOString();
+
   isSaving.value =
     false;
 
   if (
     result.data.attemptClosed
   ) {
-    await navigateTo(
+    await leaveAssessment(
       `/student/assessments/${assignmentId.value}/completed`,
     );
 
@@ -671,13 +946,15 @@ async function submit(
     true;
 
   if (
-    questionPayload.value
-      ?.allowBacktracking
-    && !auto
+    !auto
+    && questionPayload.value
+    && !questionPayload.value
+      .finalized
   ) {
     const saved =
       await synchronizeAnswer(
-        false,
+        !questionPayload.value
+          .allowBacktracking,
       );
 
     if (!saved) {
@@ -718,7 +995,7 @@ async function submit(
   submitModalOpen.value =
     false;
 
-  await navigateTo(
+  await leaveAssessment(
     `/student/assessments/${assignmentId.value}/completed`,
   );
 }
@@ -779,6 +1056,10 @@ function startTimer():
               delivery.value
                 .attempt.expiresAt,
             );
+
+          showTimerWarning(
+            overallSeconds.value,
+          );
 
           if (
             overallSeconds.value
@@ -867,7 +1148,9 @@ function handleOffline():
   isOnline.value =
     false;
 
-  saveRecovery();
+  if (pendingSync.value) {
+    saveRecovery();
+  }
 }
 
 onMounted(
@@ -883,6 +1166,16 @@ onMounted(
     window.addEventListener(
       "offline",
       handleOffline,
+    );
+
+    window.addEventListener(
+      "beforeunload",
+      handleBeforeUnload,
+    );
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange,
     );
 
     const ready =
@@ -913,6 +1206,34 @@ onBeforeUnmount(
       "offline",
       handleOffline,
     );
+
+    window.removeEventListener(
+      "beforeunload",
+      handleBeforeUnload,
+    );
+
+    document.removeEventListener(
+      "visibilitychange",
+      handleVisibilityChange,
+    );
+  },
+);
+
+onBeforeRouteLeave(
+  () => {
+    if (
+      !shouldWarnBeforeLeaving()
+    ) {
+      return true;
+    }
+
+    if (pendingSync.value) {
+      saveRecovery();
+    }
+
+    return window.confirm(
+      "Your assessment is still in progress. Leaving this page will not pause the timer. Do you want to leave?",
+    );
   },
 );
 </script>
@@ -920,76 +1241,115 @@ onBeforeUnmount(
 <template>
   <div class="min-h-screen bg-default">
     <header class="sticky top-0 z-30 border-b border-default bg-default/95 backdrop-blur">
-      <div class="flex min-h-16 items-center gap-3 px-4">
-        <div class="min-w-0 flex-1">
-          <p class="truncate font-black text-highlighted">
-            {{
-              delivery?.title
-              || "Assessment"
-            }}
-          </p>
+      <div class="px-4 py-3">
+        <div class="flex items-start gap-3">
+          <div class="min-w-0 flex-1">
+            <p class="truncate font-black text-highlighted">
+              {{
+                delivery?.title
+                || "Assessment"
+              }}
+            </p>
 
-          <p class="truncate text-xs text-muted">
-            {{
-              delivery
-                ? `${delivery.subjectCode} · ${delivery.classroom.section}`
-                : ""
-            }}
-          </p>
+            <p class="truncate text-xs text-muted">
+              {{
+                delivery
+                  ? `${delivery.subjectCode} · ${delivery.classroom.section}`
+                  : ""
+              }}
+            </p>
+          </div>
+
+          <UButton
+            color="error"
+            variant="soft"
+            icon="i-lucide-send"
+            :loading="isSubmitting"
+            @click="
+              submitModalOpen = true
+            "
+          >
+            <span class="hidden sm:inline">
+              Submit
+            </span>
+          </UButton>
         </div>
 
-        <UBadge
-          :color="
-            isOnline
-              ? 'success'
-              : 'warning'
-          "
-          variant="soft"
-        >
-          {{
-            isOnline
-              ? "Online"
-              : "Offline"
-          }}
-        </UBadge>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <UBadge
+            :color="
+              isOnline
+                ? 'success'
+                : 'warning'
+            "
+            variant="soft"
+          >
+            {{
+              isOnline
+                ? "Online"
+                : "Offline"
+            }}
+          </UBadge>
 
-        <UBadge
-          color="error"
-          variant="soft"
-          class="font-mono"
-        >
-          Overall
-          {{
-            formatTime(
-              overallSeconds,
-            )
-          }}
-        </UBadge>
+          <UBadge
+            :color="
+              !isOnline
+              || pendingSync
+                ? 'warning'
+                : isSaving
+                  ? 'info'
+                  : 'success'
+            "
+            variant="soft"
+          >
+            <UIcon
+              :name="saveStatusIcon"
+              class="mr-1 size-3.5"
+              :class="{
+                'animate-spin':
+                  isSaving,
+              }"
+            />
+            {{ saveStatusLabel }}
+            <span
+              v-if="
+                lastSyncedAt
+                && !pendingSync
+                && !isSaving
+                && isOnline
+              "
+              class="ml-1 hidden sm:inline"
+            >
+              · {{ formatSyncTime(lastSyncedAt) }}
+            </span>
+          </UBadge>
 
-        <UBadge
-          color="warning"
-          variant="soft"
-          class="font-mono"
-        >
-          Question
-          {{
-            formatTime(
-              questionSeconds,
-            )
-          }}
-        </UBadge>
+          <UBadge
+            color="error"
+            variant="soft"
+            class="font-mono"
+          >
+            Overall
+            {{
+              formatTime(
+                overallSeconds,
+              )
+            }}
+          </UBadge>
 
-        <UButton
-          color="error"
-          variant="soft"
-          icon="i-lucide-send"
-          :loading="isSubmitting"
-          @click="
-            submitModalOpen = true
-          "
-        >
-          Submit
-        </UButton>
+          <UBadge
+            color="warning"
+            variant="soft"
+            class="font-mono"
+          >
+            Question
+            {{
+              formatTime(
+                questionSeconds,
+              )
+            }}
+          </UBadge>
+        </div>
       </div>
     </header>
 
@@ -1001,6 +1361,20 @@ onBeforeUnmount(
         variant="soft"
         title="Question could not be loaded"
         :description="errorMessage"
+      />
+
+      <UAlert
+        v-if="timeWarning"
+        class="mb-4"
+        :color="
+          overallSeconds !== null
+          && overallSeconds <= 60
+            ? 'error'
+            : 'warning'
+        "
+        variant="soft"
+        title="Assessment time is running low"
+        :description="timeWarning"
       />
 
       <div
@@ -1035,7 +1409,7 @@ onBeforeUnmount(
             </p>
           </div>
 
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
             <UBadge
               color="neutral"
               variant="soft"
@@ -1049,11 +1423,25 @@ onBeforeUnmount(
             </UBadge>
 
             <UBadge
-              v-if="pendingSync"
-              color="warning"
+              :color="
+                !isOnline
+                || pendingSync
+                  ? 'warning'
+                  : isSaving
+                    ? 'info'
+                    : 'success'
+              "
               variant="soft"
             >
-              Waiting to sync
+              <UIcon
+                :name="saveStatusIcon"
+                class="mr-1 size-3.5"
+                :class="{
+                  'animate-spin':
+                    isSaving,
+                }"
+              />
+              {{ saveStatusLabel }}
             </UBadge>
           </div>
         </div>
@@ -1162,7 +1550,7 @@ onBeforeUnmount(
         submitModalOpen
       "
       title="Submit this assessment?"
-      description="Your saved answers will be graded immediately. You cannot change them after final submission."
+      description="Review your progress before final submission. Your answers cannot be changed after the server accepts the submission."
       confirm-label="Submit Assessment"
       confirm-color="error"
       icon="i-lucide-send"
@@ -1173,6 +1561,37 @@ onBeforeUnmount(
           'student_submitted',
         )
       "
-    />
+    >
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <div class="rounded-lg bg-elevated p-3 text-center">
+          <p class="text-xs text-muted">
+            Answered
+          </p>
+
+          <p class="mt-1 text-lg font-black text-highlighted">
+            {{ estimatedAnsweredCount }}
+          </p>
+        </div>
+
+        <div class="rounded-lg bg-elevated p-3 text-center">
+          <p class="text-xs text-muted">
+            Unanswered
+          </p>
+
+          <p class="mt-1 text-lg font-black text-highlighted">
+            {{ estimatedUnansweredCount }}
+          </p>
+        </div>
+      </div>
+
+      <UAlert
+        v-if="pendingSync || !isOnline"
+        class="mt-3"
+        color="warning"
+        variant="soft"
+        title="Unsynchronized answer"
+        description="Reconnect and allow the current answer to synchronize before submitting."
+      />
+    </ConfirmationModal>
   </div>
 </template>
