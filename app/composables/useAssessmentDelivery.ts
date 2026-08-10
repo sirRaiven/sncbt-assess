@@ -8,6 +8,7 @@ import type {
   InstructorDeliveryMonitor,
   SaveDeliveryAnswerResult,
   StudentAssessmentDelivery,
+  StudentResultReview,
   SubmitDeliveryAttemptResult,
 } from "~/types/assessment-delivery";
 
@@ -265,6 +266,21 @@ export function useAssessmentDelivery() {
     );
   }
 
+  async function getResultReview(
+    assignmentId: string,
+  ) {
+    return await invoke<{
+      serverNow: string;
+      review:
+        StudentResultReview;
+    }>(
+      "get-result-review",
+      {
+        assignmentId,
+      },
+    );
+  }
+
   async function listInstructorDeliveries() {
     return await invoke<{
       serverNow: string;
@@ -325,6 +341,7 @@ export function useAssessmentDelivery() {
     saveAnswer,
     submitAttempt,
     getResult,
+    getResultReview,
     listInstructorDeliveries,
     getInstructorMonitor,
     forceSubmitAttempt,

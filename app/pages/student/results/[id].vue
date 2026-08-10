@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type {
   StudentAssessmentDelivery,
+  StudentResultReview,
+  StudentResultReviewOutcome,
 } from "~/types/assessment-delivery";
 
 definePageMeta({
@@ -26,6 +28,7 @@ const assignmentId =
 
 const {
   getResult,
+  getResultReview,
 } = useAssessmentDelivery();
 
 const delivery =
@@ -36,10 +39,24 @@ const delivery =
     null,
   );
 
+const review =
+  ref<
+    StudentResultReview
+    | null
+  >(
+    null,
+  );
+
 const isLoading =
   ref(true);
 
+const isReviewLoading =
+  ref(false);
+
 const errorMessage =
+  ref("");
+
+const reviewError =
   ref("");
 
 const attempt =
@@ -57,6 +74,23 @@ const canShowScore =
         && delivery.value.resultVisibility
           !== "hidden"
         && attempt.value,
+      ),
+  );
+
+const canRequestReview =
+  computed(
+    () =>
+      Boolean(
+        delivery.value
+        && delivery.value.resultVisibility
+          === "score_and_answers"
+        && attempt.value
+        && [
+          "submitted",
+          "auto_submitted",
+        ].includes(
+          attempt.value.status,
+        ),
       ),
   );
 
@@ -132,6 +166,36 @@ const completionTime =
     },
   );
 
+const reviewSummary =
+  computed(
+    () => {
+      const questions =
+        review.value?.questions
+        || [];
+
+      return {
+        correct:
+          questions.filter(
+            (question) =>
+              question.outcome
+              === "correct",
+          ).length,
+        incorrect:
+          questions.filter(
+            (question) =>
+              question.outcome
+              === "incorrect",
+          ).length,
+        unanswered:
+          questions.filter(
+            (question) =>
+              question.outcome
+              === "unanswered",
+          ).length,
+      };
+    },
+  );
+
 function formatDate(
   value: string | null,
 ): string {
@@ -154,12 +218,133 @@ function formatDate(
     );
 }
 
+function outcomeLabel(
+  outcome:
+    StudentResultReviewOutcome,
+): string {
+  if (outcome === "correct") {
+    return "Correct";
+  }
+
+  if (outcome === "incorrect") {
+    return "Incorrect";
+  }
+
+  if (outcome === "unanswered") {
+    return "Unanswered";
+  }
+
+  return "Not graded";
+}
+
+function outcomeColor(
+  outcome:
+    StudentResultReviewOutcome,
+): "success" | "error" | "warning" | "neutral" {
+  if (outcome === "correct") {
+    return "success";
+  }
+
+  if (outcome === "incorrect") {
+    return "error";
+  }
+
+  if (outcome === "unanswered") {
+    return "warning";
+  }
+
+  return "neutral";
+}
+
+function optionStateClass(
+  selected: boolean,
+  correct: boolean,
+): string {
+  if (correct) {
+    return "border-success/50 bg-success/10";
+  }
+
+  if (selected) {
+    return "border-error/50 bg-error/10";
+  }
+
+  return "border-default bg-default";
+}
+
+function optionIcon(
+  selected: boolean,
+  correct: boolean,
+): string {
+  if (correct) {
+    return "i-lucide-circle-check-big";
+  }
+
+  if (selected) {
+    return "i-lucide-circle-x";
+  }
+
+  return "i-lucide-circle";
+}
+
+async function loadReview():
+  Promise<void> {
+  if (!canRequestReview.value) {
+    review.value =
+      null;
+
+    reviewError.value =
+      "";
+
+    return;
+  }
+
+  isReviewLoading.value =
+    true;
+
+  reviewError.value =
+    "";
+
+  const result =
+    await getResultReview(
+      assignmentId.value,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    review.value =
+      null;
+
+    reviewError.value =
+      result.error
+      || "Detailed answer review is not available from the server yet.";
+
+    isReviewLoading.value =
+      false;
+
+    return;
+  }
+
+  review.value =
+    result.data.review;
+
+  isReviewLoading.value =
+    false;
+}
+
 async function loadResult():
   Promise<void> {
   isLoading.value =
     true;
 
   errorMessage.value =
+    "";
+
+  review.value =
+    null;
+
+  reviewError.value =
     "";
 
   const result =
@@ -186,6 +371,10 @@ async function loadResult():
 
   isLoading.value =
     false;
+
+  if (canRequestReview.value) {
+    await loadReview();
+  }
 }
 
 onMounted(
@@ -216,7 +405,7 @@ onMounted(
           color="neutral"
           variant="outline"
           icon="i-lucide-refresh-cw"
-          :loading="isLoading"
+          :loading="isLoading || isReviewLoading"
           @click="loadResult"
         >
           Refresh
@@ -415,9 +604,28 @@ onMounted(
 
       <UCard>
         <template #header>
-          <h2 class="font-black text-highlighted">
-            Answer review
-          </h2>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="font-black text-highlighted">
+                Answer review
+              </h2>
+
+              <p class="mt-1 text-sm text-muted">
+                Question details are requested only after your instructor enables score and answer review.
+              </p>
+            </div>
+
+            <UButton
+              v-if="canRequestReview && reviewError"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-refresh-cw"
+              :loading="isReviewLoading"
+              @click="loadReview"
+            >
+              Retry Review
+            </UButton>
+          </div>
         </template>
 
         <UAlert
@@ -436,13 +644,167 @@ onMounted(
           description="Your instructor has released the score but has not enabled question-by-question answer review."
         />
 
+        <div
+          v-else-if="isReviewLoading"
+          class="space-y-4"
+        >
+          <USkeleton class="h-20 rounded-xl" />
+          <USkeleton class="h-64 rounded-xl" />
+          <USkeleton class="h-64 rounded-xl" />
+        </div>
+
         <UAlert
-          v-else
-          color="success"
+          v-else-if="reviewError"
+          color="warning"
           variant="soft"
-          title="Question review is being prepared"
-          description="Your instructor has allowed answer review. Your score is available now; question-by-question details will appear when the review data is available."
+          title="Detailed review is not available yet"
+          description="The score is available, but the secure question-review response has not been provided by the assessment server. No correct-answer data is reconstructed in the browser."
         />
+
+        <EmptyPanel
+          v-else-if="review && review.questions.length === 0"
+          icon="i-lucide-list-checks"
+          title="No review questions were returned"
+          description="The server allowed answer review but did not return any question records for this attempt."
+        />
+
+        <div
+          v-else-if="review"
+          class="space-y-5"
+        >
+          <div class="grid gap-3 sm:grid-cols-3">
+            <div class="rounded-xl bg-success/10 p-4 text-center">
+              <p class="text-xs font-bold uppercase tracking-[0.14em] text-success">
+                Correct
+              </p>
+              <p class="mt-2 text-2xl font-black text-highlighted">
+                {{ reviewSummary.correct }}
+              </p>
+            </div>
+
+            <div class="rounded-xl bg-error/10 p-4 text-center">
+              <p class="text-xs font-bold uppercase tracking-[0.14em] text-error">
+                Incorrect
+              </p>
+              <p class="mt-2 text-2xl font-black text-highlighted">
+                {{ reviewSummary.incorrect }}
+              </p>
+            </div>
+
+            <div class="rounded-xl bg-warning/10 p-4 text-center">
+              <p class="text-xs font-bold uppercase tracking-[0.14em] text-warning">
+                Unanswered
+              </p>
+              <p class="mt-2 text-2xl font-black text-highlighted">
+                {{ reviewSummary.unanswered }}
+              </p>
+            </div>
+          </div>
+
+          <article
+            v-for="question in review.questions"
+            :key="question.id"
+            class="rounded-xl border border-default p-4 sm:p-5"
+          >
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                  Question {{ question.orderNumber }}
+                </p>
+
+                <h3 class="mt-2 text-lg font-black leading-snug text-highlighted">
+                  {{ question.questionText }}
+                </h3>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <UBadge
+                  :color="outcomeColor(question.outcome)"
+                  variant="soft"
+                >
+                  {{ outcomeLabel(question.outcome) }}
+                </UBadge>
+
+                <UBadge
+                  color="neutral"
+                  variant="soft"
+                >
+                  {{
+                    question.earnedPoints === null
+                      ? '—'
+                      : question.earnedPoints
+                  }}
+                  /
+                  {{ question.points }}
+                  pts
+                </UBadge>
+              </div>
+            </div>
+
+            <img
+              v-if="question.imageUrl"
+              :src="question.imageUrl"
+              alt="Question illustration"
+              class="mt-4 max-h-72 w-full rounded-xl border border-default object-contain"
+            >
+
+            <div class="mt-5 space-y-3">
+              <div
+                v-for="(option, index) in question.options"
+                :key="option.id"
+                class="flex items-start gap-3 rounded-xl border p-3"
+                :class="optionStateClass(option.selected, option.correct)"
+              >
+                <UIcon
+                  :name="optionIcon(option.selected, option.correct)"
+                  class="mt-0.5 size-5 shrink-0"
+                  :class="
+                    option.correct
+                      ? 'text-success'
+                      : option.selected
+                        ? 'text-error'
+                        : 'text-muted'
+                  "
+                />
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-bold text-highlighted">
+                      {{ String.fromCharCode(65 + index) }}. {{ option.text }}
+                    </span>
+
+                    <UBadge
+                      v-if="option.selected"
+                      color="neutral"
+                      variant="soft"
+                      size="xs"
+                    >
+                      Your answer
+                    </UBadge>
+
+                    <UBadge
+                      v-if="option.correct"
+                      color="success"
+                      variant="soft"
+                      size="xs"
+                    >
+                      Correct answer
+                    </UBadge>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <UAlert
+              v-if="question.explanation"
+              class="mt-5"
+              color="info"
+              variant="soft"
+              title="Answer explanation"
+              :description="question.explanation"
+            />
+          </article>
+        </div>
       </UCard>
 
       <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">

@@ -167,6 +167,42 @@ export interface SubmitDeliveryAttemptResult {
   alreadyCompleted: boolean;
 }
 
+
+export type StudentResultReviewOutcome =
+  | "correct"
+  | "incorrect"
+  | "unanswered"
+  | "not_graded";
+
+export interface StudentResultReviewOption {
+  id: string;
+  text: string;
+  orderNumber: number;
+  selected: boolean;
+  correct: boolean;
+}
+
+export interface StudentResultReviewQuestion {
+  id: string;
+  orderNumber: number;
+  questionType:
+    | "multiple_choice"
+    | "checkbox";
+  questionText: string;
+  imageUrl: string | null;
+  points: number;
+  earnedPoints: number | null;
+  outcome: StudentResultReviewOutcome;
+  options: StudentResultReviewOption[];
+  explanation: string | null;
+}
+
+export interface StudentResultReview {
+  assignmentId: string;
+  attemptId: string;
+  questions: StudentResultReviewQuestion[];
+}
+
 export interface InstructorDeliveryListItem {
   assignmentId: string;
   assessmentId: string;
