@@ -19,6 +19,7 @@ const toast = useToast();
 
 const {
   listInstructorClasses,
+  archiveClass,
 } = useClassrooms();
 
 const classes =
@@ -27,9 +28,14 @@ const classes =
 const isLoading = ref(true);
 const errorMessage = ref("");
 const query = ref("");
-const statusFilter = ref(
-  "All statuses",
-);
+const busyClassroomId =
+  ref<string | null>(null);
+const archiveModalOpen =
+  ref(false);
+const pendingArchiveClass =
+  ref<InstructorClassroom | null>(
+    null,
+  );
 
 const filteredClasses = computed(() => {
   const keyword =
@@ -39,7 +45,14 @@ const filteredClasses = computed(() => {
 
   return classes.value.filter(
     (classroom) => {
-      const matchesQuery =
+      if (
+        classroom.status
+        === "archived"
+      ) {
+        return false;
+      }
+
+      return (
         !keyword
         || [
           classroom.name,
@@ -48,18 +61,7 @@ const filteredClasses = computed(() => {
         ]
           .join(" ")
           .toLowerCase()
-          .includes(keyword);
-
-      const matchesStatus =
-        statusFilter.value
-          === "All statuses"
-        || classroom.status
-          === statusFilter.value
-            .toLowerCase();
-
-      return (
-        matchesQuery
-        && matchesStatus
+          .includes(keyword)
       );
     },
   );
@@ -106,10 +108,74 @@ function copyCode(
   });
 }
 
+function requestArchiveClass(
+  classroom: InstructorClassroom,
+): void {
+  pendingArchiveClass.value =
+    classroom;
+  archiveModalOpen.value =
+    true;
+}
+
+async function confirmArchiveClass(): Promise<void> {
+  if (!pendingArchiveClass.value) {
+    return;
+  }
+
+  const classroom =
+    pendingArchiveClass.value;
+
+  busyClassroomId.value =
+    classroom.id;
+
+  const result =
+    await archiveClass(
+      classroom.id,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title:
+        "Class could not be archived",
+      description:
+        result.error
+        || "The class could not be archived.",
+      color:
+        "error",
+    });
+
+    busyClassroomId.value =
+      null;
+    return;
+  }
+
+  toast.add({
+    title:
+      "Class archived",
+    description:
+      `${classroom.name} is now available in Archive.`,
+    color:
+      "success",
+  });
+
+  archiveModalOpen.value =
+    false;
+  pendingArchiveClass.value =
+    null;
+
+  await loadClasses();
+
+  busyClassroomId.value =
+    null;
+}
+
 function classroomMenuItems(
   classroom: InstructorClassroom,
 ): DropdownMenuItem[][] {
-  const items:
+  const navigationItems:
     DropdownMenuItem[] = [
       {
         label:
@@ -122,7 +188,7 @@ function classroomMenuItems(
     ];
 
   if (classroom.join_enabled) {
-    items.push({
+    navigationItems.push({
       label:
         "Copy Class Code",
       icon:
@@ -135,8 +201,29 @@ function classroomMenuItems(
     });
   }
 
+  const archiveItems:
+    DropdownMenuItem[] = [
+      {
+        label:
+          "Archive",
+        icon:
+          "i-lucide-archive",
+        color:
+          "warning",
+        disabled:
+          busyClassroomId.value
+          === classroom.id,
+        onSelect: () => {
+          requestArchiveClass(
+            classroom,
+          );
+        },
+      },
+    ];
+
   return [
-    items,
+    navigationItems,
+    archiveItems,
   ];
 }
 
@@ -153,6 +240,15 @@ onMounted(
       description="Create classes, manage enrollment codes, and review student membership."
     >
       <template #actions>
+        <UButton
+          to="/instructor/archive?section=classes"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-archive"
+        >
+          Open Archive
+        </UButton>
+
         <UButton
           to="/instructor/classes/create"
           icon="i-lucide-plus"
@@ -171,21 +267,11 @@ onMounted(
     />
 
     <UCard>
-      <div class="grid gap-3 lg:grid-cols-[1fr_220px_auto]">
+      <div class="grid gap-3 lg:grid-cols-[1fr_auto]">
         <UInput
           v-model="query"
           icon="i-lucide-search"
           placeholder="Search subject, code, or section"
-          class="w-full"
-        />
-
-        <USelect
-          v-model="statusFilter"
-          :items="[
-            'All statuses',
-            'Active',
-            'Archived',
-          ]"
           class="w-full"
         />
 
@@ -218,9 +304,18 @@ onMounted(
       "
       icon="i-lucide-school"
       title="No classes found"
-      description="Create your first class or adjust the current filters."
+      description="Create your first class or adjust the search. Archived classes are available in Archive."
     >
       <template #actions>
+        <UButton
+          to="/instructor/archive?section=classes"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-archive"
+        >
+          Open Archive
+        </UButton>
+
         <UButton
           to="/instructor/classes/create"
           icon="i-lucide-plus"
@@ -371,5 +466,28 @@ onMounted(
         </div>
       </UCard>
     </div>
+
+    <ConfirmationModal
+      v-model:open="
+        archiveModalOpen
+      "
+      title="Archive class?"
+      :description="
+        pendingArchiveClass
+          ? `Archive ${pendingArchiveClass.name}? New enrollment-code access and membership requests will be disabled. The class can be reactivated later from Archive.`
+          : 'Archive this class?'
+      "
+      confirm-label="Archive Class"
+      confirm-color="warning"
+      icon="i-lucide-archive"
+      :loading="
+        Boolean(
+          busyClassroomId,
+        )
+      "
+      @confirm="
+        confirmArchiveClass
+      "
+    />
   </div>
 </template>

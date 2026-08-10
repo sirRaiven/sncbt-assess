@@ -1,4 +1,5 @@
 export type ArchiveSection =
+  | "classes"
   | "assessments"
   | "sessions";
 

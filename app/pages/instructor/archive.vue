@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import type {
+  DropdownMenuItem,
+} from "@nuxt/ui";
+
+import type {
+  InstructorClassroom,
+} from "~/types/classroom";
+import type {
   ArchiveSection,
   ArchivedAssessmentItem,
   ArchivedSessionItem,
@@ -23,6 +30,8 @@ interface DeleteTarget {
   detail: string;
 }
 
+const route = useRoute();
+const router = useRouter();
 const toast = useToast();
 
 const {
@@ -31,14 +40,40 @@ const {
   deleteClosedSession,
 } = useInstructorArchive();
 
+const {
+  listInstructorClasses,
+  reactivateClass,
+} = useClassrooms();
+
 const overview =
   ref<InstructorArchiveOverview | null>(
     null,
   );
 
+const archivedClasses =
+  ref<InstructorClassroom[]>([]);
+
+function initialSection(): ArchiveSection {
+  const requested =
+    String(
+      route.query.section
+      ?? "",
+    );
+
+  if (
+    requested === "classes"
+    || requested === "assessments"
+    || requested === "sessions"
+  ) {
+    return requested;
+  }
+
+  return "assessments";
+}
+
 const activeSection =
   ref<ArchiveSection>(
-    "assessments",
+    initialSection(),
   );
 
 const query =
@@ -61,6 +96,9 @@ const confirmationText =
 const isDeleting =
   ref(false);
 
+const busyClassroomId =
+  ref<string | null>(null);
+
 const summary = computed(
   () =>
     overview.value?.summary
@@ -74,6 +112,39 @@ const summary = computed(
       totalRecords:
         0,
     },
+);
+
+const archiveRecordCount = computed(
+  () =>
+    summary.value.totalRecords
+    + archivedClasses.value.length,
+);
+
+const filteredClasses = computed(
+  () => {
+    const keyword =
+      query.value
+        .trim()
+        .toLowerCase();
+
+    if (!keyword) {
+      return archivedClasses.value;
+    }
+
+    return archivedClasses.value.filter(
+      (classroom) =>
+        [
+          classroom.name,
+          classroom.subject_code,
+          classroom.section,
+          classroom.school_year,
+          classroom.semester,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword),
+    );
+  },
 );
 
 const filteredAssessments = computed(
@@ -137,6 +208,26 @@ const filteredSessions = computed(
   },
 );
 
+const searchPlaceholder = computed(
+  () => {
+    if (
+      activeSection.value
+      === "classes"
+    ) {
+      return "Search archived classes";
+    }
+
+    if (
+      activeSection.value
+      === "assessments"
+    ) {
+      return "Search archived assessments";
+    }
+
+    return "Search assessment, class, or code";
+  },
+);
+
 const canConfirmDelete = computed(
   () =>
     confirmationText.value
@@ -144,6 +235,22 @@ const canConfirmDelete = computed(
       .toUpperCase()
     === "DELETE",
 );
+
+function selectSection(
+  section: ArchiveSection,
+): void {
+  activeSection.value =
+    section;
+  query.value =
+    "";
+
+  void router.replace({
+    query: {
+      ...route.query,
+      section,
+    },
+  });
+}
 
 function formatDate(
   value: string | null,
@@ -233,28 +340,120 @@ async function loadArchive(): Promise<void> {
   errorMessage.value =
     "";
 
+  const [
+    archiveResult,
+    classesResult,
+  ] = await Promise.all([
+    getArchiveOverview(),
+    listInstructorClasses(),
+  ]);
+
+  const errors =
+    [
+      archiveResult.error,
+      classesResult.error,
+    ].filter(
+      Boolean,
+    ) as string[];
+
+  if (
+    archiveResult.data
+  ) {
+    overview.value =
+      archiveResult.data;
+  }
+
+  if (
+    classesResult.data
+  ) {
+    archivedClasses.value =
+      classesResult.data.classrooms.filter(
+        (classroom) =>
+          classroom.status
+          === "archived",
+      );
+  }
+
+  if (errors.length > 0) {
+    errorMessage.value =
+      errors.join(" ");
+  }
+
+  isLoading.value =
+    false;
+}
+
+async function reactivateArchivedClass(
+  classroom: InstructorClassroom,
+): Promise<void> {
+  busyClassroomId.value =
+    classroom.id;
+
   const result =
-    await getArchiveOverview();
+    await reactivateClass(
+      classroom.id,
+    );
 
   if (
     result.error
     || !result.data
   ) {
-    errorMessage.value =
-      result.error
-      || "Unable to load the instructor archive.";
+    toast.add({
+      title:
+        "Class could not be reactivated",
+      description:
+        result.error
+        || "The class could not be reactivated.",
+      color:
+        "error",
+    });
 
-    isLoading.value =
-      false;
-
+    busyClassroomId.value =
+      null;
     return;
   }
 
-  overview.value =
-    result.data;
+  toast.add({
+    title:
+      "Class reactivated",
+    description:
+      `${classroom.name} is available again in My Classes.`,
+    color:
+      "success",
+  });
 
-  isLoading.value =
-    false;
+  await loadArchive();
+
+  busyClassroomId.value =
+    null;
+}
+
+function archivedClassMenuItems(
+  classroom: InstructorClassroom,
+): DropdownMenuItem[][] {
+  return [
+    [
+      {
+        label: "View Class",
+        icon: "i-lucide-eye",
+        to: `/instructor/classes/${classroom.id}`,
+      },
+    ],
+    [
+      {
+        label: "Reactivate",
+        icon: "i-lucide-archive-restore",
+        color: "success",
+        disabled:
+          Boolean(busyClassroomId.value),
+        onSelect: () => {
+          void reactivateArchivedClass(
+            classroom,
+          );
+        },
+      },
+    ],
+  ];
 }
 
 async function confirmPermanentDelete(): Promise<void> {
@@ -322,6 +521,16 @@ async function confirmPermanentDelete(): Promise<void> {
     false;
 }
 
+watch(
+  () => route.query.section,
+  () => {
+    activeSection.value =
+      initialSection();
+    query.value =
+      "";
+  },
+);
+
 onMounted(
   loadArchive,
 );
@@ -332,7 +541,7 @@ onMounted(
     <PageHeader
       eyebrow="Records management"
       title="Archive"
-      description="Review archived assessments and closed live sessions. Permanent deletion is restricted to records you own and cannot be undone."
+      description="Review archived classes, archived assessments, and closed live sessions in one place."
     >
       <template #actions>
         <UButton
@@ -365,15 +574,18 @@ onMounted(
       </template>
     </UAlert>
 
-    <UAlert
-      color="warning"
-      variant="soft"
-      icon="i-lucide-triangle-alert"
-      title="Permanent deletion"
-      description="Deleting a record from this page cannot be reversed. Keep academic records archived when they are still covered by your institution's retention policy."
-    />
-
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatCard
+        label="Archived classes"
+        :value="
+          String(
+            archivedClasses.length,
+          )
+        "
+        icon="i-lucide-school"
+        tone="info"
+      />
+
       <StatCard
         label="Archived assessments"
         :value="
@@ -397,21 +609,10 @@ onMounted(
       />
 
       <StatCard
-        label="Linked history"
-        :value="
-          String(
-            summary.blockedAssessments,
-          )
-        "
-        icon="i-lucide-link-2"
-        tone="info"
-      />
-
-      <StatCard
         label="Archive records"
         :value="
           String(
-            summary.totalRecords,
+            archiveRecordCount,
           )
         "
         icon="i-lucide-archive"
@@ -421,7 +622,36 @@ onMounted(
 
     <UCard>
       <div class="flex flex-col gap-4 lg:flex-row lg:items-center">
-        <div class="flex rounded-xl border border-default bg-elevated p-1">
+        <div class="flex flex-wrap rounded-xl border border-default bg-elevated p-1">
+          <button
+            type="button"
+            class="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition lg:flex-none"
+            :class="
+              activeSection
+                === 'classes'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-muted hover:text-highlighted'
+            "
+            @click="
+              selectSection(
+                'classes',
+              )
+            "
+          >
+            <UIcon
+              name="i-lucide-school"
+              class="size-4"
+            />
+
+            Classes
+
+            <span class="rounded-md bg-black/10 px-1.5 py-0.5 text-xs">
+              {{
+                archivedClasses.length
+              }}
+            </span>
+          </button>
+
           <button
             type="button"
             class="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition lg:flex-none"
@@ -432,8 +662,9 @@ onMounted(
                 : 'text-muted hover:text-highlighted'
             "
             @click="
-              activeSection =
-                'assessments'
+              selectSection(
+                'assessments',
+              )
             "
           >
             <UIcon
@@ -460,8 +691,9 @@ onMounted(
                 : 'text-muted hover:text-highlighted'
             "
             @click="
-              activeSection =
-                'sessions'
+              selectSection(
+                'sessions',
+              )
             "
           >
             <UIcon
@@ -482,12 +714,7 @@ onMounted(
         <UInput
           v-model="query"
           icon="i-lucide-search"
-          :placeholder="
-            activeSection
-              === 'assessments'
-              ? 'Search archived assessments'
-              : 'Search assessment, class, or code'
-          "
+          :placeholder="searchPlaceholder"
           class="w-full lg:ml-auto lg:max-w-md"
         />
       </div>
@@ -507,6 +734,178 @@ onMounted(
     <template v-else>
       <template
         v-if="
+          activeSection
+          === 'classes'
+        "
+      >
+        <EmptyPanel
+          v-if="
+            filteredClasses.length
+            === 0
+          "
+          icon="i-lucide-school"
+          title="No archived classes"
+          description="Classes moved to Archive will appear here."
+        >
+          <template #actions>
+            <UButton
+              to="/instructor/classes"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-school"
+            >
+              Open My Classes
+            </UButton>
+          </template>
+        </EmptyPanel>
+
+        <div
+          v-else
+          class="grid gap-4 xl:grid-cols-2"
+        >
+          <UCard
+            v-for="classroom in filteredClasses"
+            :key="classroom.id"
+            class="overflow-hidden"
+            :ui="{
+              body: 'p-0 sm:p-0',
+            }"
+          >
+            <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-5">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <div class="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15">
+                    <UIcon
+                      name="i-lucide-school"
+                      class="size-5"
+                    />
+                  </div>
+
+                  <UBadge
+                    color="neutral"
+                    variant="soft"
+                  >
+                    Class
+                  </UBadge>
+                </div>
+
+                <div class="flex items-center gap-1">
+                  <StatusPill status="Archived" />
+
+                  <UDropdownMenu
+                    :items="archivedClassMenuItems(classroom)"
+                    :content="{
+                      align: 'end',
+                      side: 'bottom',
+                      sideOffset: 6,
+                    }"
+                    :ui="{
+                      content: 'w-48',
+                      item: 'min-h-10',
+                      itemLabel: 'font-semibold',
+                    }"
+                  >
+                    <UButton
+                      type="button"
+                      color="neutral"
+                      variant="ghost"
+                      size="sm"
+                      square
+                      icon="i-lucide-ellipsis-vertical"
+                      :aria-label="`Archived class actions for ${classroom.name}`"
+                    />
+                  </UDropdownMenu>
+                </div>
+              </div>
+
+              <NuxtLink
+                :to="`/instructor/classes/${classroom.id}`"
+                class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+                :aria-label="`View archived class ${classroom.name}`"
+              >
+                <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
+                  {{ classroom.name }}
+                </h2>
+
+                <p class="mt-2 text-sm font-medium text-muted">
+                  {{ classroom.subject_code }}
+                  ·
+                  {{ classroom.section }}
+                </p>
+              </NuxtLink>
+            </div>
+
+            <div class="p-5">
+              <div class="flex min-h-7 flex-wrap gap-2">
+                <UBadge
+                  color="neutral"
+                  variant="soft"
+                  icon="i-lucide-calendar-range"
+                >
+                  {{ classroom.school_year }}
+                  ·
+                  {{ classroom.semester }}
+                </UBadge>
+              </div>
+
+              <div class="mt-5 grid grid-cols-3 gap-3">
+                <div class="rounded-xl bg-elevated p-3">
+                  <div class="flex items-center gap-2 text-muted">
+                    <UIcon
+                      name="i-lucide-users"
+                      class="size-4"
+                    />
+                    <span class="text-xs">Students</span>
+                  </div>
+
+                  <p class="mt-2 text-lg font-black text-highlighted">
+                    {{ classroom.memberCounts.active }}
+                  </p>
+                </div>
+
+                <div class="rounded-xl bg-elevated p-3">
+                  <div class="flex items-center gap-2 text-muted">
+                    <UIcon
+                      name="i-lucide-user-round-clock"
+                      class="size-4"
+                    />
+                    <span class="text-xs">Pending</span>
+                  </div>
+
+                  <p class="mt-2 text-lg font-black text-highlighted">
+                    {{ classroom.memberCounts.pending }}
+                  </p>
+                </div>
+
+                <div class="min-w-0 rounded-xl bg-elevated p-3">
+                  <div class="flex items-center gap-2 text-muted">
+                    <UIcon
+                      name="i-lucide-archive"
+                      class="size-4"
+                    />
+                    <span class="text-xs">Archived</span>
+                  </div>
+
+                  <p
+                    class="mt-2 line-clamp-2 text-xs font-black leading-tight text-highlighted"
+                    :title="formatDate(classroom.archived_at || classroom.updated_at)"
+                  >
+                    {{
+                      formatDate(
+                        classroom.archived_at
+                        || classroom.updated_at,
+                      )
+                    }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </UCard>
+        </div>
+      </template>
+
+      <template
+        v-else-if="
           activeSection
           === 'assessments'
         "

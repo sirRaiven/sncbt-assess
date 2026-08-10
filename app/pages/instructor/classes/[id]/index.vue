@@ -122,12 +122,24 @@ async function runClassAction(
 
   toast.add({
     title:
-      "Class updated",
+      action === "archive"
+        ? "Class archived"
+        : "Class updated",
     description:
       result.data.message,
     color:
       "success",
   });
+
+  if (action === "archive") {
+    isUpdating.value = false;
+
+    await navigateTo(
+      "/instructor/archive?section=classes",
+    );
+
+    return;
+  }
 
   await loadClass();
 
