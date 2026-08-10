@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type {
+  DropdownMenuItem,
+} from "@nuxt/ui";
+
+import type {
   InstructorClassroom,
 } from "~/types/classroom";
 
@@ -102,6 +106,40 @@ function copyCode(
   });
 }
 
+function classroomMenuItems(
+  classroom: InstructorClassroom,
+): DropdownMenuItem[][] {
+  const items:
+    DropdownMenuItem[] = [
+      {
+        label:
+          "Open Class",
+        icon:
+          "i-lucide-arrow-up-right",
+        to:
+          `/instructor/classes/${classroom.id}`,
+      },
+    ];
+
+  if (classroom.join_enabled) {
+    items.push({
+      label:
+        "Copy Class Code",
+      icon:
+        "i-lucide-copy",
+      onSelect: () => {
+        copyCode(
+          classroom.join_code,
+        );
+      },
+    });
+  }
+
+  return [
+    items,
+  ];
+}
+
 onMounted(
   loadClasses,
 );
@@ -194,91 +232,142 @@ onMounted(
 
     <div
       v-else
-      class="grid gap-5 md:grid-cols-2 xl:grid-cols-3"
+      class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
     >
       <UCard
         v-for="classroom in filteredClasses"
         :key="classroom.id"
+        class="overflow-hidden"
+        :ui="{
+          body: 'p-0 sm:p-0',
+        }"
       >
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <UIcon
-              name="i-lucide-school"
-              class="size-5"
-            />
+        <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-5">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <div class="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15">
+                <UIcon
+                  name="i-lucide-school"
+                  class="size-5"
+                />
+              </div>
+
+              <UBadge
+                color="neutral"
+                variant="soft"
+              >
+                Class
+              </UBadge>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <StatusPill
+                :status="classroom.status"
+              />
+
+              <UDropdownMenu
+                :items="classroomMenuItems(classroom)"
+                :content="{
+                  align: 'end',
+                  side: 'bottom',
+                  sideOffset: 6,
+                }"
+                :ui="{
+                  content: 'w-52',
+                  item: 'min-h-10',
+                  itemLabel: 'font-semibold',
+                }"
+              >
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  square
+                  icon="i-lucide-ellipsis-vertical"
+                  :aria-label="`Class actions for ${classroom.name}`"
+                />
+              </UDropdownMenu>
+            </div>
           </div>
 
-          <StatusPill
-            :status="classroom.status"
-          />
-        </div>
-
-        <h2 class="mt-5 text-lg font-black text-highlighted">
-          {{ classroom.name }}
-        </h2>
-
-        <p class="mt-1 text-sm text-muted">
-          {{ classroom.subject_code }}
-          ·
-          {{ classroom.section }}
-        </p>
-
-        <p class="mt-2 text-xs text-muted">
-          {{ classroom.school_year }}
-          ·
-          {{ classroom.semester }}
-        </p>
-
-        <div class="mt-5 grid grid-cols-3 gap-3">
-          <div class="rounded-lg bg-elevated p-3">
-            <p class="text-xs text-muted">
-              Students
-            </p>
-            <p class="mt-1 text-xl font-black text-highlighted">
-              {{ classroom.memberCounts.active }}
-            </p>
-          </div>
-
-          <div class="rounded-lg bg-elevated p-3">
-            <p class="text-xs text-muted">
-              Pending
-            </p>
-            <p class="mt-1 text-xl font-black text-highlighted">
-              {{ classroom.memberCounts.pending }}
-            </p>
-          </div>
-
-          <div class="rounded-lg bg-elevated p-3">
-            <p class="text-xs text-muted">
-              Code
-            </p>
-            <p class="mt-1 truncate font-mono text-xs font-black text-highlighted">
-              {{
-                classroom.join_enabled
-                  ? classroom.join_code
-                  : "Disabled"
-              }}
-            </p>
-          </div>
-        </div>
-
-        <div class="mt-5 flex gap-2">
-          <UButton
+          <NuxtLink
             :to="`/instructor/classes/${classroom.id}`"
-            block
-            variant="soft"
+            class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+            :aria-label="`Open ${classroom.name}`"
           >
-            Open Class
-          </UButton>
+            <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
+              {{ classroom.name }}
+            </h2>
 
-          <UButton
-            v-if="classroom.join_enabled"
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-copy"
-            aria-label="Copy class code"
-            @click="copyCode(classroom.join_code)"
-          />
+            <p class="mt-2 text-sm font-medium text-muted">
+              {{ classroom.subject_code }}
+              ·
+              {{ classroom.section }}
+            </p>
+          </NuxtLink>
+        </div>
+
+        <div class="p-5">
+          <div class="flex min-h-7 flex-wrap gap-2">
+            <UBadge
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-calendar-range"
+            >
+              {{ classroom.school_year }}
+              ·
+              {{ classroom.semester }}
+            </UBadge>
+          </div>
+
+          <div class="mt-5 grid grid-cols-3 gap-3">
+            <div class="rounded-xl bg-elevated p-3">
+              <div class="flex items-center gap-2 text-muted">
+                <UIcon
+                  name="i-lucide-users"
+                  class="size-4"
+                />
+                <span class="text-xs">Students</span>
+              </div>
+              <p class="mt-2 text-lg font-black text-highlighted">
+                {{ classroom.memberCounts.active }}
+              </p>
+            </div>
+
+            <div class="rounded-xl bg-elevated p-3">
+              <div class="flex items-center gap-2 text-muted">
+                <UIcon
+                  name="i-lucide-user-round-clock"
+                  class="size-4"
+                />
+                <span class="text-xs">Pending</span>
+              </div>
+              <p class="mt-2 text-lg font-black text-highlighted">
+                {{ classroom.memberCounts.pending }}
+              </p>
+            </div>
+
+            <div class="min-w-0 rounded-xl bg-elevated p-3">
+              <div class="flex items-center gap-2 text-muted">
+                <UIcon
+                  :name="classroom.join_enabled ? 'i-lucide-key-round' : 'i-lucide-lock-keyhole'"
+                  class="size-4"
+                />
+                <span class="text-xs">Code</span>
+              </div>
+              <p
+                class="mt-2 truncate font-mono text-sm font-black text-highlighted"
+                :title="classroom.join_enabled ? classroom.join_code : 'Disabled'"
+              >
+                {{
+                  classroom.join_enabled
+                    ? classroom.join_code
+                    : "Disabled"
+                }}
+              </p>
+            </div>
+          </div>
         </div>
       </UCard>
     </div>

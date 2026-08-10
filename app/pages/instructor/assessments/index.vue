@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type {
+  DropdownMenuItem,
+} from "@nuxt/ui";
+
+import type {
   AssessmentWithClassroom,
 } from "~/types/assessment";
 
@@ -199,6 +203,129 @@ async function loadAssessments(): Promise<void> {
     result.data.assessments;
 
   isLoading.value = false;
+}
+
+function assessmentMenuItems(
+  assessment: AssessmentWithClassroom,
+): DropdownMenuItem[][] {
+  const navigationItems:
+    DropdownMenuItem[] = [];
+
+  if (
+    assessment.status
+    === "published"
+  ) {
+    navigationItems.push({
+      label:
+        "Start Live",
+      icon:
+        "i-lucide-radio-tower",
+      to:
+        `/instructor/sessions/create?assessmentId=${assessment.id}`,
+    });
+  }
+
+  navigationItems.push(
+    {
+      label:
+        "Questions",
+      icon:
+        "i-lucide-list-plus",
+      to:
+        `/instructor/assessments/${assessment.id}/edit`,
+    },
+    {
+      label:
+        "Schedule Classes",
+      icon:
+        "i-lucide-calendar-clock",
+      to:
+        `/instructor/assessments/${assessment.id}/assign`,
+    },
+    {
+      label:
+        "Settings",
+      icon:
+        "i-lucide-settings-2",
+      to:
+        `/instructor/assessments/${assessment.id}/settings`,
+    },
+    {
+      label:
+        "Preview",
+      icon:
+        "i-lucide-eye",
+      to:
+        `/instructor/assessments/${assessment.id}/preview`,
+    },
+  );
+
+  const managementItems:
+    DropdownMenuItem[] = [
+      {
+        label:
+          "Duplicate",
+        icon:
+          "i-lucide-copy-plus",
+        disabled:
+          busyAssessmentId.value
+          === assessment.id,
+        onSelect: () => {
+          void runAction(
+            assessment,
+            "duplicate",
+          );
+        },
+      },
+    ];
+
+  if (
+    assessment.status
+    === "published"
+  ) {
+    managementItems.push({
+      label:
+        "Return to Draft",
+      icon:
+        "i-lucide-undo-2",
+      disabled:
+        busyAssessmentId.value
+        === assessment.id,
+      onSelect: () => {
+        requestAssessmentAction(
+          assessment,
+          "draft",
+        );
+      },
+    });
+  }
+
+  const archiveItems:
+    DropdownMenuItem[] = [
+      {
+        label:
+          "Archive",
+        icon:
+          "i-lucide-archive",
+        color:
+          "warning",
+        disabled:
+          busyAssessmentId.value
+          === assessment.id,
+        onSelect: () => {
+          requestAssessmentAction(
+            assessment,
+            "archive",
+          );
+        },
+      },
+    ];
+
+  return [
+    navigationItems,
+    managementItems,
+    archiveItems,
+  ];
 }
 
 function requestAssessmentAction(
@@ -433,195 +560,154 @@ onMounted(
 
     <div
       v-else
-      class="grid gap-4 xl:grid-cols-2"
+      class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
     >
       <UCard
         v-for="assessment in filteredAssessments"
         :key="assessment.id"
+        class="overflow-hidden"
+        :ui="{
+          body: 'p-0 sm:p-0',
+        }"
       >
-        <div class="flex items-start gap-4">
-          <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <UIcon
-              name="i-lucide-clipboard-check"
-              class="size-5"
-            />
-          </div>
-
-          <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="min-w-0">
-                <h2 class="font-black text-highlighted">
-                  {{ assessment.title }}
-                </h2>
-
-                <p class="mt-1 text-sm text-muted">
-                  {{ assessment.subject_code }}
-                  ·
-                  {{ typeLabel(assessment.assessment_type) }}
-                  ·
-                  {{ assignmentLabel(assessment) }}
-                </p>
+        <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-5">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <div class="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15">
+                <UIcon
+                  name="i-lucide-clipboard-check"
+                  class="size-5"
+                />
               </div>
 
+              <UBadge
+                color="neutral"
+                variant="soft"
+              >
+                {{ typeLabel(assessment.assessment_type) }}
+              </UBadge>
+            </div>
+
+            <div class="flex items-center gap-1">
               <StatusPill
                 :status="assessment.status"
               />
-            </div>
 
-            <div class="mt-4 flex flex-wrap gap-2">
+              <UDropdownMenu
+                :items="assessmentMenuItems(assessment)"
+                :content="{
+                  align: 'end',
+                  side: 'bottom',
+                  sideOffset: 6,
+                }"
+                :ui="{
+                  content: 'w-56',
+                  item: 'min-h-10',
+                  itemLabel: 'font-semibold',
+                }"
+              >
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  square
+                  icon="i-lucide-ellipsis-vertical"
+                  :loading="busyAssessmentId === assessment.id"
+                  :aria-label="`Assessment actions for ${assessment.title}`"
+                />
+              </UDropdownMenu>
+            </div>
+          </div>
+
+          <NuxtLink
+            :to="`/instructor/assessments/${assessment.id}/edit`"
+            class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+            :aria-label="`Open ${assessment.title}`"
+          >
+            <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
+              {{ assessment.title }}
+            </h2>
+
+            <p class="mt-2 text-sm font-medium text-muted">
+              {{ assessment.subject_code }}
+              ·
+              {{ assignmentLabel(assessment) }}
+            </p>
+          </NuxtLink>
+        </div>
+
+        <div class="p-5">
+          <div class="flex min-h-7 flex-wrap gap-2">
+            <UBadge
+              v-if="assessment.assignedClassrooms.length === 0"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-library"
+            >
+              My Assessment Library
+            </UBadge>
+
+            <template v-else>
               <UBadge
-                v-if="assessment.assignedClassrooms.length === 0"
-                color="neutral"
-                variant="soft"
-                icon="i-lucide-library"
-              >
-                My Assessment Library
-              </UBadge>
-
-              <template v-else>
-                <UBadge
-                  v-for="classroom in assessment.assignedClassrooms.slice(0, 3)"
-                  :key="classroom.id"
-                  color="primary"
-                  variant="soft"
-                >
-                  {{ classroom.subjectCode }}
-                  ·
-                  {{ classroom.section }}
-                </UBadge>
-              </template>
-
-              <UBadge
-                v-if="assessment.assignedClassrooms.length > 3"
-                color="neutral"
+                v-for="classroom in assessment.assignedClassrooms.slice(0, 2)"
+                :key="classroom.id"
+                color="primary"
                 variant="soft"
               >
-                +{{ assessment.assignedClassrooms.length - 3 }} more
+                {{ classroom.subjectCode }}
+                ·
+                {{ classroom.section }}
               </UBadge>
+            </template>
+
+            <UBadge
+              v-if="assessment.assignedClassrooms.length > 2"
+              color="neutral"
+              variant="soft"
+            >
+              +{{ assessment.assignedClassrooms.length - 2 }} more
+            </UBadge>
+          </div>
+
+          <div class="mt-5 grid grid-cols-3 gap-3">
+            <div class="rounded-xl bg-elevated p-3">
+              <div class="flex items-center gap-2 text-muted">
+                <UIcon
+                  name="i-lucide-list-checks"
+                  class="size-4"
+                />
+                <span class="text-xs">Questions</span>
+              </div>
+              <p class="mt-2 text-lg font-black text-highlighted">
+                {{ assessment.question_count }}
+              </p>
             </div>
 
-            <div class="mt-5 grid grid-cols-3 gap-3">
-              <div class="rounded-lg bg-elevated p-3">
-                <p class="text-xs text-muted">
-                  Questions
-                </p>
-                <p class="mt-1 font-black text-highlighted">
-                  {{ assessment.question_count }}
-                </p>
+            <div class="rounded-xl bg-elevated p-3">
+              <div class="flex items-center gap-2 text-muted">
+                <UIcon
+                  name="i-lucide-circle-dot"
+                  class="size-4"
+                />
+                <span class="text-xs">Points</span>
               </div>
-
-              <div class="rounded-lg bg-elevated p-3">
-                <p class="text-xs text-muted">
-                  Points
-                </p>
-                <p class="mt-1 font-black text-highlighted">
-                  {{ assessment.total_points }}
-                </p>
-              </div>
-
-              <div class="rounded-lg bg-elevated p-3">
-                <p class="text-xs text-muted">
-                  Classes
-                </p>
-                <p class="mt-1 font-black text-highlighted">
-                  {{ assessment.assignedClassrooms.length }}
-                </p>
-              </div>
+              <p class="mt-2 text-lg font-black text-highlighted">
+                {{ assessment.total_points }}
+              </p>
             </div>
 
-            <div class="mt-5 flex flex-wrap gap-2">
-              <UButton
-                v-if="assessment.status === 'published'"
-                :to="`/instructor/sessions/create?assessmentId=${assessment.id}`"
-                icon="i-lucide-radio-tower"
-              >
-                Start Live
-              </UButton>
-
-              <UButton
-                :to="`/instructor/assessments/${assessment.id}/edit`"
-                :color="
-                  assessment.status === 'published'
-                    ? 'neutral'
-                    : 'primary'
-                "
-                :variant="
-                  assessment.status === 'published'
-                    ? 'outline'
-                    : 'soft'
-                "
-                icon="i-lucide-list-plus"
-              >
-                Questions
-              </UButton>
-
-              <UButton
-                :to="`/instructor/assessments/${assessment.id}/assign`"
-                color="neutral"
-                variant="outline"
-                icon="i-lucide-calendar-clock"
-              >
-                Schedule Classes
-              </UButton>
-
-              <UButton
-                :to="`/instructor/assessments/${assessment.id}/settings`"
-                color="neutral"
-                variant="outline"
-                icon="i-lucide-settings-2"
-              >
-                Settings
-              </UButton>
-
-              <UButton
-                :to="`/instructor/assessments/${assessment.id}/preview`"
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-eye"
-              >
-                Preview
-              </UButton>
-
-              <UButton
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-copy-plus"
-                :loading="busyAssessmentId === assessment.id"
-                @click="runAction(assessment, 'duplicate')"
-              >
-                Duplicate
-              </UButton>
-
-              <UButton
-                v-if="assessment.status === 'published'"
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-undo-2"
-                :disabled="busyAssessmentId === assessment.id"
-                @click="
-                  requestAssessmentAction(
-                    assessment,
-                    'draft',
-                  )
-                "
-              >
-                Return to Draft
-              </UButton>
-
-              <UButton
-                color="warning"
-                variant="ghost"
-                icon="i-lucide-archive"
-                :disabled="busyAssessmentId === assessment.id"
-                @click="
-                  requestAssessmentAction(
-                    assessment,
-                    'archive',
-                  )
-                "
-              >
-                Archive
-              </UButton>
+            <div class="rounded-xl bg-elevated p-3">
+              <div class="flex items-center gap-2 text-muted">
+                <UIcon
+                  name="i-lucide-school"
+                  class="size-4"
+                />
+                <span class="text-xs">Classes</span>
+              </div>
+              <p class="mt-2 text-lg font-black text-highlighted">
+                {{ assessment.assignedClassrooms.length }}
+              </p>
             </div>
           </div>
         </div>
