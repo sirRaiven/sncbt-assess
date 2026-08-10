@@ -7,6 +7,9 @@ import {
   z,
 } from "zod";
 
+import type {
+  InstructorClassroom,
+} from "~/types/classroom";
 
 definePageMeta({
   layout: "instructor",
@@ -21,6 +24,18 @@ const toast = useToast();
 const {
   createAssessment,
 } = useAssessments();
+
+const {
+  listInstructorClasses,
+} = useClassrooms();
+
+const subjectClasses =
+  ref<InstructorClassroom[]>([]);
+const isLoadingSubjects = ref(true);
+const subjectLoadError = ref("");
+const customSubjectValue =
+  "__custom_subject__";
+
 const isSubmitting = ref(false);
 const errorMessage = ref("");
 
@@ -33,6 +48,13 @@ const schema = z.object({
       "Assessment title is required.",
     )
     .max(200),
+
+  subjectSource: z
+    .string()
+    .min(
+      1,
+      "Choose a subject from My Classes or select Custom subject.",
+    ),
 
   subjectName: z
     .string()
@@ -93,6 +115,7 @@ type CreateAssessmentSchema =
 
 const state = reactive<CreateAssessmentSchema>({
   title: "",
+  subjectSource: "",
   subjectName: "",
   subjectCode: "",
   instructions: "",
@@ -104,6 +127,122 @@ const state = reactive<CreateAssessmentSchema>({
   leaderboardEnabled: false,
   allowBacktracking: true,
 });
+
+const subjectSourceItems = computed(
+  () => [
+    ...subjectClasses.value.map(
+      (classroom) => ({
+        label:
+          `${classroom.name} · ${classroom.subject_code} · ${classroom.section}`,
+        value:
+          classroom.id,
+      }),
+    ),
+    {
+      label:
+        "Custom subject",
+      value:
+        customSubjectValue,
+    },
+  ],
+);
+
+const isCustomSubject = computed(
+  () =>
+    state.subjectSource
+    === customSubjectValue,
+);
+
+const selectedSubjectClass = computed(
+  () =>
+    subjectClasses.value.find(
+      (classroom) =>
+        classroom.id
+        === state.subjectSource,
+    )
+    ?? null,
+);
+
+watch(
+  () => state.subjectSource,
+  (value) => {
+    if (
+      value
+      === customSubjectValue
+    ) {
+      state.subjectName = "";
+      state.subjectCode = "";
+      return;
+    }
+
+    const classroom =
+      subjectClasses.value.find(
+        (item) =>
+          item.id === value,
+      );
+
+    if (!classroom) {
+      state.subjectName = "";
+      state.subjectCode = "";
+      return;
+    }
+
+    state.subjectName =
+      classroom.name;
+    state.subjectCode =
+      classroom.subject_code;
+  },
+);
+
+async function loadSubjectChoices(): Promise<void> {
+  isLoadingSubjects.value = true;
+  subjectLoadError.value = "";
+
+  const result =
+    await listInstructorClasses();
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    subjectClasses.value = [];
+    state.subjectSource =
+      customSubjectValue;
+    subjectLoadError.value =
+      result.error
+      || "Unable to load your active classes. You can still enter a custom subject.";
+    isLoadingSubjects.value = false;
+    return;
+  }
+
+  subjectClasses.value =
+    result.data.classrooms
+      .filter(
+        (classroom) =>
+          classroom.status
+          === "active",
+      )
+      .sort(
+        (first, second) =>
+          first.name.localeCompare(
+            second.name,
+          ),
+      );
+
+  if (
+    subjectClasses.value.length
+    === 0
+  ) {
+    state.subjectSource =
+      customSubjectValue;
+  }
+
+  isLoadingSubjects.value = false;
+}
+
+onMounted(
+  loadSubjectChoices,
+);
 
 async function submit(
   event: FormSubmitEvent<CreateAssessmentSchema>,
@@ -219,15 +358,52 @@ async function submit(
               />
             </UFormField>
 
-            <div class="grid gap-5 sm:grid-cols-2">
+            <UFormField
+              label="Subject"
+              name="subjectSource"
+              required
+              help="Choose an active class to reuse its subject details, or choose Custom subject. This does not assign or schedule the assessment to that class."
+            >
+              <USelect
+                v-model="state.subjectSource"
+                :items="subjectSourceItems"
+                value-key="value"
+                label-key="label"
+                :disabled="isLoadingSubjects"
+                :placeholder="isLoadingSubjects
+                  ? 'Loading subjects from My Classes...'
+                  : 'Choose a subject from My Classes'"
+                icon="i-lucide-graduation-cap"
+                class="w-full"
+              />
+            </UFormField>
+
+            <UAlert
+              v-if="subjectLoadError"
+              color="warning"
+              variant="soft"
+              icon="i-lucide-triangle-alert"
+              title="Class subjects could not be loaded"
+              :description="subjectLoadError"
+            />
+
+            <div
+              v-if="state.subjectSource"
+              class="grid gap-5 sm:grid-cols-2"
+            >
               <UFormField
                 label="Subject name"
                 name="subjectName"
                 required
+                :help="isCustomSubject
+                  ? 'Enter the subject name for this reusable assessment.'
+                  : 'Filled automatically from the selected class.'"
               >
                 <UInput
                   v-model="state.subjectName"
                   placeholder="Introduction to Mobile Development"
+                  :readonly="!isCustomSubject"
+                  :icon="!isCustomSubject ? 'i-lucide-lock-keyhole' : 'i-lucide-pencil-line'"
                   class="w-full"
                 />
               </UFormField>
@@ -236,13 +412,46 @@ async function submit(
                 label="Subject code"
                 name="subjectCode"
                 required
+                :help="isCustomSubject
+                  ? 'Enter the subject code.'
+                  : 'Filled automatically from the selected class.'"
               >
                 <UInput
                   v-model="state.subjectCode"
                   placeholder="IT216"
+                  :readonly="!isCustomSubject"
+                  :icon="!isCustomSubject ? 'i-lucide-lock-keyhole' : 'i-lucide-pencil-line'"
                   class="w-full"
                 />
               </UFormField>
+            </div>
+
+            <div
+              v-if="selectedSubjectClass"
+              class="rounded-xl border border-default bg-elevated/60 p-4"
+            >
+              <div class="flex items-start gap-3">
+                <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <UIcon
+                    name="i-lucide-school"
+                    class="size-4 text-primary"
+                  />
+                </div>
+
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-highlighted">
+                    Using subject details from My Classes
+                  </p>
+
+                  <p class="mt-1 text-sm text-muted">
+                    {{ selectedSubjectClass.name }}
+                    ·
+                    {{ selectedSubjectClass.subject_code }}
+                    ·
+                    {{ selectedSubjectClass.section }}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <UFormField
