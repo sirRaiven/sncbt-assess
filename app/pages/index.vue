@@ -192,7 +192,7 @@ async function signIn(
 
               <div>
                 <p class="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-                  SNCBT Digital Learning
+                  SNCBT E-Learning
                 </p>
                 <p class="mt-1 text-sm font-semibold text-highlighted">
                   Assessment Classroom Management System
