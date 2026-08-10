@@ -1,16 +1,15 @@
 <script setup lang="ts">
 definePageMeta({
-    layout: "student",
+  layout:
+    "student",
+});
+
+useSeoMeta({
+  title:
+    "My Profile",
 });
 </script>
 
 <template>
-  <FeaturePage
-    eyebrow="Account"
-    title="My profile"
-    description="Review your student identity and permitted personal information."
-    action-label="Save Profile"
-    action-to=""
-    action-icon="i-lucide-save"
-   />
+  <PortalProfilePage role="student" />
 </template>

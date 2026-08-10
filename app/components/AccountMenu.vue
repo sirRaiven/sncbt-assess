@@ -271,33 +271,22 @@ async function signOut():
         />
       </button>
 
-      <button
+      <UButton
         v-else
         type="button"
-        class="flex min-h-11 items-center gap-2 rounded-xl px-1.5 py-1 transition hover:bg-elevated focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/20 sm:px-2"
-        aria-label="Open account menu"
+        color="neutral"
+        variant="ghost"
+        size="lg"
+        square
+        class="rounded-full"
+        :aria-label="`Open account menu for ${displayName}`"
       >
         <UAvatar
           :src="avatarUrl || undefined"
           :text="initials"
           size="xs"
         />
-
-        <span class="hidden max-w-36 text-left lg:block">
-          <span class="block truncate text-xs font-bold text-highlighted">
-            {{ displayName }}
-          </span>
-
-          <span class="block truncate text-[11px] text-muted">
-            {{ accountDetail }}
-          </span>
-        </span>
-
-        <UIcon
-          name="i-lucide-chevron-down"
-          class="hidden size-4 text-muted sm:block"
-        />
-      </button>
+      </UButton>
     </UDropdownMenu>
 
     <UModal

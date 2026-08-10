@@ -12,7 +12,7 @@ const props = withDefaults(
   {
     compact: false,
   },
-);
+);  
 
 function safeCount(value: number): number {
   return Math.max(0, Math.trunc(Number(value) || 0));

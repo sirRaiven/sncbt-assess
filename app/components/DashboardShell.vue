@@ -462,8 +462,22 @@ onBeforeUnmount(
     </USidebar>
 
     <div class="min-w-0 flex-1">
-      <header class="safe-area-top sticky top-0 z-30 border-b border-default bg-default/90 backdrop-blur-xl">
-        <div class="flex min-h-16 items-center gap-3 px-3 sm:px-5 lg:px-8">
+      <UHeader
+        :toggle="false"
+        :ui="{
+          root:
+            'safe-area-top sticky top-0 z-30 border-b border-default bg-default/90 backdrop-blur-xl',
+          container:
+            'mx-0 h-full min-h-16 w-full max-w-none px-3 sm:px-5 lg:px-8',
+          left:
+            'min-w-0 flex-1 items-center gap-3',
+          center:
+            'hidden',
+          right:
+            'ml-auto flex-none items-center gap-1 sm:gap-2',
+        }"
+      >
+        <template #left>
           <UButton
             type="button"
             color="neutral"
@@ -484,42 +498,40 @@ onBeforeUnmount(
             "
           />
 
-          <div class="flex min-w-0 flex-1 items-center gap-3">
-            <div class="hidden size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:flex">
-              <UIcon
-                :name="currentPageIcon"
-                class="size-4.5"
-              />
-            </div>
-
-            <div class="min-w-0">
-              <p class="truncate text-sm font-black text-highlighted sm:text-base">
-                {{ currentPageLabel }}
-              </p>
-
-              <p class="hidden truncate text-xs text-muted sm:block">
-                {{ roleLabel }} portal
-              </p>
-            </div>
-          </div>
-
-          <div class="ml-auto flex items-center gap-1 sm:gap-2">
-            <UColorModeButton
-              size="lg"
-              variant="ghost"
-            />
-
-            <AccountMenu
-              :display-name="displayName"
-              :account-detail="accountDetail"
-              :initials="initials"
-              :avatar-url="profile?.avatar_url"
-              :profile-path="profilePath"
-              placement="header"
+          <div class="hidden size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:flex">
+            <UIcon
+              :name="currentPageIcon"
+              class="size-4.5"
             />
           </div>
-        </div>
-      </header>
+
+          <div class="min-w-0">
+            <p class="truncate text-sm font-black text-highlighted sm:text-base">
+              {{ currentPageLabel }}
+            </p>
+
+            <p class="hidden truncate text-xs text-muted sm:block">
+              {{ roleLabel }} portal
+            </p>
+          </div>
+        </template>
+
+        <template #right>
+          <UColorModeButton
+            size="lg"
+            variant="ghost"
+          />
+
+          <AccountMenu
+            :display-name="displayName"
+            :account-detail="accountDetail"
+            :initials="initials"
+            :avatar-url="profile?.avatar_url"
+            :profile-path="profilePath"
+            placement="header"
+          />
+        </template>
+      </UHeader>
 
       <main class="safe-area-bottom mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-6 lg:px-8 lg:py-8">
         <slot />
