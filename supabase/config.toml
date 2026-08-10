@@ -428,3 +428,8 @@ entrypoint = "./functions/health/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/assessment-question-policy/index.ts"
+[functions.auth-sign-in]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/auth-sign-in/index.ts"
+
