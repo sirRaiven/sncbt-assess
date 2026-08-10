@@ -307,12 +307,13 @@ onMounted(
       v-else
       class="space-y-4"
     >
-      <UCard
+      <div
         v-for="delivery in filteredDeliveries"
         :key="delivery.assignmentId"
+        class="overflow-hidden rounded-xl border border-default p-5 transition-colors hover:border-primary/30"
       >
         <div class="flex flex-col gap-5 xl:flex-row xl:items-center">
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 flex-1 rounded-lg bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-4">
             <div class="flex flex-wrap items-center gap-2">
               <StatusPill
                 :status="
@@ -405,7 +406,7 @@ onMounted(
             Open Monitor
           </UButton>
         </div>
-      </UCard>
+      </div>
     </div>
   </div>
 </template>
