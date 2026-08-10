@@ -105,6 +105,15 @@ const deadlineWarningsShown =
 const questionTimeoutTriggered =
   ref(false);
 
+const questionTimeoutRetryCount =
+  ref(0);
+
+const questionTimeoutRetryAtMs =
+  ref(0);
+
+const questionTimeoutSyncPending =
+  ref(false);
+
 const scheduleDeadlineTriggered =
   ref(false);
 
@@ -223,6 +232,24 @@ const isLastQuestion =
           === questionPayload.value
             .questionCount - 1
         : false,
+  );
+
+const nextActionLabel =
+  computed(
+    () => {
+      if (
+        questionPayload.value
+          ?.finalized
+      ) {
+        return isLastQuestion.value
+          ? "Submit Assessment"
+          : "Next Question";
+      }
+
+      return isLastQuestion.value
+        ? "Save and Submit"
+        : "Save and Continue";
+    },
   );
 
 const recoveryKey =
@@ -705,6 +732,142 @@ function selectOption(
   saveRecovery();
 }
 
+function normalizeSelectedOptionIds():
+  string[] {
+  if (!questionPayload.value) {
+    return [];
+  }
+
+  const validOptionIds =
+    new Set(
+      questionPayload.value
+        .question.options
+        .map(
+          (option) =>
+            option.id,
+        ),
+    );
+
+  const normalized = [
+    ...new Set(
+      selectedOptionIds.value
+        .filter(
+          (optionId) =>
+            validOptionIds.has(
+              optionId,
+            ),
+        ),
+    ),
+  ];
+
+  if (
+    questionPayload.value
+      .question.questionType
+    === "multiple_choice"
+  ) {
+    return normalized.slice(
+      0,
+      1,
+    );
+  }
+
+  return normalized;
+}
+
+function applyQuestionPayload(
+  payload: DeliveryQuestionPayload,
+  restoreLocalRecovery = true,
+): void {
+  syncServerClock(
+    payload.serverNow,
+  );
+
+  currentIndex.value =
+    payload.questionIndex;
+
+  questionPayload.value =
+    payload;
+
+  selectedOptionIds.value = [
+    ...payload.selectedOptionIds,
+  ];
+
+  loadedSelectedOptionIds.value = [
+    ...payload.selectedOptionIds,
+  ];
+
+  pendingSync.value =
+    false;
+
+  lastSyncedAt.value =
+    new Date()
+      .toISOString();
+
+  questionSeconds.value =
+    secondsUntil(
+      payload.deadlineAt,
+    );
+
+  questionTimeoutTriggered.value =
+    false;
+
+  questionTimeoutRetryCount.value =
+    0;
+
+  questionTimeoutRetryAtMs.value =
+    0;
+
+  questionTimeoutSyncPending.value =
+    false;
+
+  if (payload.finalized) {
+    clearRecovery();
+  } else if (restoreLocalRecovery) {
+    restoreRecovery();
+  }
+}
+
+async function refreshFinalizedQuestionState():
+  Promise<boolean> {
+  if (
+    !delivery.value?.attempt
+    || !questionPayload.value
+  ) {
+    return false;
+  }
+
+  const result =
+    await getQuestion(
+      delivery.value.attempt.id,
+      currentIndex.value,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    return false;
+  }
+
+  const payload =
+    result.data.payload;
+
+  syncServerClock(
+    payload.serverNow,
+  );
+
+  if (!payload.finalized) {
+    return false;
+  }
+
+  applyQuestionPayload(
+    payload,
+    false,
+  );
+
+  return true;
+}
+
 async function loadDelivery():
   Promise<boolean> {
   const result =
@@ -787,6 +950,7 @@ async function loadDelivery():
 
 async function loadQuestion(
   index: number,
+  autoAdvanceFinalized = false,
 ): Promise<void> {
   if (
     !delivery.value?.attempt
@@ -836,43 +1000,26 @@ async function loadQuestion(
     return;
   }
 
-  syncServerClock(
-    result.data.payload.serverNow,
-  );
-
-  currentIndex.value =
-    index;
-
-  questionPayload.value =
+  const payload =
     result.data.payload;
 
-  selectedOptionIds.value = [
-    ...result.data.payload
-      .selectedOptionIds,
-  ];
+  applyQuestionPayload(
+    payload,
+  );
 
-  loadedSelectedOptionIds.value = [
-    ...result.data.payload
-      .selectedOptionIds,
-  ];
-
-  pendingSync.value =
-    false;
-
-  lastSyncedAt.value =
-    new Date()
-      .toISOString();
-
-  questionSeconds.value =
-    secondsUntil(
-      result.data.payload
-        .deadlineAt,
+  if (
+    autoAdvanceFinalized
+    && payload.finalized
+    && payload.questionIndex
+      < payload.questionCount - 1
+  ) {
+    await loadQuestion(
+      payload.questionIndex + 1,
+      true,
     );
 
-  questionTimeoutTriggered.value =
-    false;
-
-  restoreRecovery();
+    return;
+  }
 
   isLoading.value =
     false;
@@ -880,6 +1027,10 @@ async function loadQuestion(
 
 async function synchronizeAnswer(
   finalize: boolean,
+  options?: {
+    silentError?: boolean;
+    recoverFinalized?: boolean;
+  },
 ): Promise<boolean> {
   if (
     !delivery.value?.attempt
@@ -894,120 +1045,177 @@ async function synchronizeAnswer(
     pendingSync.value =
       true;
 
-    toast.add({
-      title:
-        "Answer saved on this device",
-      description:
-        "Reconnect before moving to another question or submitting.",
-      color:
-        "warning",
-    });
+    if (!options?.silentError) {
+      toast.add({
+        title:
+          "Answer saved on this device",
+        description:
+          "Reconnect before moving to another question or submitting.",
+        color:
+          "warning",
+      });
+    }
 
     return false;
   }
+
+  const normalizedOptionIds =
+    normalizeSelectedOptionIds();
+
+  selectedOptionIds.value = [
+    ...normalizedOptionIds,
+  ];
 
   isSaving.value =
     true;
 
-  const result =
-    await saveAnswer(
-      delivery.value.attempt.id,
-      questionPayload.value
-        .question.id,
-      selectedOptionIds.value,
-      finalize,
-    );
+  try {
+    const result =
+      await saveAnswer(
+        delivery.value.attempt.id,
+        questionPayload.value
+          .question.id,
+        normalizedOptionIds,
+        finalize,
+      );
 
-  if (
-    result.error
-    || !result.data
-  ) {
-    saveRecovery();
+    if (
+      result.error
+      || !result.data
+    ) {
+      const lowerError =
+        result.error
+          ?.toLowerCase()
+        || "";
+
+      const mayAlreadyBeFinal =
+        options?.recoverFinalized
+          !== false
+        && (
+          lowerError.includes(
+            "already final",
+          )
+          || lowerError.includes(
+            "already finalized",
+          )
+          || lowerError.includes(
+            "response is already final",
+          )
+        );
+
+      if (mayAlreadyBeFinal) {
+        const recovered =
+          await refreshFinalizedQuestionState();
+
+        if (recovered) {
+          clearRecovery();
+
+          pendingSync.value =
+            false;
+
+          lastSyncedAt.value =
+            new Date()
+              .toISOString();
+
+          return true;
+        }
+      }
+
+      saveRecovery();
+
+      pendingSync.value =
+        true;
+
+      if (!options?.silentError) {
+        toast.add({
+          title:
+            "Answer could not be synchronized",
+          description:
+            result.error
+            || "The answer remains cached on this device.",
+          color:
+            "error",
+        });
+      }
+
+      return false;
+    }
+
+    clearRecovery();
 
     pendingSync.value =
-      true;
-
-    toast.add({
-      title:
-        "Answer could not be synchronized",
-      description:
-        result.error
-        || "The answer remains cached on this device.",
-      color:
-        "error",
-    });
-
-    isSaving.value =
       false;
 
-    return false;
-  }
+    if (
+      result.data.attemptClosed
+    ) {
+      await leaveAssessment(
+        `/student/assessments/${assignmentId.value}/completed`,
+      );
 
-  clearRecovery();
+      return false;
+    }
 
-  pendingSync.value =
-    false;
+    if (
+      delivery.value.attempt
+    ) {
+      delivery.value.attempt
+        .answeredCount =
+          result.data
+            .answeredCount;
+    }
 
-  if (
-    result.data.timedOut
-  ) {
-    // The server ignores any selection that arrived after the
-    // question deadline and keeps only the last selection that
-    // was already synchronized before expiry.
-    selectedOptionIds.value = [
-      ...loadedSelectedOptionIds.value,
-    ];
-  } else {
-    loadedSelectedOptionIds.value = [
-      ...selectedOptionIds.value,
-    ];
-  }
+    if (
+      result.data.timedOut
+    ) {
+      // The server is authoritative after expiry. Reload the
+      // finalized question so a response that succeeded during a
+      // network race is not overwritten by stale browser state.
+      const refreshed =
+        await refreshFinalizedQuestionState();
 
-  lastSyncedAt.value =
-    new Date()
-      .toISOString();
+      if (!refreshed) {
+        selectedOptionIds.value = [
+          ...loadedSelectedOptionIds.value,
+        ];
+      }
 
-  isSaving.value =
-    false;
+      toast.add({
+        title:
+          "Question time expired",
+        description:
+          selectedOptionIds.value.length > 0
+            ? "The server finalized the answer that was already saved before the question deadline."
+            : "No answer was saved before the question deadline. This question is recorded as unanswered due to timeout.",
+        color:
+          "warning",
+      });
+    } else {
+      loadedSelectedOptionIds.value = [
+        ...normalizedOptionIds,
+      ];
 
-  if (
-    result.data.attemptClosed
-  ) {
-    await leaveAssessment(
-      `/student/assessments/${assignmentId.value}/completed`,
-    );
+      if (
+        result.data.finalized
+        && questionPayload.value
+      ) {
+        questionPayload.value = {
+          ...questionPayload.value,
+          finalized:
+            true,
+        };
+      }
+    }
 
+    lastSyncedAt.value =
+      new Date()
+        .toISOString();
+
+    return true;
+  } finally {
     isSaving.value =
       false;
-
-    return false;
   }
-
-  if (
-    delivery.value.attempt
-  ) {
-    delivery.value.attempt
-      .answeredCount =
-        result.data
-          .answeredCount;
-  }
-
-  if (
-    result.data.timedOut
-  ) {
-    toast.add({
-      title:
-        "Question time expired",
-      description:
-        loadedSelectedOptionIds.value.length > 0
-          ? "The server finalized the answer that was already saved before the question deadline."
-          : "No answer was saved before the question deadline. This question is recorded as unanswered due to timeout.",
-      color:
-        "warning",
-    });
-  }
-
-  return true;
 }
 
 async function goNext():
@@ -1068,6 +1276,26 @@ async function goPrevious():
     !questionPayload.value
       ?.allowBacktracking
     || currentIndex.value <= 0
+  ) {
+    return;
+  }
+
+  // Finalized questions are read-only. Navigation must never try
+  // to save them again, especially after their timer expired.
+  if (
+    questionPayload.value
+      .finalized
+  ) {
+    await loadQuestion(
+      currentIndex.value - 1,
+    );
+
+    return;
+  }
+
+  if (
+    questionSeconds.value
+      === 0
   ) {
     return;
   }
@@ -1198,17 +1426,64 @@ async function handleQuestionTimeout():
     return;
   }
 
+  if (
+    currentServerTimeMs()
+      < questionTimeoutRetryAtMs.value
+  ) {
+    return;
+  }
+
   questionTimeoutTriggered.value =
+    true;
+
+  questionTimeoutSyncPending.value =
     true;
 
   const saved =
     await synchronizeAnswer(
       true,
+      {
+        silentError:
+          questionTimeoutRetryCount.value
+            > 0,
+      },
     );
 
+  questionTimeoutSyncPending.value =
+    false;
+
   if (!saved) {
+    if (
+      !isOnline.value
+    ) {
+      questionTimeoutTriggered.value =
+        false;
+
+      return;
+    }
+
+    questionTimeoutRetryCount.value +=
+      1;
+
+    questionTimeoutRetryAtMs.value =
+      currentServerTimeMs()
+      + 3000;
+
+    // Release the timeout latch so the interval can retry. The
+    // server/database operation is idempotent after the matching
+    // SQL hotfix, so an uncertain network response cannot strand
+    // the student at 00:00.
+    questionTimeoutTriggered.value =
+      false;
+
     return;
   }
+
+  questionTimeoutRetryCount.value =
+    0;
+
+  questionTimeoutRetryAtMs.value =
+    0;
 
   if (
     isLastQuestion.value
@@ -1317,6 +1592,9 @@ async function handleOnline():
     questionTimeoutTriggered.value =
       false;
 
+    questionTimeoutRetryAtMs.value =
+      0;
+
     await handleQuestionTimeout();
 
     return;
@@ -1372,6 +1650,7 @@ onMounted(
     if (ready) {
       await loadQuestion(
         currentIndex.value,
+        true,
       );
 
       startTimer();
@@ -1655,7 +1934,34 @@ onBeforeRouteLeave(
           />
 
           <p
-            v-if="
+            v-if="questionPayload.finalized"
+            class="mt-2 text-xs font-semibold text-muted"
+          >
+            This question is finalized. You can review it and move to another question.
+          </p>
+
+          <p
+            v-else-if="
+              questionTimeoutSyncPending
+              && questionSeconds === 0
+            "
+            class="mt-2 text-xs font-semibold text-warning"
+          >
+            Time expired. Contacting the server to finalize this question...
+          </p>
+
+          <p
+            v-else-if="
+              questionTimeoutRetryCount > 0
+              && questionSeconds === 0
+            "
+            class="mt-2 text-xs font-semibold text-warning"
+          >
+            Time expired. The server did not respond; retrying automatically. Keep this page open.
+          </p>
+
+          <p
+            v-else-if="
               questionTimeoutTriggered
               && questionSeconds === 0
             "
@@ -1735,7 +2041,13 @@ onBeforeRouteLeave(
               :disabled="
                 !questionPayload.canGoPrevious
                 || isSaving
-                || questionTimeoutTriggered
+                || (
+                  !questionPayload.finalized
+                  && (
+                    questionTimeoutTriggered
+                    || questionSeconds === 0
+                  )
+                )
               "
               @click="goPrevious"
             >
@@ -1750,16 +2062,15 @@ onBeforeRouteLeave(
               "
               :loading="isSaving"
               :disabled="
-                questionTimeoutTriggered
-                || questionSeconds === 0
+                !questionPayload.finalized
+                && (
+                  questionTimeoutTriggered
+                  || questionSeconds === 0
+                )
               "
               @click="goNext"
             >
-              {{
-                isLastQuestion
-                  ? "Save and Submit"
-                  : "Save and Continue"
-              }}
+              {{ nextActionLabel }}
             </UButton>
           </div>
         </UCard>

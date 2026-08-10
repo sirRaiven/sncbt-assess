@@ -85,13 +85,19 @@ export function useAssessmentDelivery() {
     action: string,
     payload?:
       Record<string, unknown>,
+    timeoutMs = 15000,
   ): Promise<FunctionResult<T>> {
+    const timeoutMessage =
+      "__SNCBT_ASSESSMENT_REQUEST_TIMEOUT__";
+
+    let timeoutId:
+      ReturnType<typeof setTimeout>
+      | null =
+        null;
+
     try {
-      const {
-        data,
-        error,
-      } =
-        await supabase.functions
+      const request =
+        supabase.functions
           .invoke<T>(
             "assessment-delivery",
             {
@@ -105,6 +111,30 @@ export function useAssessmentDelivery() {
               },
             },
           );
+
+      const timeout =
+        new Promise<never>(
+          (_, reject) => {
+            timeoutId =
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      timeoutMessage,
+                    ),
+                  ),
+                timeoutMs,
+              );
+          },
+        );
+
+      const {
+        data,
+        error,
+      } = await Promise.race([
+        request,
+        timeout,
+      ]);
 
       if (error) {
         const parsed =
@@ -130,6 +160,21 @@ export function useAssessmentDelivery() {
           null,
       };
     } catch (error) {
+      if (
+        error instanceof Error
+        && error.message
+          === timeoutMessage
+      ) {
+        return {
+          data:
+            null,
+          error:
+            "The assessment server did not respond in time. Your selection is still kept on this device and can be retried.",
+          code:
+            "REQUEST_TIMEOUT",
+        };
+      }
+
       const parsed =
         await parseFunctionError(
           error,
@@ -143,6 +188,10 @@ export function useAssessmentDelivery() {
         code:
           parsed.code,
       };
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
   }
 
@@ -275,6 +324,7 @@ export function useAssessmentDelivery() {
         selectedOptionIds,
         finalize,
       },
+      8000,
     );
   }
 

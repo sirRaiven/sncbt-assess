@@ -173,6 +173,7 @@ export interface SaveDeliveryAnswerResult {
   nextQuestionIndex: number;
   answeredCount: number;
   attemptClosed?: boolean;
+  alreadyFinalized?: boolean;
 }
 
 export interface SubmitDeliveryAttemptResult {
