@@ -253,8 +253,14 @@ export interface InstructorMonitorStudent {
   answeredCount: number;
   questionCount: number;
   progressPercent: number;
-  score: number;
-  maximumScore: number;
+  correctCount: number;
+  wrongCount: number;
+  /** Questions finalized without a submitted answer. */
+  unansweredCount: number;
+  /** Subset of unansweredCount that expired at the server question deadline. */
+  timedOutCount: number;
+  /** Questions that have not yet been resolved. */
+  remainingCount: number;
   rank: number | null;
   startedAt: string | null;
   expiresAt: string | null;
@@ -277,9 +283,6 @@ export interface InstructorDeliveryMonitor {
     submitted: number;
     autoSubmitted: number;
     notStarted: number;
-    classAverage: number | null;
-    highestScore: number | null;
-    lowestScore: number | null;
   };
   students: InstructorMonitorStudent[];
 }

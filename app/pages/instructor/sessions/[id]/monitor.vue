@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type {
   InstructorDeliveryMonitor,
-  InstructorMonitorStudent,
 } from "~/types/assessment-delivery";
 
 definePageMeta({
@@ -17,9 +16,6 @@ useSeoMeta({
 const route =
   useRoute();
 
-const toast =
-  useToast();
-
 const assignmentId =
   computed(
     () =>
@@ -30,7 +26,6 @@ const assignmentId =
 
 const {
   getInstructorMonitor,
-  forceSubmitAttempt,
 } = useAssessmentDelivery();
 
 const monitor =
@@ -60,24 +55,6 @@ const activeView =
 
 const query =
   ref("");
-
-const forceSubmitModalOpen =
-  ref(false);
-
-const pendingStudent =
-  ref<
-    InstructorMonitorStudent
-    | null
-  >(
-    null,
-  );
-
-const busyAction =
-  ref<
-    string | null
-  >(
-    null,
-  );
 
 let refreshTimer:
   | ReturnType<
@@ -165,6 +142,24 @@ function formatDate(
     );
 }
 
+const serverClockOffsetMs = computed(() => {
+  const serverNow = monitor.value?.serverNow;
+
+  if (!serverNow) {
+    return 0;
+  }
+
+  const parsed = Date.parse(serverNow);
+
+  return Number.isFinite(parsed)
+    ? parsed - Date.now()
+    : 0;
+});
+
+function currentServerTimeMs(): number {
+  return Date.now() + serverClockOffsetMs.value;
+}
+
 function formatRemaining(
   expiresAt: string | null,
 ): string {
@@ -179,7 +174,7 @@ function formatRemaining(
         (
           new Date(expiresAt)
             .getTime()
-          - Date.now()
+          - currentServerTimeMs()
         ) / 1000,
       ),
     );
@@ -206,27 +201,17 @@ function formatRemaining(
   return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
-function scoreLabel(
-  student:
-    InstructorMonitorStudent,
-): string {
-  return `${student.score} / ${student.maximumScore}`;
-}
-
 async function loadMonitor(
   silent = false,
 ): Promise<void> {
   if (silent) {
-    isRefreshing.value =
-      true;
+    isRefreshing.value = true;
   } else {
-    isLoading.value =
-      true;
+    isLoading.value = true;
   }
 
   if (!silent) {
-    errorMessage.value =
-      "";
+    errorMessage.value = "";
   }
 
   const result =
@@ -234,114 +219,21 @@ async function loadMonitor(
       assignmentId.value,
     );
 
-  if (
-    result.error
-    || !result.data
-  ) {
+  if (result.error || !result.data) {
     if (!silent) {
       errorMessage.value =
         result.error
         || "Unable to load the assessment monitor.";
     }
 
-    isLoading.value =
-      false;
-
-    isRefreshing.value =
-      false;
-
+    isLoading.value = false;
+    isRefreshing.value = false;
     return;
   }
 
-  monitor.value =
-    result.data;
-
-  isLoading.value =
-    false;
-
-  isRefreshing.value =
-    false;
-}
-
-function requestForceSubmit(
-  student:
-    InstructorMonitorStudent,
-): void {
-  if (
-    !student.attemptId
-    || student.status
-    !== "in_progress"
-  ) {
-    return;
-  }
-
-  pendingStudent.value =
-    student;
-
-  forceSubmitModalOpen.value =
-    true;
-}
-
-async function confirmForceSubmit():
-  Promise<void> {
-  if (
-    !pendingStudent.value
-      ?.attemptId
-  ) {
-    return;
-  }
-
-  busyAction.value =
-    pendingStudent.value
-      .attemptId;
-
-  const result =
-    await forceSubmitAttempt(
-      pendingStudent.value
-        .attemptId,
-    );
-
-  if (
-    result.error
-    || !result.data
-  ) {
-    toast.add({
-      title:
-        "Attempt could not be submitted",
-      description:
-        result.error
-        || "The server did not accept the instructor submission.",
-      color:
-        "error",
-    });
-
-    busyAction.value =
-      null;
-
-    return;
-  }
-
-  forceSubmitModalOpen.value =
-    false;
-
-  toast.add({
-    title:
-      "Attempt submitted",
-    description:
-      result.data.message,
-    color:
-      "success",
-  });
-
-  pendingStudent.value =
-    null;
-
-  busyAction.value =
-    null;
-
-  await loadMonitor(
-    true,
-  );
+  monitor.value = result.data;
+  isLoading.value = false;
+  isRefreshing.value = false;
 }
 
 onMounted(
@@ -449,7 +341,7 @@ onBeforeUnmount(
             </h1>
 
             <p class="mt-2 text-sm text-blue-100">
-              Monitoring updates every five seconds. Scores for in-progress students are provisional.
+              Monitoring updates every five seconds. Live progress shows correct, wrong, unanswered/timed-out, and remaining questions without displaying scores.
             </p>
           </div>
 
@@ -470,7 +362,7 @@ onBeforeUnmount(
         </div>
       </section>
 
-      <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+      <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <StatCard
           label="Class members"
           :value="
@@ -536,33 +428,6 @@ onBeforeUnmount(
           tone="neutral"
         />
 
-        <StatCard
-          label="Class average"
-          :value="
-            monitor.summary.classAverage
-            === null
-              ? '—'
-              : String(
-                  monitor.summary.classAverage,
-                )
-          "
-          icon="i-lucide-chart-column"
-          tone="info"
-        />
-
-        <StatCard
-          label="Highest score"
-          :value="
-            monitor.summary.highestScore
-            === null
-              ? '—'
-              : String(
-                  monitor.summary.highestScore,
-                )
-          "
-          icon="i-lucide-trophy"
-          tone="warning"
-        />
       </section>
 
       <UCard>
@@ -599,7 +464,7 @@ onBeforeUnmount(
                   'ranking'
               "
             >
-              Ranking and Scores
+              Live Ranking
             </button>
           </div>
 
@@ -625,7 +490,7 @@ onBeforeUnmount(
             </h2>
 
             <p class="mt-1 text-sm text-muted">
-              The roster includes every active member. "Closes in" is the shared class schedule deadline for all active attempts.
+              The roster includes every active member. Progress is separated into correct, wrong, unanswered, timed-out, and remaining questions. "Closes in" is the shared class schedule deadline.
             </p>
           </div>
         </template>
@@ -647,13 +512,10 @@ onBeforeUnmount(
                   Closes in
                 </th>
                 <th>
-                  Provisional score
+                  Answer outcomes
                 </th>
                 <th>
                   Last activity
-                </th>
-                <th>
-                  Actions
                 </th>
               </tr>
             </thead>
@@ -685,12 +547,13 @@ onBeforeUnmount(
                 </td>
 
                 <td>
-                  <div class="min-w-40">
+                  <div class="min-w-36">
                     <div class="flex justify-between text-xs text-muted">
                       <span>
-                        {{ student.answeredCount }}
+                        {{ student.correctCount + student.wrongCount + student.unansweredCount }}
                         /
                         {{ student.questionCount }}
+                        resolved
                       </span>
 
                       <span>
@@ -700,9 +563,10 @@ onBeforeUnmount(
 
                     <UProgress
                       class="mt-2"
-                      :model-value="
-                        student.progressPercent
-                      "
+                      :model-value="student.progressPercent"
+                      :max="100"
+                      color="primary"
+                      size="sm"
                     />
                   </div>
                 </td>
@@ -718,8 +582,16 @@ onBeforeUnmount(
                   }}
                 </td>
 
-                <td class="font-black text-highlighted">
-                  {{ scoreLabel(student) }}
+                <td>
+                  <AssessmentOutcomeProgress
+                    :correct-count="student.correctCount"
+                    :wrong-count="student.wrongCount"
+                    :unanswered-count="student.unansweredCount"
+                    :timed-out-count="student.timedOutCount"
+                    :remaining-count="student.remainingCount"
+                    :total="student.questionCount"
+                    compact
+                  />
                 </td>
 
                 <td class="text-sm text-muted">
@@ -728,28 +600,6 @@ onBeforeUnmount(
                       student.lastActivityAt,
                     )
                   }}
-                </td>
-
-                <td>
-                  <div class="flex flex-wrap gap-2">
-                    <UButton
-                      color="error"
-                      variant="soft"
-                      size="xs"
-                      icon="i-lucide-send"
-                      :disabled="
-                        student.status
-                        !== 'in_progress'
-                      "
-                      @click="
-                        requestForceSubmit(
-                          student,
-                        )
-                      "
-                    >
-                      Force Submit
-                    </UButton>
-                  </div>
                 </td>
               </tr>
             </tbody>
@@ -761,11 +611,11 @@ onBeforeUnmount(
         <template #header>
           <div>
             <h2 class="font-black text-highlighted">
-              Live ranking and scoring
+              Live ranking
             </h2>
 
             <p class="mt-1 text-sm text-muted">
-              In-progress scores are provisional. Submitted scores are final.
+              Ranking is server-calculated. Numeric scores stay hidden here; use the outcome colors to follow each student’s assessment progress.
             </p>
           </div>
         </template>
@@ -802,59 +652,35 @@ onBeforeUnmount(
             </div>
 
             <div class="min-w-0 flex-1">
-              <p class="font-black text-highlighted">
-                {{ student.studentName }}
-              </p>
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="font-black text-highlighted">
+                  {{ student.studentName }}
+                </p>
+
+                <StatusPill :status="student.status" />
+              </div>
 
               <p class="mt-1 text-xs text-muted">
-                {{ student.answeredCount }}
+                {{ student.correctCount + student.wrongCount + student.unansweredCount }}
                 /
                 {{ student.questionCount }}
-                answered
-                ·
-                {{ student.status }}
-              </p>
-            </div>
-
-            <div class="text-right">
-              <p class="text-xl font-black text-highlighted">
-                {{ scoreLabel(student) }}
+                questions resolved
               </p>
 
-              <p class="text-xs text-muted">
-                {{
-                  student.status
-                  === "in_progress"
-                    ? "Provisional"
-                    : "Final"
-                }}
-              </p>
+              <AssessmentOutcomeProgress
+                class="mt-3 max-w-2xl"
+                :correct-count="student.correctCount"
+                :wrong-count="student.wrongCount"
+                :unanswered-count="student.unansweredCount"
+                :timed-out-count="student.timedOutCount"
+                :remaining-count="student.remainingCount"
+                :total="student.questionCount"
+              />
             </div>
           </div>
         </div>
       </UCard>
     </template>
-
-    <ConfirmationModal
-      v-model:open="
-        forceSubmitModalOpen
-      "
-      title="Force-submit this attempt?"
-      :description="
-        pendingStudent
-          ? `${pendingStudent.studentName}'s saved answers will be locked and graded immediately.`
-          : 'The attempt will be submitted.'
-      "
-      confirm-label="Force Submit"
-      confirm-color="error"
-      icon="i-lucide-send"
-      :loading="
-        Boolean(
-          busyAction,
-        )
-      "
-      @confirm="confirmForceSubmit"
-    />
 
 
   </div>

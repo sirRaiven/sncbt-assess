@@ -146,6 +146,53 @@ export function useAssessmentDelivery() {
     }
   }
 
+  async function invokeInstructorMonitor<T>(
+    assignmentId: string,
+  ): Promise<FunctionResult<T>> {
+    try {
+      const {
+        data,
+        error,
+      } = await supabase.functions.invoke<T>(
+        "assessment-monitor",
+        {
+          body: {
+            action: "get-monitor",
+            payload: {
+              assignmentId,
+            },
+          },
+        },
+      );
+
+      if (error) {
+        const parsed =
+          await parseFunctionError(error);
+
+        return {
+          data: null,
+          error: parsed.message,
+          code: parsed.code,
+        };
+      }
+
+      return {
+        data,
+        error: null,
+        code: null,
+      };
+    } catch (error) {
+      const parsed =
+        await parseFunctionError(error);
+
+      return {
+        data: null,
+        error: parsed.message,
+        code: parsed.code,
+      };
+    }
+  }
+
   async function listStudentDeliveries(
     classroomId?: string,
   ) {
@@ -294,28 +341,10 @@ export function useAssessmentDelivery() {
   async function getInstructorMonitor(
     assignmentId: string,
   ) {
-    return await invoke<
+    return await invokeInstructorMonitor<
       InstructorDeliveryMonitor
-    >(
-      "get-instructor-monitor",
-      {
-        assignmentId,
-      },
-    );
+    >(assignmentId);
   }
-
-  async function forceSubmitAttempt(
-    attemptId: string,
-  ) {
-    return await invoke<MessageResponse>(
-      "force-submit-attempt",
-      {
-        attemptId,
-      },
-    );
-  }
-
-
 
   return {
     listStudentDeliveries,
@@ -328,6 +357,5 @@ export function useAssessmentDelivery() {
     getResultReview,
     listInstructorDeliveries,
     getInstructorMonitor,
-    forceSubmitAttempt,
   };
 }
