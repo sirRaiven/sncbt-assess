@@ -169,7 +169,7 @@ async function signIn(
 
 <template>
   <div class="mx-auto w-full max-w-5xl">
-    <div class="overflow-hidden rounded-3xl border border-default bg-default shadow-2xl shadow-slate-950/10">
+    <div class="overflow-hidden rounded-xl border border-default bg-default shadow-2xl shadow-slate-950/10">
       <div class="grid lg:grid-cols-[1.05fr_0.95fr]">
         <section
           class="relative overflow-hidden border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-6 sm:p-8 lg:border-b-0 lg:border-r lg:p-10"
@@ -218,7 +218,7 @@ async function signIn(
               </p>
 
               <div class="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                <div class="rounded-2xl border border-default/80 bg-default/55 p-4 backdrop-blur-sm">
+                <div class="rounded-xl border border-default/80 bg-default/55 p-4 backdrop-blur-sm">
                   <UIcon
                     name="i-lucide-book-open-check"
                     class="size-5 text-primary"
@@ -231,7 +231,7 @@ async function signIn(
                   </p>
                 </div>
 
-                <div class="rounded-2xl border border-default/80 bg-default/55 p-4 backdrop-blur-sm">
+                <div class="rounded-xl border border-default/80 bg-default/55 p-4 backdrop-blur-sm">
                   <UIcon
                     name="i-lucide-timer"
                     class="size-5 text-primary"
@@ -244,7 +244,7 @@ async function signIn(
                   </p>
                 </div>
 
-                <div class="rounded-2xl border border-default/80 bg-default/55 p-4 backdrop-blur-sm">
+                <div class="rounded-xl border border-default/80 bg-default/55 p-4 backdrop-blur-sm">
                   <UIcon
                     name="i-lucide-chart-no-axes-combined"
                     class="size-5 text-primary"
