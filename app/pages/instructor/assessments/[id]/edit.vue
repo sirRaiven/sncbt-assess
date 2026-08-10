@@ -1637,8 +1637,8 @@ onMounted(
             </UFormField>
 
             <UFormField
-              label="Time allowed"
-              help="Enter the number of seconds for this question."
+              label="Answer time (seconds)"
+              help="This timer applies only to this question. At zero, the response is finalized and the student automatically proceeds to the next question."
             >
               <UInput
                 v-model.number="editor.timeLimitSeconds"
@@ -1681,7 +1681,7 @@ onMounted(
 
             <div class="flex justify-between gap-4">
               <dt class="text-muted">
-                Estimated time
+                Total configured question time
               </dt>
 
               <dd class="font-bold text-highlighted">

@@ -315,23 +315,7 @@ export function useAssessmentDelivery() {
     );
   }
 
-  async function grantExtraTime(
-    attemptId: string,
-    extraMinutes: number,
-  ) {
-    return await invoke<
-      MessageResponse
-      & {
-        expiresAt: string;
-      }
-    >(
-      "grant-extra-time",
-      {
-        attemptId,
-        extraMinutes,
-      },
-    );
-  }
+
 
   return {
     listStudentDeliveries,
@@ -345,6 +329,5 @@ export function useAssessmentDelivery() {
     listInstructorDeliveries,
     getInstructorMonitor,
     forceSubmitAttempt,
-    grantExtraTime,
   };
 }

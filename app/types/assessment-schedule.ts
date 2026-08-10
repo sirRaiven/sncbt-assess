@@ -34,6 +34,7 @@ export interface InstructorAssessmentScheduleOverview {
     assessmentType: AssessmentType;
     questionCount: number;
     totalPoints: number;
+    /** @deprecated Always null; use the class schedule closing time. */
     defaultTimeLimitSeconds: number | null;
     defaultLeaderboardEnabled: boolean;
   };

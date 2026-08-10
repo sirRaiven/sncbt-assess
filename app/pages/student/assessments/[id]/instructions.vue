@@ -52,6 +52,90 @@ const errorMessage =
 const startModalOpen =
   ref(false);
 
+const completedStatuses = [
+  "submitted",
+  "auto_submitted",
+] as const;
+
+const completedAttempt =
+  computed(
+    () =>
+      Boolean(
+        delivery.value?.attempt
+        && completedStatuses
+          .includes(
+            delivery.value.attempt.status as typeof completedStatuses[number],
+          ),
+      ),
+  );
+
+const attemptPolicy =
+  computed(
+    () =>
+      delivery.value?.attemptPolicy
+      || null,
+  );
+
+const canStartAnotherAttempt =
+  computed(
+    () =>
+      Boolean(
+        delivery.value?.canStart
+        && completedAttempt.value,
+      ),
+  );
+
+function scorePolicyLabel(
+  policy: string,
+): string {
+  if (policy === "highest") {
+    return "Highest score";
+  }
+
+  if (policy === "latest") {
+    return "Latest attempt";
+  }
+
+  if (policy === "first") {
+    return "First attempt";
+  }
+
+  if (policy === "average") {
+    return "Average score";
+  }
+
+  return "Server-managed";
+}
+
+const startConfirmationDescription =
+  computed(
+    () => {
+      const closesAt =
+        delivery.value
+          ? formatDate(
+              delivery.value.endsAt,
+            )
+          : "the scheduled closing time";
+
+      if (
+        canStartAnotherAttempt.value
+        && attemptPolicy.value
+      ) {
+        const nextNumber =
+          attemptPolicy.value.nextAttemptNumber
+          || attemptPolicy.value.attemptsUsed + 1;
+
+        return `This will start attempt ${nextNumber} of ${attemptPolicy.value.maxAttempts}. The first question timer starts when the question is delivered. The class closes at ${closesAt}.`;
+      }
+
+      if (canStartAnotherAttempt.value) {
+        return `This will start another assessment attempt. Each question has its own answer timer, and the class closes at ${closesAt}.`;
+      }
+
+      return `The first question timer starts when the question is delivered. Each question has its own answer time, and the class closes at ${closesAt}.`;
+    },
+  );
+
 function formatDate(
   value: string,
 ): string {
@@ -70,21 +154,6 @@ function formatDate(
     );
 }
 
-function formatDuration(
-  seconds: number | null,
-): string {
-  if (!seconds) {
-    return "Available until the class schedule closes";
-  }
-
-  const minutes =
-    Math.round(
-      seconds / 60,
-    );
-
-  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
-}
-
 const actionLabel =
   computed(
     () => {
@@ -93,6 +162,12 @@ const actionLabel =
           ?.canResume
       ) {
         return "Continue Assessment";
+      }
+
+      if (
+        canStartAnotherAttempt.value
+      ) {
+        return "Start Another Attempt";
       }
 
       if (
@@ -198,20 +273,20 @@ function requestProceed(): void {
   }
 
   if (
-    delivery.value.canViewResult
+    delivery.value.canStart
   ) {
-    void navigateTo(
-      `/student/results/${assignmentId.value}`,
-    );
+    startModalOpen.value =
+      true;
 
     return;
   }
 
   if (
-    delivery.value.canStart
+    delivery.value.canViewResult
   ) {
-    startModalOpen.value =
-      true;
+    void navigateTo(
+      `/student/results/${assignmentId.value}`,
+    );
   }
 }
 
@@ -302,7 +377,14 @@ onMounted(
           </h2>
         </template>
 
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div
+          class="grid gap-4 sm:grid-cols-2"
+          :class="
+            attemptPolicy
+              ? 'xl:grid-cols-5'
+              : 'xl:grid-cols-4'
+          "
+        >
           <div class="rounded-xl bg-elevated p-4 text-center">
             <p class="text-xs text-muted">
               Questions
@@ -325,15 +407,11 @@ onMounted(
 
           <div class="rounded-xl bg-elevated p-4 text-center">
             <p class="text-xs text-muted">
-              Attempt duration
+              Question timing
             </p>
 
             <p class="mt-2 text-sm font-black text-highlighted">
-              {{
-                formatDuration(
-                  delivery.timeLimitSeconds,
-                )
-              }}
+              Timed individually
             </p>
           </div>
 
@@ -350,7 +428,36 @@ onMounted(
               }}
             </p>
           </div>
+
+          <div
+            v-if="attemptPolicy"
+            class="rounded-xl bg-elevated p-4 text-center"
+          >
+            <p class="text-xs text-muted">
+              Attempts
+            </p>
+
+            <p class="mt-2 text-sm font-black text-highlighted">
+              {{ attemptPolicy.attemptsUsed }}
+              of
+              {{ attemptPolicy.maxAttempts }}
+              used
+            </p>
+
+            <p class="mt-1 text-xs text-muted">
+              {{ attemptPolicy.attemptsRemaining }} remaining
+            </p>
+          </div>
         </div>
+
+        <UAlert
+          class="mt-6"
+          color="warning"
+          variant="soft"
+          icon="i-lucide-hourglass"
+          title="Question timeout rule"
+          description="If a question's answer time reaches zero, the server finalizes that question. If no answer was saved before timeout, it is recorded as unanswered due to timeout and the assessment automatically proceeds to the next question. The next question receives its own configured time unless the class closing deadline is reached first."
+        />
 
         <div class="mt-6 grid gap-4 md:grid-cols-2">
           <div class="rounded-xl border border-default p-4">
@@ -403,7 +510,7 @@ onMounted(
             />
 
             <p class="text-sm text-muted">
-              The server controls the assessment timer, saves your progress, and prevents answers after submission.
+              The server controls every question timer and the class closing deadline, saves your progress, and prevents answers after submission.
             </p>
           </div>
 
@@ -427,6 +534,42 @@ onMounted(
             <p class="text-sm text-muted">
               Closing or refreshing the browser does not create another attempt. Use Continue Assessment to resume.
             </p>
+          </div>
+        </div>
+
+        <div
+          v-if="attemptPolicy"
+          class="mt-6 rounded-xl border border-default p-4"
+        >
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                Attempt policy
+              </p>
+
+              <p class="mt-2 font-bold text-highlighted">
+                {{ attemptPolicy.attemptsUsed }} of {{ attemptPolicy.maxAttempts }} attempts used
+              </p>
+
+              <p class="mt-1 text-sm text-muted">
+                {{ attemptPolicy.attemptsRemaining }} attempt{{ attemptPolicy.attemptsRemaining === 1 ? '' : 's' }} remaining · {{ scorePolicyLabel(attemptPolicy.scorePolicy) }}
+              </p>
+            </div>
+
+            <UBadge
+              :color="
+                attemptPolicy.attemptsRemaining > 0
+                  ? 'success'
+                  : 'neutral'
+              "
+              variant="soft"
+            >
+              {{
+                attemptPolicy.attemptsRemaining > 0
+                  ? 'Attempts available'
+                  : 'Attempt limit reached'
+              }}
+            </UBadge>
           </div>
         </div>
 
@@ -455,20 +598,38 @@ onMounted(
           description="The class availability period has ended."
         />
 
-        <UButton
-          class="mt-6"
-          block
-          size="xl"
-          :disabled="!canProceed"
-          :icon="
-            delivery.canViewResult
-              ? 'i-lucide-chart-column'
-              : 'i-lucide-play'
-          "
-          @click="requestProceed"
-        >
-          {{ actionLabel }}
-        </UButton>
+        <div class="mt-6 space-y-3">
+          <UButton
+            v-if="
+              canStartAnotherAttempt
+              && delivery.canViewResult
+            "
+            :to="`/student/results/${assignmentId}`"
+            block
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-chart-column"
+          >
+            View Latest Result
+          </UButton>
+
+          <UButton
+            block
+            size="xl"
+            :disabled="!canProceed"
+            :icon="
+              delivery.canStart
+              || delivery.canResume
+                ? 'i-lucide-play'
+                : delivery.canViewResult
+                  ? 'i-lucide-chart-column'
+                  : 'i-lucide-eye'
+            "
+            @click="requestProceed"
+          >
+            {{ actionLabel }}
+          </UButton>
+        </div>
       </UCard>
     </template>
 
@@ -477,8 +638,12 @@ onMounted(
         startModalOpen
       "
       title="Begin this assessment?"
-      description="Your timer starts immediately after confirmation. The deadline is controlled by the server and cannot be paused by closing the browser."
-      confirm-label="Begin Assessment"
+      :description="startConfirmationDescription"
+      :confirm-label="
+        canStartAnotherAttempt
+          ? 'Start Another Attempt'
+          : 'Begin Assessment'
+      "
       icon="i-lucide-play"
       :loading="isStarting"
       @confirm="startAttempt"

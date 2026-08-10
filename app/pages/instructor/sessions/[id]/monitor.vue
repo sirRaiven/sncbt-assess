@@ -31,7 +31,6 @@ const assignmentId =
 const {
   getInstructorMonitor,
   forceSubmitAttempt,
-  grantExtraTime,
 } = useAssessmentDelivery();
 
 const monitor =
@@ -65,9 +64,6 @@ const query =
 const forceSubmitModalOpen =
   ref(false);
 
-const extraTimeModalOpen =
-  ref(false);
-
 const pendingStudent =
   ref<
     InstructorMonitorStudent
@@ -75,9 +71,6 @@ const pendingStudent =
   >(
     null,
   );
-
-const extraMinutes =
-  ref(15);
 
 const busyAction =
   ref<
@@ -336,91 +329,6 @@ async function confirmForceSubmit():
       "Attempt submitted",
     description:
       result.data.message,
-    color:
-      "success",
-  });
-
-  pendingStudent.value =
-    null;
-
-  busyAction.value =
-    null;
-
-  await loadMonitor(
-    true,
-  );
-}
-
-function requestExtraTime(
-  student:
-    InstructorMonitorStudent,
-): void {
-  if (
-    !student.attemptId
-    || student.status
-    !== "in_progress"
-  ) {
-    return;
-  }
-
-  pendingStudent.value =
-    student;
-
-  extraMinutes.value =
-    15;
-
-  extraTimeModalOpen.value =
-    true;
-}
-
-async function confirmExtraTime():
-  Promise<void> {
-  if (
-    !pendingStudent.value
-      ?.attemptId
-  ) {
-    return;
-  }
-
-  busyAction.value =
-    pendingStudent.value
-      .attemptId;
-
-  const result =
-    await grantExtraTime(
-      pendingStudent.value
-        .attemptId,
-      extraMinutes.value,
-    );
-
-  if (
-    result.error
-    || !result.data
-  ) {
-    toast.add({
-      title:
-        "Extra time could not be added",
-      description:
-        result.error
-        || "The accommodation could not be saved.",
-      color:
-        "error",
-    });
-
-    busyAction.value =
-      null;
-
-    return;
-  }
-
-  extraTimeModalOpen.value =
-    false;
-
-  toast.add({
-    title:
-      "Extra time added",
-    description:
-      `${extraMinutes.value} minutes were added to the student's deadline.`,
     color:
       "success",
   });
@@ -717,7 +625,7 @@ onBeforeUnmount(
             </h2>
 
             <p class="mt-1 text-sm text-muted">
-              The roster includes every active member of the assigned class.
+              The roster includes every active member. "Closes in" is the shared class schedule deadline for all active attempts.
             </p>
           </div>
         </template>
@@ -736,7 +644,7 @@ onBeforeUnmount(
                   Progress
                 </th>
                 <th>
-                  Remaining
+                  Closes in
                 </th>
                 <th>
                   Provisional score
@@ -804,7 +712,7 @@ onBeforeUnmount(
                     student.status
                     === "in_progress"
                       ? formatRemaining(
-                          student.expiresAt,
+                          monitor.delivery.endsAt,
                         )
                       : "—"
                   }}
@@ -824,24 +732,6 @@ onBeforeUnmount(
 
                 <td>
                   <div class="flex flex-wrap gap-2">
-                    <UButton
-                      color="warning"
-                      variant="soft"
-                      size="xs"
-                      icon="i-lucide-clock-plus"
-                      :disabled="
-                        student.status
-                        !== 'in_progress'
-                      "
-                      @click="
-                        requestExtraTime(
-                          student,
-                        )
-                      "
-                    >
-                      Extra Time
-                    </UButton>
-
                     <UButton
                       color="error"
                       variant="soft"
@@ -966,38 +856,6 @@ onBeforeUnmount(
       @confirm="confirmForceSubmit"
     />
 
-    <ConfirmationModal
-      v-model:open="
-        extraTimeModalOpen
-      "
-      title="Add approved extra time?"
-      :description="
-        pendingStudent
-          ? `Add an individual accommodation to ${pendingStudent.studentName}'s active attempt.`
-          : 'Add extra time to the active attempt.'
-      "
-      confirm-label="Add Extra Time"
-      confirm-color="warning"
-      icon="i-lucide-clock-plus"
-      :loading="
-        Boolean(
-          busyAction,
-        )
-      "
-      @confirm="confirmExtraTime"
-    >
-      <UFormField
-        class="mt-4"
-        label="Additional minutes"
-      >
-        <UInput
-          v-model.number="extraMinutes"
-          type="number"
-          min="1"
-          max="120"
-          class="w-full"
-        />
-      </UFormField>
-    </ConfirmationModal>
+
   </div>
 </template>

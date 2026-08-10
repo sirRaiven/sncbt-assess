@@ -42,6 +42,40 @@ const isLoading =
 const errorMessage =
   ref("");
 
+function automaticSubmissionDescription(
+  reason: string | null,
+): string {
+  if (
+    reason === "automatic_deadline_submission"
+    || reason === "deadline_expired"
+    || reason === "schedule_deadline_expired"
+    || reason === "schedule_deadline_expired_after_reconnect"
+  ) {
+    return "The class closing deadline was reached before the assessment was submitted manually.";
+  }
+
+  if (
+    reason === "last_question_timer_expired"
+  ) {
+    return "The final question's answer time expired, so the assessment was submitted automatically.";
+  }
+
+  if (
+    reason === "instructor_force_submitted"
+  ) {
+    return "Your instructor submitted the active attempt.";
+  }
+
+  if (
+    reason === "overall_timer_expired"
+    || reason === "overall_timer_expired_after_reconnect"
+  ) {
+    return "This historical attempt was submitted by the previous whole-assessment timer.";
+  }
+
+  return "The assessment was submitted automatically by a server-enforced deadline.";
+}
+
 function formatDate(
   value: string | null,
 ): string {
@@ -63,6 +97,28 @@ function formatDate(
       new Date(value),
     );
 }
+
+const attemptPolicy =
+  computed(
+    () =>
+      delivery.value?.attemptPolicy
+      || null,
+  );
+
+const canTakeAnotherAttempt =
+  computed(
+    () =>
+      Boolean(
+        delivery.value?.canStart
+        && delivery.value?.attempt
+        && [
+          "submitted",
+          "auto_submitted",
+        ].includes(
+          delivery.value.attempt.status,
+        ),
+      ),
+  );
 
 const scorePercent =
   computed(
@@ -280,6 +336,34 @@ onMounted(
           </div>
         </div>
 
+        <div
+          v-if="attemptPolicy"
+          class="mt-6 rounded-xl border border-default p-4"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                Attempts
+              </p>
+
+              <p class="mt-2 font-bold text-highlighted">
+                {{ attemptPolicy.attemptsUsed }} of {{ attemptPolicy.maxAttempts }} used
+              </p>
+
+              <p class="mt-1 text-sm text-muted">
+                {{ attemptPolicy.attemptsRemaining }} remaining
+              </p>
+            </div>
+
+            <UBadge
+              :color="canTakeAnotherAttempt ? 'success' : 'neutral'"
+              variant="soft"
+            >
+              {{ canTakeAnotherAttempt ? 'Another attempt available' : 'Current attempt recorded' }}
+            </UBadge>
+          </div>
+        </div>
+
         <UAlert
           v-if="
             delivery.attempt.status
@@ -290,8 +374,9 @@ onMounted(
           variant="soft"
           title="Automatically submitted"
           :description="
-            delivery.attempt.submittedReason
-            || 'The timer or class availability period ended.'
+            automaticSubmissionDescription(
+              delivery.attempt.submittedReason,
+            )
           "
         />
 
@@ -321,6 +406,14 @@ onMounted(
               icon="i-lucide-chart-column"
             >
               View Detailed Result
+            </UButton>
+
+            <UButton
+              v-if="canTakeAnotherAttempt"
+              :to="`/student/assessments/${delivery.assignmentId}/instructions`"
+              icon="i-lucide-rotate-ccw"
+            >
+              Take Another Attempt
             </UButton>
           </div>
         </div>

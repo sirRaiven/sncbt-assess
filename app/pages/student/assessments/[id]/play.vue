@@ -97,16 +97,16 @@ const loadedSelectedOptionIds =
 const allowRouteLeave =
   ref(false);
 
-const timerWarningsShown =
+const deadlineWarningsShown =
   new Set<number>();
 
 const questionTimeoutTriggered =
   ref(false);
 
-const overallTimeoutTriggered =
+const scheduleDeadlineTriggered =
   ref(false);
 
-const overallSeconds =
+const scheduleSeconds =
   ref<number | null>(
     null,
   );
@@ -123,19 +123,94 @@ let timer:
   | null =
     null;
 
-const progress =
+const serverClockEpochMs =
+  ref<number | null>(
+    null,
+  );
+
+const serverClockAnchorMs =
+  ref<number | null>(
+    null,
+  );
+
+const questionTimerProgress =
   computed(
-    () =>
-      questionPayload.value
-        ? (
-            (
-              currentIndex.value
-              + 1
-            )
-            / questionPayload.value
-              .questionCount
-          ) * 100
-        : 0,
+    () => {
+      const totalSeconds =
+        questionPayload.value
+          ?.question
+          .timeLimitSeconds;
+
+      if (
+        !totalSeconds
+        || totalSeconds <= 0
+        || questionSeconds.value
+          === null
+      ) {
+        return 0;
+      }
+
+      return Math.max(
+        0,
+        Math.min(
+          100,
+          (
+            questionSeconds.value
+            / totalSeconds
+          ) * 100,
+        ),
+      );
+    },
+  );
+
+const scheduleDeadlineColor =
+  computed<
+    "neutral"
+    | "warning"
+    | "error"
+  >(
+    () => {
+      const seconds =
+        scheduleSeconds.value;
+
+      if (
+        seconds !== null
+        && seconds <= 60
+      ) {
+        return "error";
+      }
+
+      if (
+        seconds !== null
+        && seconds <= 300
+      ) {
+        return "warning";
+      }
+
+      return "neutral";
+    },
+  );
+
+const questionTimerColor =
+  computed<
+    "primary"
+    | "warning"
+    | "error"
+  >(
+    () => {
+      const remaining =
+        questionTimerProgress.value;
+
+      if (remaining <= 20) {
+        return "error";
+      }
+
+      if (remaining <= 50) {
+        return "warning";
+      }
+
+      return "primary";
+    },
   );
 
 const isLastQuestion =
@@ -253,11 +328,11 @@ const saveStatusIcon =
     },
   );
 
-const timeWarning =
+const deadlineWarning =
   computed(
     () => {
       const seconds =
-        overallSeconds.value;
+        scheduleSeconds.value;
 
       if (
         seconds === null
@@ -268,12 +343,63 @@ const timeWarning =
       }
 
       if (seconds <= 60) {
-        return "Less than 1 minute remains. The assessment will submit automatically when time expires.";
+        return "The class closes in less than 1 minute. Any active attempt will be submitted when the scheduled closing time is reached.";
       }
 
-      return "Less than 5 minutes remain. Review your saved answers and submit before time expires.";
+      return "The class closing deadline is less than 5 minutes away. Continue answering each timed question and submit before the schedule closes.";
     },
   );
+
+function syncServerClock(
+  serverNow: string | null,
+): void {
+  if (!serverNow) {
+    return;
+  }
+
+  const parsed =
+    Date.parse(serverNow);
+
+  if (!Number.isFinite(parsed)) {
+    return;
+  }
+
+  serverClockEpochMs.value =
+    parsed;
+
+  serverClockAnchorMs.value =
+    import.meta.client
+    && typeof performance
+      !== "undefined"
+      ? performance.now()
+      : null;
+}
+
+function currentServerTimeMs():
+  number {
+  if (
+    serverClockEpochMs.value
+      === null
+  ) {
+    return Date.now();
+  }
+
+  if (
+    import.meta.client
+    && serverClockAnchorMs.value
+      !== null
+    && typeof performance
+      !== "undefined"
+  ) {
+    return (
+      serverClockEpochMs.value
+      + performance.now()
+      - serverClockAnchorMs.value
+    );
+  }
+
+  return serverClockEpochMs.value;
+}
 
 function secondsUntil(
   value: string | null,
@@ -282,13 +408,19 @@ function secondsUntil(
     return null;
   }
 
+  const deadlineMs =
+    Date.parse(value);
+
+  if (!Number.isFinite(deadlineMs)) {
+    return null;
+  }
+
   return Math.max(
     0,
     Math.ceil(
       (
-        new Date(value)
-          .getTime()
-        - Date.now()
+        deadlineMs
+        - currentServerTimeMs()
       ) / 1000,
     ),
   );
@@ -381,7 +513,7 @@ function handleVisibilityChange():
   }
 }
 
-function showTimerWarning(
+function showDeadlineWarning(
   seconds: number | null,
 ): void {
   if (
@@ -402,14 +534,14 @@ function showTimerWarning(
 
   if (
     !threshold
-    || timerWarningsShown.has(
+    || deadlineWarningsShown.has(
       threshold,
     )
   ) {
     return;
   }
 
-  timerWarningsShown.add(
+  deadlineWarningsShown.add(
     threshold,
   );
 
@@ -424,7 +556,7 @@ function showTimerWarning(
     title:
       `${label} remaining`,
     description:
-      "The overall assessment timer continues running and the server will submit the attempt when time expires.",
+      "This is the shared class closing deadline. The server will submit any active attempt when the scheduled closing time is reached.",
     color:
       threshold === 60
         ? "error"
@@ -589,6 +721,10 @@ async function loadDelivery():
     return false;
   }
 
+  syncServerClock(
+    result.data.serverNow,
+  );
+
   delivery.value =
     result.data.delivery;
 
@@ -639,9 +775,9 @@ async function loadDelivery():
       ),
     );
 
-  overallSeconds.value =
+  scheduleSeconds.value =
     secondsUntil(
-      attempt.expiresAt,
+      delivery.value.endsAt,
     );
 
   return true;
@@ -697,6 +833,10 @@ async function loadQuestion(
 
     return;
   }
+
+  syncServerClock(
+    result.data.payload.serverNow,
+  );
 
   currentIndex.value =
     index;
@@ -806,9 +946,20 @@ async function synchronizeAnswer(
   pendingSync.value =
     false;
 
-  loadedSelectedOptionIds.value = [
-    ...selectedOptionIds.value,
-  ];
+  if (
+    result.data.timedOut
+  ) {
+    // The server ignores any selection that arrived after the
+    // question deadline and keeps only the last selection that
+    // was already synchronized before expiry.
+    selectedOptionIds.value = [
+      ...loadedSelectedOptionIds.value,
+    ];
+  } else {
+    loadedSelectedOptionIds.value = [
+      ...selectedOptionIds.value,
+    ];
+  }
 
   lastSyncedAt.value =
     new Date()
@@ -846,7 +997,9 @@ async function synchronizeAnswer(
       title:
         "Question time expired",
       description:
-        "The server finalized this question.",
+        loadedSelectedOptionIds.value.length > 0
+          ? "The server finalized the answer that was already saved before the question deadline."
+          : "No answer was saved before the question deadline. This question is recorded as unanswered due to timeout.",
       color:
         "warning",
     });
@@ -976,6 +1129,37 @@ async function submit(
     result.error
     || !result.data
   ) {
+    if (
+      auto
+      && result.code
+        === "TIMER_NOT_EXPIRED"
+    ) {
+      scheduleDeadlineTriggered.value =
+        false;
+
+      questionTimeoutTriggered.value =
+        false;
+
+      const stillOpen =
+        await loadDelivery();
+
+      if (stillOpen) {
+        toast.add({
+          title:
+            "Timer synchronized",
+          description:
+            "The server confirmed that the class schedule is still open. The deadline has been synchronized and you can continue answering.",
+          color:
+            "info",
+        });
+      }
+
+      isSubmitting.value =
+        false;
+
+      return;
+    }
+
     toast.add({
       title:
         "Assessment could not be submitted",
@@ -1006,6 +1190,7 @@ async function handleQuestionTimeout():
     !questionPayload.value
     || isSaving.value
     || isSubmitting.value
+    || questionPayload.value.finalized
     || questionTimeoutTriggered.value
   ) {
     return;
@@ -1048,31 +1233,29 @@ function startTimer():
       () => {
         if (
           delivery.value
-            ?.attempt
-            ?.expiresAt
+            ?.endsAt
         ) {
-          overallSeconds.value =
+          scheduleSeconds.value =
             secondsUntil(
-              delivery.value
-                .attempt.expiresAt,
+              delivery.value.endsAt,
             );
 
-          showTimerWarning(
-            overallSeconds.value,
+          showDeadlineWarning(
+            scheduleSeconds.value,
           );
 
           if (
-            overallSeconds.value
+            scheduleSeconds.value
             === 0
             && !isSubmitting.value
-            && !overallTimeoutTriggered.value
+            && !scheduleDeadlineTriggered.value
           ) {
-            overallTimeoutTriggered.value =
+            scheduleDeadlineTriggered.value =
               true;
 
             void submit(
               true,
-              "overall_timer_expired",
+              "schedule_deadline_expired",
             );
 
             return;
@@ -1092,6 +1275,7 @@ function startTimer():
           if (
             questionSeconds.value
             === 0
+            && !questionPayload.value.finalized
             && !questionTimeoutTriggered.value
           ) {
             void handleQuestionTimeout();
@@ -1108,15 +1292,15 @@ async function handleOnline():
     true;
 
   if (
-    overallSeconds.value
+    scheduleSeconds.value
     === 0
   ) {
-    overallTimeoutTriggered.value =
+    scheduleDeadlineTriggered.value =
       false;
 
     await submit(
       true,
-      "overall_timer_expired_after_reconnect",
+      "schedule_deadline_expired_after_reconnect",
     );
 
     return;
@@ -1125,6 +1309,8 @@ async function handleOnline():
   if (
     questionSeconds.value
     === 0
+    && questionPayload.value
+    && !questionPayload.value.finalized
   ) {
     questionTimeoutTriggered.value =
       false;
@@ -1325,30 +1511,18 @@ onBeforeRouteLeave(
           </UBadge>
 
           <UBadge
-            color="error"
+            :color="scheduleDeadlineColor"
             variant="soft"
             class="font-mono"
           >
-            Overall
+            Closes in
             {{
               formatTime(
-                overallSeconds,
+                scheduleSeconds,
               )
             }}
           </UBadge>
 
-          <UBadge
-            color="warning"
-            variant="soft"
-            class="font-mono"
-          >
-            Question
-            {{
-              formatTime(
-                questionSeconds,
-              )
-            }}
-          </UBadge>
         </div>
       </div>
     </header>
@@ -1364,17 +1538,17 @@ onBeforeRouteLeave(
       />
 
       <UAlert
-        v-if="timeWarning"
+        v-if="deadlineWarning"
         class="mb-4"
         :color="
-          overallSeconds !== null
-          && overallSeconds <= 60
+          scheduleSeconds !== null
+          && scheduleSeconds <= 60
             ? 'error'
             : 'warning'
         "
         variant="soft"
-        title="Assessment time is running low"
-        :description="timeWarning"
+        title="Class closing deadline is approaching"
+        :description="deadlineWarning"
       />
 
       <div
@@ -1446,10 +1620,48 @@ onBeforeRouteLeave(
           </div>
         </div>
 
-        <UProgress
-          class="mb-6"
-          :model-value="progress"
-        />
+        <div class="mb-6 rounded-xl border border-default bg-elevated/50 p-4">
+          <div class="mb-2 flex items-center justify-between gap-3">
+            <div>
+              <p class="text-sm font-bold text-highlighted">
+                Answer time
+              </p>
+              <p class="text-xs text-muted">
+                This question has its own timer. At zero, the server finalizes it and automatically moves you forward.
+              </p>
+            </div>
+
+            <span
+              class="shrink-0 font-mono text-lg font-black"
+              :class="{
+                'text-error':
+                  questionTimerProgress <= 20,
+                'text-warning':
+                  questionTimerProgress > 20
+                  && questionTimerProgress <= 50,
+              }"
+            >
+              {{ formatTime(questionSeconds) }}
+            </span>
+          </div>
+
+          <UProgress
+            :model-value="questionTimerProgress"
+            :max="100"
+            :color="questionTimerColor"
+            size="md"
+          />
+
+          <p
+            v-if="
+              questionTimeoutTriggered
+              && questionSeconds === 0
+            "
+            class="mt-2 text-xs font-semibold text-warning"
+          >
+            Time expired. Finalizing this question and preparing the next one...
+          </p>
+        </div>
 
         <UCard>
           <h1 class="text-2xl font-black leading-tight text-highlighted lg:text-3xl">
@@ -1481,6 +1693,8 @@ onBeforeRouteLeave(
               "
               :disabled="
                 questionPayload.finalized
+                || questionTimeoutTriggered
+                || questionSeconds === 0
               "
               @click="
                 selectOption(
@@ -1519,6 +1733,7 @@ onBeforeRouteLeave(
               :disabled="
                 !questionPayload.canGoPrevious
                 || isSaving
+                || questionTimeoutTriggered
               "
               @click="goPrevious"
             >
@@ -1532,6 +1747,10 @@ onBeforeRouteLeave(
                   : 'i-lucide-arrow-right'
               "
               :loading="isSaving"
+              :disabled="
+                questionTimeoutTriggered
+                || questionSeconds === 0
+              "
               @click="goNext"
             >
               {{

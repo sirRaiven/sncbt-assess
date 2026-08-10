@@ -86,13 +86,6 @@ const schema = z.object({
 
   allowBacktracking:
     z.boolean(),
-
-  overallTimeLimitMinutes: z
-    .number()
-    .int()
-    .min(1)
-    .max(360)
-    .nullable(),
 });
 
 type CreateAssessmentSchema =
@@ -110,7 +103,6 @@ const state = reactive<CreateAssessmentSchema>({
   resultVisibility: "score_only",
   leaderboardEnabled: false,
   allowBacktracking: true,
-  overallTimeLimitMinutes: null,
 });
 
 async function submit(
@@ -145,8 +137,6 @@ async function submit(
         event.data.leaderboardEnabled,
       allowBacktracking:
         event.data.allowBacktracking,
-      overallTimeLimitMinutes:
-        event.data.overallTimeLimitMinutes,
     });
 
   if (
@@ -420,19 +410,13 @@ async function submit(
               />
             </UFormField>
 
-            <UFormField
-              label="Overall time limit in minutes"
-              name="overallTimeLimitMinutes"
-              help="Leave empty when each question will use its own timer."
-            >
-              <UInput
-                v-model.number="state.overallTimeLimitMinutes"
-                type="number"
-                min="1"
-                max="360"
-                class="w-full"
-              />
-            </UFormField>
+            <UAlert
+              color="info"
+              variant="soft"
+              icon="i-lucide-timer"
+              title="Assessment timing"
+              description="The class schedule decides when the assessment closes. Set the answering time for each individual question in the Question Builder."
+            />
 
             <USeparator />
 

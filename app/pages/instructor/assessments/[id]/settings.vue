@@ -97,13 +97,6 @@ const schema = z.object({
 
   allowBacktracking:
     z.boolean(),
-
-  overallTimeLimitMinutes: z
-    .number()
-    .int()
-    .min(1)
-    .max(360)
-    .nullable(),
 });
 
 type SettingsSchema =
@@ -121,7 +114,6 @@ const state = reactive<SettingsSchema>({
   resultVisibility: "score_only",
   leaderboardEnabled: false,
   allowBacktracking: true,
-  overallTimeLimitMinutes: null,
 });
 
 const isDraft = computed(
@@ -164,13 +156,6 @@ function fillState(
     value.leaderboard_enabled;
   state.allowBacktracking =
     value.allow_backtracking;
-  state.overallTimeLimitMinutes =
-    value.overall_time_limit_seconds
-      ? Math.round(
-          value.overall_time_limit_seconds
-          / 60,
-        )
-      : null;
 }
 
 async function loadData(): Promise<void> {
@@ -241,8 +226,6 @@ async function save(
           event.data.leaderboardEnabled,
         allowBacktracking:
           event.data.allowBacktracking,
-        overallTimeLimitMinutes:
-          event.data.overallTimeLimitMinutes,
       },
     );
 
@@ -699,18 +682,13 @@ onMounted(
                 />
               </UFormField>
 
-              <UFormField
-                label="Overall time limit in minutes"
-                name="overallTimeLimitMinutes"
-              >
-                <UInput
-                  v-model.number="state.overallTimeLimitMinutes"
-                  type="number"
-                  min="1"
-                  max="360"
-                  class="w-full"
-                />
-              </UFormField>
+              <UAlert
+                color="info"
+                variant="soft"
+                icon="i-lucide-timer"
+                title="Timing is set in two places"
+                description="Use the Question Builder to set each question's answer time. Use Assign Classes to set the opening and closing deadline for the whole assessment."
+              />
 
               <USeparator />
 

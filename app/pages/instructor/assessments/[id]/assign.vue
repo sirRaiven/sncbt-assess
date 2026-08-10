@@ -25,8 +25,6 @@ interface ClassScheduleRow {
   selected: boolean;
   startsAtLocal: string;
   endsAtLocal: string;
-  timeLimitMinutes:
-    number | null;
   showLeaderboard: boolean;
   maxAttempts: number;
   existing:
@@ -244,12 +242,6 @@ function buildRows(
       const defaults =
         defaultWindow();
 
-      const defaultSeconds =
-        overview.value
-          ?.assessment
-          .defaultTimeLimitSeconds
-        ?? 3600;
-
       return {
         classroom,
         selected:
@@ -268,14 +260,6 @@ function buildRows(
               )
             : defaults
               .endsAtLocal,
-        timeLimitMinutes:
-          Math.round(
-            (
-              existing
-                ?.timeLimitSeconds
-              ?? defaultSeconds
-            ) / 60,
-          ),
         showLeaderboard:
           existing
             ?.showLeaderboard
@@ -344,13 +328,6 @@ function validateRows():
       return `The closing time must be in the future for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
     }
 
-    if (
-      !row.timeLimitMinutes
-      || row.timeLimitMinutes < 1
-      || row.timeLimitMinutes > 360
-    ) {
-      return `Set a duration from 1 to 360 minutes for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
-    }
   }
 
   return null;
@@ -455,11 +432,10 @@ async function save():
           new Date(
             row.endsAtLocal,
           ).toISOString(),
+        // Deprecated whole-attempt timing is always disabled.
+        // The class closing time is the only assessment deadline.
         timeLimitSeconds:
-          row.timeLimitMinutes
-            ? row.timeLimitMinutes
-              * 60
-            : null,
+          null,
         showLeaderboard:
           row.showLeaderboard,
         maxAttempts:
@@ -595,7 +571,7 @@ onMounted(
         overview?.assessment.title
         || 'Assign Assessment'
       "
-      description="Select classes and configure when students can begin, how long each attempt lasts, and whether ranking is available."
+      description="Select classes and configure when students can begin, the final submission deadline, and whether ranking is available."
     />
 
     <UAlert
@@ -666,7 +642,15 @@ onMounted(
         variant="soft"
         icon="i-lucide-clock-3"
         title="Automatic student access"
-        description="No session code or instructor Start button is required. Enrolled students can start or continue when the schedule is open."
+        description="No session code or instructor Start button is required. The opening time allows students to begin, while the closing time is the final whole-assessment deadline."
+      />
+
+      <UAlert
+        color="neutral"
+        variant="soft"
+        icon="i-lucide-list-timer"
+        title="Question timers stay independent"
+        description="The answering time configured on each question remains unchanged. If a student does not answer before a question timer expires, that question is finalized as timed out and the student moves to the next question."
       />
 
       <UCard>
@@ -677,7 +661,7 @@ onMounted(
             </h2>
 
             <p class="mt-1 text-sm text-muted">
-              Each class may use a different opening time, closing time, and attempt duration.
+              Each class may use a different opening time and closing deadline. Question timers are configured separately in the Question Builder.
             </p>
           </div>
         </template>
@@ -749,7 +733,7 @@ onMounted(
 
               <div
                 v-if="row.selected"
-                class="grid gap-4 border-t border-default pt-4 md:grid-cols-2 xl:grid-cols-4"
+                class="grid gap-4 border-t border-default pt-4 md:grid-cols-3"
               >
                 <UFormField label="Opens">
                   <UInput
@@ -763,19 +747,6 @@ onMounted(
                   <UInput
                     v-model="row.endsAtLocal"
                     type="datetime-local"
-                    class="w-full"
-                  />
-                </UFormField>
-
-                <UFormField
-                  label="Attempt duration"
-                  description="Minutes"
-                >
-                  <UInput
-                    v-model.number="row.timeLimitMinutes"
-                    type="number"
-                    min="1"
-                    max="360"
                     class="w-full"
                   />
                 </UFormField>
@@ -834,7 +805,7 @@ onMounted(
         saveConfirmationOpen
       "
       title="Save classroom assessment schedules?"
-      description="Students in the selected classes will be able to start independently when the opening time is reached. Their answers and timer will be controlled by the server."
+      description="Students can start independently after the opening time. The closing time is the final assessment deadline, and every question keeps its own server-controlled answer timer."
       confirm-label="Save Schedules"
       icon="i-lucide-calendar-check"
       :loading="isSaving"

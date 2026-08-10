@@ -30,6 +30,7 @@ export interface AssessmentScheduleInput {
   classroomId: string;
   startsAt: string;
   endsAt: string;
+  /** @deprecated Always null; the class closing time is the whole-assessment deadline. */
   timeLimitSeconds: number | null;
   showLeaderboard: boolean;
   maxAttempts: number;
@@ -43,6 +44,7 @@ export interface AssessmentScheduleItem {
   endsAt: string;
   closedAt: string | null;
   cancelledAt: string | null;
+  /** @deprecated Always null; the class closing time is the whole-assessment deadline. */
   timeLimitSeconds: number | null;
   showLeaderboard: boolean;
   maxAttempts: number;
@@ -61,6 +63,7 @@ export interface InstructorAssessmentScheduleOverview {
     assessmentType: AssessmentType;
     questionCount: number;
     totalPoints: number;
+    /** @deprecated Always null; use the class schedule closing time. */
     defaultTimeLimitSeconds: number | null;
     defaultLeaderboardEnabled: boolean;
   };
@@ -85,6 +88,23 @@ export interface DeliveryAttemptSummary {
   submittedReason: string | null;
 }
 
+export type DeliveryScorePolicy =
+  | "highest"
+  | "latest"
+  | "first"
+  | "average";
+
+export interface DeliveryAttemptPolicy {
+  maxAttempts: number;
+  attemptsUsed: number;
+  attemptsRemaining: number;
+  nextAttemptNumber: number | null;
+  canStartNewAttempt: boolean;
+  scorePolicy: DeliveryScorePolicy;
+  bestScore: number | null;
+  latestScore: number | null;
+}
+
 export interface StudentAssessmentDelivery {
   assignmentId: string;
   assessmentId: string;
@@ -99,11 +119,13 @@ export interface StudentAssessmentDelivery {
   resultVisibility: AssessmentResultVisibility;
   startsAt: string;
   endsAt: string;
+  /** @deprecated Always null; the class closing time is the whole-assessment deadline. */
   timeLimitSeconds: number | null;
   showLeaderboard: boolean;
   status: DeliveryAvailabilityStatus;
   classroom: DeliveryClassSummary;
   attempt: DeliveryAttemptSummary | null;
+  attemptPolicy?: DeliveryAttemptPolicy | null;
   canStart: boolean;
   canResume: boolean;
   canViewResult: boolean;

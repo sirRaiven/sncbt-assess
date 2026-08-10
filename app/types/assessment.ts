@@ -45,6 +45,7 @@ export interface Assessment {
   result_visibility: AssessmentResultVisibility;
   leaderboard_enabled: boolean;
   allow_backtracking: boolean;
+  /** @deprecated Whole-assessment timing is controlled by the class schedule. */
   overall_time_limit_seconds: number | null;
   question_count: number;
   total_points: number;
@@ -82,7 +83,6 @@ export interface AssessmentDetailsInput {
   resultVisibility: AssessmentResultVisibility;
   leaderboardEnabled: boolean;
   allowBacktracking: boolean;
-  overallTimeLimitMinutes: number | null;
 }
 
 export interface AssessmentCreateInput
@@ -99,6 +99,7 @@ export interface StudentPublishedAssessment {
   assessmentType: AssessmentType;
   questionCount: number;
   totalPoints: number;
+  /** @deprecated Whole-assessment timing is controlled by the class schedule. */
   overallTimeLimitSeconds: number | null;
   publishedAt: string;
 }

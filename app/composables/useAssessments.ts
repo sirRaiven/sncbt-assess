@@ -168,7 +168,13 @@ export function useAssessments() {
       }
     >(
       "create-assessment",
-      input,
+      {
+        ...input,
+        // Kept only for compatibility with the current Edge Function
+        // contract. Whole-assessment duration is no longer configurable.
+        overallTimeLimitMinutes:
+          null,
+      },
     );
   }
 
@@ -185,6 +191,9 @@ export function useAssessments() {
       {
         assessmentId,
         ...input,
+        // Keep the deprecated whole-assessment duration disabled.
+        overallTimeLimitMinutes:
+          null,
       },
     );
   }

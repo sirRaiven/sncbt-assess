@@ -66,6 +66,84 @@ const attempt =
       || null,
   );
 
+const attemptPolicy =
+  computed(
+    () =>
+      delivery.value?.attemptPolicy
+      || null,
+  );
+
+const canTakeAnotherAttempt =
+  computed(
+    () =>
+      Boolean(
+        delivery.value?.canStart
+        && attempt.value
+        && [
+          "submitted",
+          "auto_submitted",
+        ].includes(
+          attempt.value.status,
+        ),
+      ),
+  );
+
+function automaticSubmissionDescription(
+  reason: string | null,
+): string {
+  if (
+    reason === "automatic_deadline_submission"
+    || reason === "deadline_expired"
+    || reason === "schedule_deadline_expired"
+    || reason === "schedule_deadline_expired_after_reconnect"
+  ) {
+    return "The class closing deadline was reached before the assessment was submitted manually.";
+  }
+
+  if (
+    reason === "last_question_timer_expired"
+  ) {
+    return "The final question's answer time expired, so the assessment was submitted automatically.";
+  }
+
+  if (
+    reason === "instructor_force_submitted"
+  ) {
+    return "Your instructor submitted the active attempt.";
+  }
+
+  if (
+    reason === "overall_timer_expired"
+    || reason === "overall_timer_expired_after_reconnect"
+  ) {
+    return "This historical attempt was submitted by the previous whole-assessment timer.";
+  }
+
+  return "The assessment was submitted automatically by a server-enforced deadline.";
+}
+
+function scorePolicyLabel(
+  policy: string,
+): string {
+  if (policy === "highest") {
+    return "Highest score";
+  }
+
+  if (policy === "latest") {
+    return "Latest attempt";
+  }
+
+  if (policy === "first") {
+    return "First attempt";
+  }
+
+  if (policy === "average") {
+    return "Average score";
+  }
+
+  return "Server-managed";
+}
+
 const canShowScore =
   computed(
     () =>
@@ -589,6 +667,35 @@ onMounted(
           </div>
         </div>
 
+        <div
+          v-if="attemptPolicy"
+          class="mt-6 rounded-xl border border-default p-4"
+        >
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                Attempt policy
+              </p>
+
+              <p class="mt-2 font-bold text-highlighted">
+                {{ attemptPolicy.attemptsUsed }} of {{ attemptPolicy.maxAttempts }} attempts used
+              </p>
+
+              <p class="mt-1 text-sm text-muted">
+                {{ attemptPolicy.attemptsRemaining }} remaining · {{ scorePolicyLabel(attemptPolicy.scorePolicy) }}
+              </p>
+            </div>
+
+            <UButton
+              v-if="canTakeAnotherAttempt"
+              :to="`/student/assessments/${delivery.assignmentId}/instructions`"
+              icon="i-lucide-rotate-ccw"
+            >
+              Take Another Attempt
+            </UButton>
+          </div>
+        </div>
+
         <UAlert
           v-if="attempt.status === 'auto_submitted'"
           class="mt-6"
@@ -596,8 +703,9 @@ onMounted(
           variant="soft"
           title="Automatically submitted"
           :description="
-            attempt.submittedReason
-            || 'The assessment timer or availability period ended.'
+            automaticSubmissionDescription(
+              attempt.submittedReason,
+            )
           "
         />
       </UCard>

@@ -78,6 +78,19 @@ const completedStatuses = [
   "auto_submitted",
 ];
 
+function hasCompletedAttempt(
+  delivery:
+    StudentAssessmentDelivery,
+): boolean {
+  return Boolean(
+    delivery.attempt
+    && completedStatuses
+      .includes(
+        delivery.attempt.status,
+      ),
+  );
+}
+
 const filteredDeliveries =
   computed(
     () => {
@@ -107,11 +120,24 @@ const filteredDeliveries =
         .filter(
           (delivery) => {
             const completed =
-              delivery.attempt
-              && completedStatuses
-                .includes(
-                  delivery.attempt.status,
-                );
+              hasCompletedAttempt(
+                delivery,
+              );
+
+            if (
+              activeFilter.value
+              === "open"
+            ) {
+              return (
+                delivery.status
+                  === "open"
+                && (
+                  !completed
+                  || delivery.canStart
+                  || delivery.canResume
+                )
+              );
+            }
 
             if (completed) {
               return false;
@@ -133,13 +159,13 @@ const counts =
         deliveries.value.filter(
           (delivery) =>
             delivery.status
-            === "open"
-            && !(
-              delivery.attempt
-              && completedStatuses
-                .includes(
-                  delivery.attempt.status,
-                )
+              === "open"
+            && (
+              !hasCompletedAttempt(
+                delivery,
+              )
+              || delivery.canStart
+              || delivery.canResume
             ),
         ).length,
 
@@ -188,21 +214,6 @@ function formatDate(
     );
 }
 
-function formatDuration(
-  seconds: number | null,
-): string {
-  if (!seconds) {
-    return "Until the class schedule closes";
-  }
-
-  const minutes =
-    Math.round(
-      seconds / 60,
-    );
-
-  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
-}
-
 function displayStatus(
   delivery:
     StudentAssessmentDelivery,
@@ -238,6 +249,15 @@ function actionLabel(
   }
 
   if (
+    delivery.canStart
+    && hasCompletedAttempt(
+      delivery,
+    )
+  ) {
+    return "Start Another Attempt";
+  }
+
+  if (
     delivery.canViewResult
   ) {
     return "View Result";
@@ -270,12 +290,36 @@ function actionRoute(
   }
 
   if (
+    delivery.canStart
+  ) {
+    return `/student/assessments/${delivery.assignmentId}/instructions`;
+  }
+
+  if (
     delivery.canViewResult
   ) {
     return `/student/results/${delivery.assignmentId}`;
   }
 
   return `/student/assessments/${delivery.assignmentId}/instructions`;
+}
+
+function actionIcon(
+  delivery:
+    StudentAssessmentDelivery,
+): string {
+  if (
+    delivery.canResume
+    || delivery.canStart
+  ) {
+    return "i-lucide-play";
+  }
+
+  if (delivery.canViewResult) {
+    return "i-lucide-chart-column";
+  }
+
+  return "i-lucide-eye";
 }
 
 async function loadDeliveries():
@@ -498,15 +542,11 @@ onMounted(
 
               <div class="rounded-lg bg-elevated p-3">
                 <p class="text-xs text-muted">
-                  Duration
+                  Question timing
                 </p>
 
                 <p class="mt-1 text-sm font-black text-highlighted">
-                  {{
-                    formatDuration(
-                      delivery.timeLimitSeconds,
-                    )
-                  }}
+                  Per question
                 </p>
               </div>
             </div>
@@ -540,6 +580,44 @@ onMounted(
                 </span>
               </div>
             </div>
+
+            <div
+              v-if="delivery.attemptPolicy"
+              class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-elevated p-3"
+            >
+              <div>
+                <p class="text-xs text-muted">
+                  Attempts
+                </p>
+
+                <p class="mt-1 text-sm font-bold text-highlighted">
+                  {{ delivery.attemptPolicy.attemptsUsed }} of {{ delivery.attemptPolicy.maxAttempts }} used
+                </p>
+              </div>
+
+              <UBadge
+                :color="
+                  delivery.attemptPolicy.attemptsRemaining > 0
+                    ? 'success'
+                    : 'neutral'
+                "
+                variant="soft"
+              >
+                {{ delivery.attemptPolicy.attemptsRemaining }} remaining
+              </UBadge>
+            </div>
+
+            <UAlert
+              v-if="
+                hasCompletedAttempt(delivery)
+                && delivery.canStart
+              "
+              class="mt-4"
+              color="success"
+              variant="soft"
+              title="Another attempt is available"
+              description="You have already submitted an attempt, but the server currently allows you to start another one."
+            />
 
             <div
               v-if="
@@ -594,11 +672,9 @@ onMounted(
                     : 'outline'
                 "
                 :icon="
-                  delivery.canResume
-                    ? 'i-lucide-play'
-                    : delivery.canViewResult
-                      ? 'i-lucide-chart-column'
-                      : 'i-lucide-eye'
+                  actionIcon(
+                    delivery,
+                  )
                 "
               >
                 {{
