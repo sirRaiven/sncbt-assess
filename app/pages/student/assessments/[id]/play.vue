@@ -11,6 +11,8 @@ import type {
 definePageMeta({
   layout:
     "exam",
+  middleware:
+    ["student"],
 });
 
 useSeoMeta({

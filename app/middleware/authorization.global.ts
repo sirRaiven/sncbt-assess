@@ -13,6 +13,12 @@ const protectedPrefixes: Record<AppRole, string> = {
   student: "/student",
 };
 
+const allowedPortalLayouts: Record<AppRole, Set<string>> = {
+  admin: new Set(["admin"]),
+  instructor: new Set(["instructor"]),
+  student: new Set(["student", "exam"]),
+};
+
 const guestOnlyPaths = new Set([
   "/",
   "/register",
@@ -52,6 +58,46 @@ export default defineNuxtRouteMiddleware(
   async (to) => {
     const user = useSupabaseUser();
     const requiredRole = getRequiredRole(to.path);
+
+    if (requiredRole) {
+      const routeLayout =
+        typeof to.meta.layout === "string"
+          ? to.meta.layout
+          : null;
+
+      if (
+        routeLayout
+        && !allowedPortalLayouts[requiredRole]
+          .has(routeLayout)
+      ) {
+        console.error(
+          `[route-integrity] ${to.path} resolved with unexpected layout "${routeLayout}" for ${requiredRole}.`,
+        );
+
+        const safeDestination =
+          requiredRole === "student"
+            ? "/student/dashboard"
+            : requiredRole === "instructor"
+              ? "/instructor/dashboard"
+              : "/admin/dashboard";
+
+        if (to.path !== safeDestination) {
+          return navigateTo({
+            path: safeDestination,
+            query: {
+              reason: "route-integrity",
+            },
+          });
+        }
+
+        return abortNavigation(
+          createError({
+            statusCode: 500,
+            statusMessage: "Portal route configuration mismatch.",
+          }),
+        );
+      }
+    }
 
     if (
       requiredRole

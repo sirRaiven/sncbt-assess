@@ -1,35 +1,27 @@
 <script setup lang="ts">
 import type {
-  DropdownMenuItem,
-} from "@nuxt/ui";
-
-import type {
-  InstructorClassroom,
+  StudentClassListItem,
 } from "~/types/classroom";
 
 definePageMeta({
-  layout: "instructor",
+  layout: "student",
+  middleware: ["student"],
 });
 
 useSeoMeta({
   title: "My classes",
 });
 
-const toast = useToast();
-
 const {
-  listInstructorClasses,
+  listStudentClasses,
 } = useClassrooms();
 
 const classes =
-  ref<InstructorClassroom[]>([]);
+  ref<StudentClassListItem[]>([]);
 
 const isLoading = ref(true);
 const errorMessage = ref("");
 const query = ref("");
-const statusFilter = ref(
-  "All statuses",
-);
 
 const filteredClasses = computed(() => {
   const keyword =
@@ -37,31 +29,21 @@ const filteredClasses = computed(() => {
       .trim()
       .toLowerCase();
 
+  if (!keyword) {
+    return classes.value;
+  }
+
   return classes.value.filter(
-    (classroom) => {
-      const matchesQuery =
-        !keyword
-        || [
-          classroom.name,
-          classroom.subject_code,
-          classroom.section,
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(keyword);
-
-      const matchesStatus =
-        statusFilter.value
-          === "All statuses"
-        || classroom.status
-          === statusFilter.value
-            .toLowerCase();
-
-      return (
-        matchesQuery
-        && matchesStatus
-      );
-    },
+    (item) =>
+      [
+        item.classroom.name,
+        item.classroom.subject_code,
+        item.classroom.section,
+        item.instructor.name,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(keyword),
   );
 });
 
@@ -70,7 +52,7 @@ async function loadClasses(): Promise<void> {
   errorMessage.value = "";
 
   const result =
-    await listInstructorClasses();
+    await listStudentClasses();
 
   if (
     result.error
@@ -85,59 +67,9 @@ async function loadClasses(): Promise<void> {
   }
 
   classes.value =
-    result.data.classrooms;
+    result.data.classes;
 
   isLoading.value = false;
-}
-
-function copyCode(
-  code: string,
-): void {
-  void navigator.clipboard
-    .writeText(code);
-
-  toast.add({
-    title:
-      "Class code copied",
-    description:
-      code,
-    color:
-      "success",
-  });
-}
-
-function classroomMenuItems(
-  classroom: InstructorClassroom,
-): DropdownMenuItem[][] {
-  const items:
-    DropdownMenuItem[] = [
-      {
-        label:
-          "Open Class",
-        icon:
-          "i-lucide-arrow-up-right",
-        to:
-          `/instructor/classes/${classroom.id}`,
-      },
-    ];
-
-  if (classroom.join_enabled) {
-    items.push({
-      label:
-        "Copy Class Code",
-      icon:
-        "i-lucide-copy",
-      onSelect: () => {
-        copyCode(
-          classroom.join_code,
-        );
-      },
-    });
-  }
-
-  return [
-    items,
-  ];
 }
 
 onMounted(
@@ -148,16 +80,16 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="Classroom management"
+      eyebrow="Learning spaces"
       title="My classes"
-      description="Create classes, manage enrollment codes, and review student membership."
+      description="View joined classes and pending membership requests."
     >
       <template #actions>
         <UButton
-          to="/instructor/classes/create"
+          to="/student/classes/join"
           icon="i-lucide-plus"
         >
-          Create Class
+          Join Class
         </UButton>
       </template>
     </PageHeader>
@@ -171,21 +103,11 @@ onMounted(
     />
 
     <UCard>
-      <div class="grid gap-3 lg:grid-cols-[1fr_220px_auto]">
+      <div class="grid gap-3 lg:grid-cols-[1fr_auto]">
         <UInput
           v-model="query"
           icon="i-lucide-search"
-          placeholder="Search subject, code, or section"
-          class="w-full"
-        />
-
-        <USelect
-          v-model="statusFilter"
-          :items="[
-            'All statuses',
-            'Active',
-            'Archived',
-          ]"
+          placeholder="Search class or instructor"
           class="w-full"
         />
 
@@ -203,7 +125,7 @@ onMounted(
 
     <div
       v-if="isLoading"
-      class="grid gap-5 md:grid-cols-2 xl:grid-cols-3"
+      class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
     >
       <USkeleton
         v-for="number in 3"
@@ -213,125 +135,134 @@ onMounted(
     </div>
 
     <EmptyPanel
-      v-else-if="
-        filteredClasses.length === 0
-      "
-      icon="i-lucide-school"
-      title="No classes found"
-      description="Create your first class or adjust the current filters."
+      v-else-if="filteredClasses.length === 0"
+      icon="i-lucide-book-open"
+      title="No classes yet"
+      description="Enter a class code from your instructor to request membership."
     >
       <template #actions>
         <UButton
-          to="/instructor/classes/create"
+          to="/student/classes/join"
           icon="i-lucide-plus"
         >
-          Create Class
+          Join Class
         </UButton>
       </template>
     </EmptyPanel>
 
     <div
       v-else
-      class="grid gap-5 md:grid-cols-2 xl:grid-cols-3"
+      class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
     >
       <UCard
-        v-for="classroom in filteredClasses"
-        :key="classroom.id"
+        v-for="item in filteredClasses"
+        :key="item.membership.id"
+        class="overflow-hidden"
+        :ui="{
+          body: 'p-0 sm:p-0',
+        }"
       >
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <UIcon
-              name="i-lucide-school"
-              class="size-5"
-            />
-          </div>
+        <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-5">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <div class="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15">
+                <UIcon
+                  name="i-lucide-school"
+                  class="size-5"
+                />
+              </div>
 
-          <div class="flex items-center gap-2">
-            <StatusPill
-              :status="classroom.status"
-            />
-
-            <UDropdownMenu
-              :items="classroomMenuItems(classroom)"
-              :content="{
-                align: 'end',
-                side: 'bottom',
-                sideOffset: 6,
-              }"
-              :ui="{
-                content: 'w-52',
-                item: 'min-h-10',
-                itemLabel: 'font-semibold',
-              }"
-            >
-              <UButton
-                type="button"
+              <UBadge
                 color="neutral"
-                variant="ghost"
-                size="sm"
-                square
-                icon="i-heroicons-ellipsis-horizontal"
-                :aria-label="`Class actions for ${classroom.name}`"
-              />
-            </UDropdownMenu>
-          </div>
-        </div>
+                variant="soft"
+              >
+                Class
+              </UBadge>
+            </div>
 
-        <NuxtLink
-          :to="`/instructor/classes/${classroom.id}`"
-          class="group mt-5 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
-          :aria-label="`Open ${classroom.name}`"
-        >
-          <h2 class="text-lg font-black text-highlighted transition group-hover:text-primary">
-            {{ classroom.name }}
-          </h2>
-
-          <p class="mt-1 text-sm text-muted">
-            {{ classroom.subject_code }}
-            ·
-            {{ classroom.section }}
-          </p>
-
-          <p class="mt-2 text-xs text-muted">
-            {{ classroom.school_year }}
-            ·
-            {{ classroom.semester }}
-          </p>
-        </NuxtLink>
-
-        <div class="mt-5 grid grid-cols-3 gap-3">
-          <div class="rounded-lg bg-elevated p-3">
-            <p class="text-xs text-muted">
-              Students
-            </p>
-            <p class="mt-1 text-xl font-black text-highlighted">
-              {{ classroom.memberCounts.active }}
-            </p>
+            <StatusPill
+              :status="
+                item.membership.membership_status === 'pending'
+                  ? 'Pending approval'
+                  : item.classroom.status
+              "
+            />
           </div>
 
-          <div class="rounded-lg bg-elevated p-3">
-            <p class="text-xs text-muted">
-              Pending
-            </p>
-            <p class="mt-1 text-xl font-black text-highlighted">
-              {{ classroom.memberCounts.pending }}
-            </p>
-          </div>
+          <NuxtLink
+            v-if="item.membership.membership_status !== 'pending'"
+            :to="`/student/classes/${item.classroom.id}`"
+            class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+            :aria-label="`Open ${item.classroom.name}`"
+          >
+            <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
+              {{ item.classroom.name }}
+            </h2>
 
-          <div class="rounded-lg bg-elevated p-3">
-            <p class="text-xs text-muted">
-              Code
+            <p class="mt-2 text-sm font-medium text-muted">
+              {{ item.classroom.subject_code }}
+              ·
+              {{ item.classroom.section }}
             </p>
-            <p class="mt-1 truncate font-mono text-xs font-black text-highlighted">
-              {{
-                classroom.join_enabled
-                  ? classroom.join_code
-                  : "Disabled"
-              }}
+          </NuxtLink>
+
+          <div
+            v-else
+            class="mt-6"
+          >
+            <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted">
+              {{ item.classroom.name }}
+            </h2>
+
+            <p class="mt-2 text-sm font-medium text-muted">
+              {{ item.classroom.subject_code }}
+              ·
+              {{ item.classroom.section }}
             </p>
           </div>
         </div>
 
+        <div class="p-5">
+          <div class="flex min-h-7 flex-wrap gap-2">
+            <UBadge
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-user-round"
+            >
+              {{ item.instructor.name }}
+            </UBadge>
+
+            <UBadge
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-calendar-range"
+            >
+              {{ item.classroom.school_year }}
+              ·
+              {{ item.classroom.semester }}
+            </UBadge>
+          </div>
+
+          <UAlert
+            v-if="item.membership.membership_status === 'pending'"
+            class="mt-5"
+            color="warning"
+            variant="soft"
+            title="Awaiting approval"
+            description="The instructor must approve your membership before the class can be opened."
+          />
+
+          <UButton
+            v-else
+            :to="`/student/classes/${item.classroom.id}`"
+            block
+            variant="soft"
+            trailing-icon="i-lucide-arrow-right"
+            class="mt-5"
+          >
+            Open Class
+          </UButton>
+        </div>
       </UCard>
     </div>
   </div>

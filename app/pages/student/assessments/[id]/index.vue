@@ -2,6 +2,8 @@
 definePageMeta({
   layout:
     "student",
+  middleware:
+    ["student"],
 });
 
 const route =
