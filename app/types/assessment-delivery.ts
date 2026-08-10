@@ -165,6 +165,17 @@ export interface DeliveryQuestionPayload {
   question: SafeDeliveryQuestion;
 }
 
+
+export interface AttemptQuestionSelectionPolicy {
+  questionId: string;
+  requiredSelections: number;
+}
+
+export interface AttemptSelectionPolicyResponse {
+  attemptId: string;
+  questions: AttemptQuestionSelectionPolicy[];
+}
+
 export interface SaveDeliveryAnswerResult {
   message: string;
   saved: boolean;

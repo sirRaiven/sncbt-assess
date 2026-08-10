@@ -422,4 +422,9 @@ import_map = "./functions/health/deno.json"
 entrypoint = "./functions/health/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/health/*.html" ]npx supabase functions list
+# static_files = [ "./functions/health/*.html" ]
+
+[functions.assessment-question-policy]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/assessment-question-policy/index.ts"

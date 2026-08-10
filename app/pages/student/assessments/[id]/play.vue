@@ -37,6 +37,7 @@ const assignmentId =
 const {
   getStudentDelivery,
   getQuestion,
+  getAttemptSelectionPolicy,
   saveAnswer,
   submitAttempt,
 } = useAssessmentDelivery();
@@ -54,6 +55,16 @@ const questionPayload =
     DeliveryQuestionPayload
     | null
   >(
+    null,
+  );
+
+const selectionLimitByQuestionId =
+  ref<Record<string, number>>(
+    {},
+  );
+
+const selectionPolicyAttemptId =
+  ref<string | null>(
     null,
   );
 
@@ -232,6 +243,94 @@ const isLastQuestion =
           === questionPayload.value
             .questionCount - 1
         : false,
+  );
+
+const requiredSelections =
+  computed<number | null>(
+    () => {
+      const payload =
+        questionPayload.value;
+
+      if (!payload) {
+        return null;
+      }
+
+      if (
+        payload.question
+          .questionType
+        === "multiple_choice"
+      ) {
+        return 1;
+      }
+
+      return (
+        selectionLimitByQuestionId
+          .value[
+            payload.question.id
+          ]
+        ?? null
+      );
+    },
+  );
+
+const selectedAnswerCount =
+  computed(
+    () =>
+      normalizeSelectedOptionIds()
+        .length,
+  );
+
+const selectionRequirementMet =
+  computed(
+    () => {
+      if (
+        questionPayload.value
+          ?.finalized
+      ) {
+        return true;
+      }
+
+      const required =
+        requiredSelections.value;
+
+      if (required === null) {
+        return false;
+      }
+
+      return (
+        selectedAnswerCount.value
+        === required
+      );
+    },
+  );
+
+const selectionInstruction =
+  computed(
+    () => {
+      const payload =
+        questionPayload.value;
+
+      if (!payload) {
+        return "";
+      }
+
+      if (
+        payload.question
+          .questionType
+        === "multiple_choice"
+      ) {
+        return "Select one answer.";
+      }
+
+      const required =
+        requiredSelections.value;
+
+      if (required === null) {
+        return "Loading answer-selection rules...";
+      }
+
+      return `Select exactly ${required} ${required === 1 ? "answer" : "answers"}. ${selectedAnswerCount.value} of ${required} selected.`;
+    },
   );
 
 const nextActionLabel =
@@ -688,6 +787,36 @@ function clearRecovery():
   }
 }
 
+function isOptionChoiceDisabled(
+  optionId: string,
+): boolean {
+  if (
+    !questionPayload.value
+    || questionPayload.value
+      .finalized
+    || questionTimeoutTriggered.value
+    || questionSeconds.value === 0
+  ) {
+    return true;
+  }
+
+  if (isSelected(optionId)) {
+    return false;
+  }
+
+  const required =
+    requiredSelections.value;
+
+  if (required === null) {
+    return true;
+  }
+
+  return (
+    selectedAnswerCount.value
+    >= required
+  );
+}
+
 function selectOption(
   optionId: string,
 ): void {
@@ -720,6 +849,17 @@ function selectOption(
             id !== optionId,
         );
   } else {
+    const required =
+      requiredSelections.value;
+
+    if (
+      required === null
+      || selectedAnswerCount.value
+        >= required
+    ) {
+      return;
+    }
+
     selectedOptionIds.value = [
       ...selectedOptionIds.value,
       optionId,
@@ -868,6 +1008,51 @@ async function refreshFinalizedQuestionState():
   return true;
 }
 
+async function ensureAttemptSelectionPolicy(
+  attemptId: string,
+): Promise<boolean> {
+  if (
+    selectionPolicyAttemptId.value
+      === attemptId
+    && Object.keys(
+      selectionLimitByQuestionId.value,
+    ).length > 0
+  ) {
+    return true;
+  }
+
+  const result =
+    await getAttemptSelectionPolicy(
+      attemptId,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    errorMessage.value =
+      result.error
+      || "Unable to load the answer-selection rules.";
+
+    return false;
+  }
+
+  selectionLimitByQuestionId.value =
+    Object.fromEntries(
+      result.data.questions.map(
+        (item) => [
+          item.questionId,
+          item.requiredSelections,
+        ],
+      ),
+    );
+
+  selectionPolicyAttemptId.value =
+    attemptId;
+
+  return true;
+}
+
 async function loadDelivery():
   Promise<boolean> {
   const result =
@@ -927,6 +1112,15 @@ async function loadDelivery():
       `/student/assessments/${assignmentId.value}/instructions`,
     );
 
+    return false;
+  }
+
+  const policyReady =
+    await ensureAttemptSelectionPolicy(
+      attempt.id,
+    );
+
+  if (!policyReady) {
     return false;
   }
 
@@ -1241,6 +1435,16 @@ async function goNext():
     return;
   }
 
+  if (!selectionRequirementMet.value) {
+    toast.add({
+      title: "Complete the required selections",
+      description: selectionInstruction.value,
+      color: "warning",
+    });
+
+    return;
+  }
+
   const saved =
     await synchronizeAnswer(
       !questionPayload.value
@@ -1297,6 +1501,16 @@ async function goPrevious():
     questionSeconds.value
       === 0
   ) {
+    return;
+  }
+
+  if (!selectionRequirementMet.value) {
+    toast.add({
+      title: "Complete the required selections",
+      description: selectionInstruction.value,
+      color: "warning",
+    });
+
     return;
   }
 
@@ -1654,6 +1868,9 @@ onMounted(
       );
 
       startTimer();
+    } else {
+      isLoading.value =
+        false;
     }
   },
 );
@@ -1855,12 +2072,7 @@ onBeforeRouteLeave(
             </p>
 
             <p class="mt-1 text-sm text-muted">
-              {{
-                questionPayload.question.questionType
-                === "multiple_choice"
-                  ? "Select one answer."
-                  : "Select all correct answers."
-              }}
+              {{ selectionInstruction }}
             </p>
           </div>
 
@@ -1875,6 +2087,22 @@ onBeforeRouteLeave(
                   ? ""
                   : "s"
               }}
+            </UBadge>
+
+            <UBadge
+              v-if="
+                questionPayload.question.questionType
+                === 'checkbox'
+                && requiredSelections !== null
+              "
+              :color="
+                selectionRequirementMet
+                  ? 'success'
+                  : 'primary'
+              "
+              variant="soft"
+            >
+              {{ selectedAnswerCount }} / {{ requiredSelections }} selected
             </UBadge>
 
             <UBadge
@@ -1991,7 +2219,7 @@ onBeforeRouteLeave(
               ) in questionPayload.question.options"
               :key="option.id"
               type="button"
-              class="flex min-h-20 items-center gap-4 rounded-xl border p-4 text-left transition"
+              class="flex min-h-20 items-center gap-4 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
               :class="
                 isSelected(
                   option.id,
@@ -2000,9 +2228,9 @@ onBeforeRouteLeave(
                   : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'
               "
               :disabled="
-                questionPayload.finalized
-                || questionTimeoutTriggered
-                || questionSeconds === 0
+                isOptionChoiceDisabled(
+                  option.id,
+                )
               "
               @click="
                 selectOption(
@@ -2044,7 +2272,8 @@ onBeforeRouteLeave(
                 || (
                   !questionPayload.finalized
                   && (
-                    questionTimeoutTriggered
+                    !selectionRequirementMet
+                    || questionTimeoutTriggered
                     || questionSeconds === 0
                   )
                 )
@@ -2064,7 +2293,8 @@ onBeforeRouteLeave(
               :disabled="
                 !questionPayload.finalized
                 && (
-                  questionTimeoutTriggered
+                  !selectionRequirementMet
+                  || questionTimeoutTriggered
                   || questionSeconds === 0
                 )
               "

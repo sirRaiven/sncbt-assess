@@ -3,6 +3,7 @@ import type {
 } from "@supabase/supabase-js";
 
 import type {
+  AttemptSelectionPolicyResponse,
   DeliveryQuestionPayload,
   InstructorDeliveryListItem,
   InstructorDeliveryMonitor,
@@ -86,6 +87,8 @@ export function useAssessmentDelivery() {
     payload?:
       Record<string, unknown>,
     timeoutMs = 15000,
+    functionName =
+      "assessment-delivery",
   ): Promise<FunctionResult<T>> {
     const timeoutMessage =
       "__SNCBT_ASSESSMENT_REQUEST_TIMEOUT__";
@@ -99,7 +102,7 @@ export function useAssessmentDelivery() {
       const request =
         supabase.functions
           .invoke<T>(
-            "assessment-delivery",
+            functionName,
             {
               body: {
                 action,
@@ -308,6 +311,21 @@ export function useAssessmentDelivery() {
     );
   }
 
+  async function getAttemptSelectionPolicy(
+    attemptId: string,
+  ) {
+    return await invoke<
+      AttemptSelectionPolicyResponse
+    >(
+      "get-attempt-policy",
+      {
+        attemptId,
+      },
+      10000,
+      "assessment-question-policy",
+    );
+  }
+
   async function saveAnswer(
     attemptId: string,
     questionId: string,
@@ -401,6 +419,7 @@ export function useAssessmentDelivery() {
     getStudentDelivery,
     beginAttempt,
     getQuestion,
+    getAttemptSelectionPolicy,
     saveAnswer,
     submitAttempt,
     getResult,
