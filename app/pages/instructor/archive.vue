@@ -456,6 +456,32 @@ function archivedClassMenuItems(
   ];
 }
 
+function archivedAssessmentMenuItems(
+  assessment: ArchivedAssessmentItem,
+): DropdownMenuItem[][] {
+  return [
+    [
+      {
+        label: "View Assessment",
+        icon: "i-lucide-eye",
+        to: `/instructor/assessments/${assessment.id}/preview`,
+      },
+    ],
+    [
+      {
+        label: "Delete Permanently",
+        icon: "i-lucide-trash-2",
+        color: "error",
+        onSelect: () => {
+          openAssessmentDelete(
+            assessment,
+          );
+        },
+      },
+    ],
+  ];
+}
+
 async function confirmPermanentDelete(): Promise<void> {
   if (
     !deleteTarget.value
@@ -573,6 +599,15 @@ onMounted(
         </UButton>
       </template>
     </UAlert>
+
+    <UAlert
+      v-if="activeSection !== 'classes'"
+      color="warning"
+      variant="soft"
+      icon="i-lucide-triangle-alert"
+      title="Permanent deletion"
+      description="Permanent deletion is available only for archived assessments and closed sessions. Keep academic records archived when they are still covered by your institution's retention policy."
+    />
 
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard
@@ -933,122 +968,162 @@ onMounted(
 
         <div
           v-else
-          class="grid gap-4 xl:grid-cols-2"
+          class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
         >
           <UCard
             v-for="assessment in filteredAssessments"
             :key="assessment.id"
+            class="overflow-hidden"
+            :ui="{
+              body: 'p-0 sm:p-0',
+            }"
           >
-            <div class="flex items-start gap-4">
-              <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                <UIcon
-                  name="i-lucide-file-archive"
-                  class="size-5"
-                />
+            <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-5">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <div class="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15">
+                    <UIcon
+                      name="i-lucide-clipboard-check"
+                      class="size-5"
+                    />
+                  </div>
+
+                  <UBadge
+                    color="neutral"
+                    variant="soft"
+                  >
+                    {{
+                      typeLabel(
+                        assessment.assessmentType,
+                      )
+                    }}
+                  </UBadge>
+                </div>
+
+                <div class="flex items-center gap-1">
+                  <StatusPill status="Archived" />
+
+                  <UDropdownMenu
+                    :items="archivedAssessmentMenuItems(assessment)"
+                    :content="{
+                      align: 'end',
+                      side: 'bottom',
+                      sideOffset: 6,
+                    }"
+                    :ui="{
+                      content: 'w-52',
+                      item: 'min-h-10',
+                      itemLabel: 'font-semibold',
+                    }"
+                  >
+                    <UButton
+                      type="button"
+                      color="neutral"
+                      variant="ghost"
+                      size="sm"
+                      square
+                      icon="i-lucide-ellipsis-vertical"
+                      :aria-label="`Archived assessment actions for ${assessment.title}`"
+                    />
+                  </UDropdownMenu>
+                </div>
               </div>
 
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <h2 class="font-black text-highlighted">
-                      {{ assessment.title }}
-                    </h2>
+              <NuxtLink
+                :to="`/instructor/assessments/${assessment.id}/preview`"
+                class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+                :aria-label="`View archived assessment ${assessment.title}`"
+              >
+                <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
+                  {{ assessment.title }}
+                </h2>
 
-                    <p class="mt-1 text-sm text-muted">
-                      {{ assessment.subjectCode }}
-                      ·
-                      {{
-                        typeLabel(
-                          assessment.assessmentType,
-                        )
-                      }}
-                    </p>
-                  </div>
+                <p class="mt-2 text-sm font-medium text-muted">
+                  {{ assessment.subjectCode }}
+                  · Archived assessment
+                </p>
+              </NuxtLink>
+            </div>
 
-                  <StatusPill status="Archived" />
-                </div>
-
-                <div class="mt-5 grid grid-cols-3 gap-3">
-                  <div class="rounded-lg bg-elevated p-3">
-                    <p class="text-xs text-muted">
-                      Questions
-                    </p>
-
-                    <p class="mt-1 font-black text-highlighted">
-                      {{ assessment.questionCount }}
-                    </p>
-                  </div>
-
-                  <div class="rounded-lg bg-elevated p-3">
-                    <p class="text-xs text-muted">
-                      Points
-                    </p>
-
-                    <p class="mt-1 font-black text-highlighted">
-                      {{ assessment.totalPoints }}
-                    </p>
-                  </div>
-
-                  <div class="rounded-lg bg-elevated p-3">
-                    <p class="text-xs text-muted">
-                      Linked sessions
-                    </p>
-
-                    <p class="mt-1 font-black text-highlighted">
-                      {{ assessment.linkedSessionCount }}
-                    </p>
-                  </div>
-                </div>
-
-                <p class="mt-4 text-xs text-muted">
-                  Archived:
+            <div class="p-5">
+              <div class="flex min-h-7 flex-wrap gap-2">
+                <UBadge
+                  color="neutral"
+                  variant="soft"
+                  icon="i-lucide-archive"
+                >
+                  Archived
                   {{
                     formatDate(
                       assessment.archivedAt
                       || assessment.updatedAt,
                     )
                   }}
-                </p>
+                </UBadge>
 
-                <UAlert
-                  v-if="
-                    assessment.linkedSessionCount > 0
-                    || assessment.assignedClassCount > 0
-                  "
-                  class="mt-4"
+                <UBadge
+                  v-if="assessment.linkedSessionCount > 0"
                   color="warning"
                   variant="soft"
-                  title="Linked records will also be removed"
-                  :description="`Permanent deletion will remove ${assessment.assignedClassCount} class schedule(s), ${assessment.linkedSessionCount} session record(s), their participants, and existing attempt records in one database transaction.`"
-                />
+                  icon="i-lucide-link-2"
+                >
+                  {{ assessment.linkedSessionCount }}
+                  linked
+                  {{
+                    assessment.linkedSessionCount === 1
+                      ? 'session'
+                      : 'sessions'
+                  }}
+                </UBadge>
+              </div>
 
-                <div class="mt-5 flex flex-wrap gap-2">
-                  <UButton
-                    :to="`/instructor/assessments/${assessment.id}/preview`"
-                    color="neutral"
-                    variant="outline"
-                    icon="i-lucide-eye"
-                  >
-                    View Assessment
-                  </UButton>
+              <div class="mt-5 grid grid-cols-3 gap-3">
+                <div class="rounded-xl bg-elevated p-3">
+                  <div class="flex items-center gap-2 text-muted">
+                    <UIcon
+                      name="i-lucide-list-checks"
+                      class="size-4"
+                    />
+                    <span class="text-xs">Questions</span>
+                  </div>
 
-                  <UButton
-                    color="error"
-                    variant="soft"
-                    icon="i-lucide-trash-2"
-                    @click="
-                      openAssessmentDelete(
-                        assessment,
-                      )
-                    "
-                  >
-                    Delete Permanently
-                  </UButton>
+                  <p class="mt-2 text-lg font-black text-highlighted">
+                    {{ assessment.questionCount }}
+                  </p>
+                </div>
+
+                <div class="rounded-xl bg-elevated p-3">
+                  <div class="flex items-center gap-2 text-muted">
+                    <UIcon
+                      name="i-lucide-circle-dot"
+                      class="size-4"
+                    />
+                    <span class="text-xs">Points</span>
+                  </div>
+
+                  <p class="mt-2 text-lg font-black text-highlighted">
+                    {{ assessment.totalPoints }}
+                  </p>
+                </div>
+
+                <div class="rounded-xl bg-elevated p-3">
+                  <div class="flex items-center gap-2 text-muted">
+                    <UIcon
+                      name="i-lucide-school"
+                      class="size-4"
+                    />
+                    <span class="text-xs">Classes</span>
+                  </div>
+
+                  <p class="mt-2 text-lg font-black text-highlighted">
+                    {{ assessment.assignedClassCount }}
+                  </p>
                 </div>
               </div>
             </div>
           </UCard>
         </div>
+
       </template>
 
       <template v-else>
