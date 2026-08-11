@@ -8,6 +8,12 @@ import type {
   StudentAssessmentDelivery,
 } from "~/types/assessment-delivery";
 
+import type {
+  AssessmentIntegrityEventInput,
+  AssessmentIntegrityEventType,
+  AssessmentIntegrityPolicy,
+} from "~/types/assessment-integrity";
+
 definePageMeta({
   layout:
     "exam",
@@ -42,6 +48,11 @@ const {
   submitAttempt,
 } = useAssessmentDelivery();
 
+const {
+  getAttemptIntegrityPolicy,
+  reportIntegrityEvents,
+} = useAssessmentIntegrity();
+
 const delivery =
   ref<
     StudentAssessmentDelivery
@@ -67,6 +78,45 @@ const selectionPolicyAttemptId =
   ref<string | null>(
     null,
   );
+
+const integrityPolicy =
+  ref<
+    AssessmentIntegrityPolicy
+    | null
+  >(null);
+
+const focusGateRequired =
+  ref(false);
+
+const focusModeExited =
+  ref(false);
+
+const visibilitySignalPending =
+  ref(false);
+
+const fullscreenWasEntered =
+  ref(false);
+
+const focusTransitionGraceUntilMs =
+  ref(0);
+
+const integrityEventQueue =
+  ref<AssessmentIntegrityEventInput[]>([]);
+
+const integrityFlushInProgress =
+  ref(false);
+
+const integrityRetryAtMs =
+  ref(0);
+
+const questionAreaRef =
+  ref<HTMLElement | null>(null);
+
+const integrityListenersActive =
+  ref(false);
+
+const lastIntegrityEventAt =
+  new Map<AssessmentIntegrityEventType, number>();
 
 const currentIndex =
   ref(0);
@@ -141,6 +191,20 @@ const questionSeconds =
 let timer:
   | ReturnType<
       typeof setInterval
+    >
+  | null =
+    null;
+
+let integrityFlushTimer:
+  | ReturnType<
+      typeof setTimeout
+    >
+  | null =
+    null;
+
+let blurDetectionTimer:
+  | ReturnType<
+      typeof setTimeout
     >
   | null =
     null;
@@ -351,6 +415,37 @@ const nextActionLabel =
     },
   );
 
+const integrityMonitoringActive =
+  computed(
+    () =>
+      Boolean(
+        integrityPolicy.value
+          ?.enabled
+        && delivery.value
+          ?.attempt
+          ?.status === "in_progress",
+      ),
+  );
+
+const fullscreenSupported =
+  computed(
+    () =>
+      Boolean(
+        import.meta.client
+        && document.fullscreenEnabled
+        && document.documentElement
+          ?.requestFullscreen,
+      ),
+  );
+
+const integrityQueueKey =
+  computed(
+    () =>
+      delivery.value?.attempt
+        ? `sncbt-integrity:${delivery.value.attempt.id}`
+        : "",
+  );
+
 const recoveryKey =
   computed(
     () =>
@@ -477,6 +572,596 @@ const deadlineWarning =
       return "The class closing deadline is less than 5 minutes away. Continue answering each timed question and submit before the schedule closes.";
     },
   );
+
+function currentIntegrityMetadata():
+  AssessmentIntegrityEventInput["metadata"] {
+  if (!import.meta.client) {
+    return {};
+  }
+
+  return {
+    visibilityState:
+      document.visibilityState,
+    fullscreen:
+      Boolean(document.fullscreenElement),
+    fullscreenSupported:
+      Boolean(
+        document.fullscreenEnabled
+        && document.documentElement
+          ?.requestFullscreen,
+      ),
+    online:
+      navigator.onLine,
+    viewportWidth:
+      window.innerWidth,
+    viewportHeight:
+      window.innerHeight,
+    source:
+      "assessment-player",
+  };
+}
+
+function persistIntegrityQueue():
+  void {
+  if (
+    !import.meta.client
+    || !integrityQueueKey.value
+  ) {
+    return;
+  }
+
+  if (
+    integrityEventQueue.value
+      .length === 0
+  ) {
+    localStorage.removeItem(
+      integrityQueueKey.value,
+    );
+    return;
+  }
+
+  localStorage.setItem(
+    integrityQueueKey.value,
+    JSON.stringify(
+      integrityEventQueue.value
+        .slice(-100),
+    ),
+  );
+}
+
+function restoreIntegrityQueue():
+  void {
+  if (
+    !import.meta.client
+    || !integrityQueueKey.value
+  ) {
+    return;
+  }
+
+  const raw = localStorage.getItem(
+    integrityQueueKey.value,
+  );
+
+  if (!raw) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+
+    if (Array.isArray(parsed)) {
+      integrityEventQueue.value = [
+        ...parsed,
+      ].slice(-100);
+    }
+  } catch {
+    localStorage.removeItem(
+      integrityQueueKey.value,
+    );
+  }
+}
+
+function integrityEventIsThrottled(
+  eventType: AssessmentIntegrityEventType,
+): boolean {
+  const now = Date.now();
+  const previous =
+    lastIntegrityEventAt.get(
+      eventType,
+    ) ?? 0;
+  const threshold =
+    eventType === "window_blur"
+      ? 1500
+      : 800;
+
+  if (
+    now - previous
+    < threshold
+  ) {
+    return true;
+  }
+
+  lastIntegrityEventAt.set(
+    eventType,
+    now,
+  );
+  return false;
+}
+
+function scheduleIntegrityFlush():
+  void {
+  if (
+    !integrityMonitoringActive.value
+    || !isOnline.value
+    || integrityFlushTimer
+  ) {
+    return;
+  }
+
+  const delay =
+    Math.max(
+      250,
+      integrityRetryAtMs.value
+      - Date.now(),
+    );
+
+  integrityFlushTimer =
+    setTimeout(
+      () => {
+        integrityFlushTimer = null;
+        void flushIntegrityEvents();
+      },
+      delay,
+    );
+}
+
+async function flushIntegrityEvents():
+  Promise<void> {
+  const attempt =
+    delivery.value?.attempt;
+
+  if (
+    !attempt
+    || !integrityMonitoringActive.value
+    || !isOnline.value
+    || integrityFlushInProgress.value
+    || Date.now()
+      < integrityRetryAtMs.value
+    || integrityEventQueue.value
+      .length === 0
+  ) {
+    return;
+  }
+
+  integrityFlushInProgress.value =
+    true;
+
+  const batch =
+    integrityEventQueue.value
+      .slice(0, 20);
+
+  try {
+    const result =
+      await reportIntegrityEvents(
+        attempt.id,
+        batch,
+      );
+
+    if (
+      !result.error
+      && result.data
+    ) {
+      integrityRetryAtMs.value =
+        0;
+
+      const sentIds =
+        new Set(
+          batch.map(
+            (event) => event.id,
+          ),
+        );
+
+      integrityEventQueue.value =
+        integrityEventQueue.value
+          .filter(
+            (event) =>
+              !sentIds.has(
+                event.id,
+              ),
+          );
+
+      persistIntegrityQueue();
+    } else if (
+      result.code
+      === "ATTEMPT_CLOSED"
+    ) {
+      integrityEventQueue.value = [];
+      integrityRetryAtMs.value = 0;
+      persistIntegrityQueue();
+    } else {
+      integrityRetryAtMs.value =
+        Date.now()
+        + (
+          result.code
+          === "INTEGRITY_EVENT_RATE_LIMITED"
+            ? 60_000
+            : 5_000
+        );
+    }
+  } finally {
+    integrityFlushInProgress.value =
+      false;
+
+    if (
+      integrityEventQueue.value
+        .length > 0
+      && isOnline.value
+    ) {
+      scheduleIntegrityFlush();
+    }
+  }
+}
+
+function queueIntegrityEvent(
+  eventType: AssessmentIntegrityEventType,
+): void {
+  if (
+    !integrityMonitoringActive.value
+    || !import.meta.client
+    || integrityEventIsThrottled(
+      eventType,
+    )
+  ) {
+    return;
+  }
+
+  const event: AssessmentIntegrityEventInput = {
+    id:
+      crypto.randomUUID(),
+    eventType,
+    clientOccurredAt:
+      new Date()
+        .toISOString(),
+    questionId:
+      questionPayload.value
+        ?.question.id
+        ?? null,
+    questionIndex:
+      questionPayload.value
+        ? currentIndex.value
+        : null,
+    metadata:
+      currentIntegrityMetadata(),
+  };
+
+  integrityEventQueue.value = [
+    ...integrityEventQueue.value,
+    event,
+  ].slice(-100);
+
+  persistIntegrityQueue();
+  scheduleIntegrityFlush();
+}
+
+async function ensureAttemptIntegrityPolicy(
+  attemptId: string,
+): Promise<void> {
+  const result =
+    await getAttemptIntegrityPolicy(
+      attemptId,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    // Integrity telemetry must not consume or block question time when the
+    // monitoring service is temporarily unavailable.
+    integrityPolicy.value = {
+      assignmentId:
+        assignmentId.value,
+      attemptId,
+      enabled: false,
+      focusModeEnabled: false,
+    };
+    return;
+  }
+
+  integrityPolicy.value =
+    result.data;
+
+  restoreIntegrityQueue();
+
+  if (
+    integrityPolicy.value.enabled
+    && integrityPolicy.value
+      .focusModeEnabled
+  ) {
+    if (fullscreenSupported.value) {
+      focusGateRequired.value =
+        !document.fullscreenElement;
+    } else {
+      queueIntegrityEvent(
+        "focus_mode_unavailable",
+      );
+    }
+  }
+}
+
+function handleWindowBlur():
+  void {
+  if (
+    !integrityMonitoringActive.value
+    || blurDetectionTimer
+    || Date.now()
+      < focusTransitionGraceUntilMs.value
+  ) {
+    return;
+  }
+
+  blurDetectionTimer =
+    setTimeout(
+      () => {
+        blurDetectionTimer = null;
+
+        // A tab/app switch normally changes document visibility too. In that
+        // case tab_hidden is the stronger signal, so avoid double counting.
+        if (
+          document.visibilityState
+          === "visible"
+        ) {
+          queueIntegrityEvent(
+            "window_blur",
+          );
+        }
+      },
+      350,
+    );
+}
+
+function handleFullscreenChange():
+  void {
+  if (
+    !integrityMonitoringActive.value
+    || !integrityPolicy.value
+      ?.focusModeEnabled
+    || allowRouteLeave.value
+  ) {
+    return;
+  }
+
+  if (document.fullscreenElement) {
+    fullscreenWasEntered.value =
+      true;
+    focusModeExited.value =
+      false;
+    focusTransitionGraceUntilMs.value =
+      Date.now() + 1500;
+    return;
+  }
+
+  if (fullscreenWasEntered.value) {
+    focusModeExited.value =
+      true;
+    queueIntegrityEvent(
+      "fullscreen_exit",
+    );
+
+    toast.add({
+      title:
+        "Focus Mode exited",
+      description:
+        "Return to fullscreen to continue in Focus Mode. The focus change was recorded as an integrity signal.",
+      color:
+        "warning",
+    });
+  }
+}
+
+function handleProtectedInteraction(
+  eventType: Extract<
+    AssessmentIntegrityEventType,
+    | "copy_attempt"
+    | "cut_attempt"
+    | "paste_attempt"
+    | "context_menu_attempt"
+  >,
+  event: Event,
+): void {
+  if (
+    !integrityMonitoringActive.value
+    || !questionAreaRef.value
+  ) {
+    return;
+  }
+
+  const target =
+    event.target;
+
+  if (
+    !(target instanceof Node)
+    || !questionAreaRef.value
+      .contains(target)
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  queueIntegrityEvent(
+    eventType,
+  );
+
+  toast.add({
+    title:
+      "Action restricted during assessment",
+    description:
+      "This action is disabled in the question area and has been recorded as an assessment integrity signal.",
+    color:
+      "warning",
+  });
+}
+
+function handleCopyAttempt(
+  event: Event,
+): void {
+  handleProtectedInteraction(
+    "copy_attempt",
+    event,
+  );
+}
+
+function handleCutAttempt(
+  event: Event,
+): void {
+  handleProtectedInteraction(
+    "cut_attempt",
+    event,
+  );
+}
+
+function handlePasteAttempt(
+  event: Event,
+): void {
+  handleProtectedInteraction(
+    "paste_attempt",
+    event,
+  );
+}
+
+function handleContextMenuAttempt(
+  event: Event,
+): void {
+  handleProtectedInteraction(
+    "context_menu_attempt",
+    event,
+  );
+}
+
+function activateIntegrityListeners():
+  void {
+  if (
+    !import.meta.client
+    || !integrityMonitoringActive.value
+    || integrityListenersActive.value
+  ) {
+    return;
+  }
+
+  window.addEventListener(
+    "blur",
+    handleWindowBlur,
+  );
+  document.addEventListener(
+    "fullscreenchange",
+    handleFullscreenChange,
+  );
+  document.addEventListener(
+    "copy",
+    handleCopyAttempt,
+  );
+  document.addEventListener(
+    "cut",
+    handleCutAttempt,
+  );
+  document.addEventListener(
+    "paste",
+    handlePasteAttempt,
+  );
+  document.addEventListener(
+    "contextmenu",
+    handleContextMenuAttempt,
+  );
+
+  integrityListenersActive.value =
+    true;
+}
+
+async function enterFocusModeAndContinue():
+  Promise<void> {
+  if (
+    !delivery.value?.attempt
+  ) {
+    return;
+  }
+
+  if (
+    fullscreenSupported.value
+    && !document.fullscreenElement
+  ) {
+    focusTransitionGraceUntilMs.value =
+      Date.now() + 1500;
+
+    try {
+      await document.documentElement
+        .requestFullscreen();
+
+      fullscreenWasEntered.value =
+        true;
+      queueIntegrityEvent(
+        "focus_mode_started",
+      );
+    } catch {
+      queueIntegrityEvent(
+        "focus_mode_unavailable",
+      );
+
+      toast.add({
+        title:
+          "Fullscreen could not be started",
+        description:
+          "The assessment will continue with browser focus monitoring. Keep this assessment page active.",
+        color:
+          "warning",
+      });
+    }
+  }
+
+  focusGateRequired.value =
+    false;
+  focusModeExited.value =
+    false;
+
+  activateIntegrityListeners();
+
+  await loadQuestion(
+    currentIndex.value,
+    true,
+  );
+  startTimer();
+}
+
+async function returnToFocusMode():
+  Promise<void> {
+  if (
+    !fullscreenSupported.value
+  ) {
+    return;
+  }
+
+  focusTransitionGraceUntilMs.value =
+    Date.now() + 1500;
+
+  try {
+    await document.documentElement
+      .requestFullscreen();
+    fullscreenWasEntered.value =
+      true;
+    focusModeExited.value =
+      false;
+    queueIntegrityEvent(
+      "focus_mode_started",
+    );
+  } catch {
+    toast.add({
+      title:
+        "Unable to return to fullscreen",
+      description:
+        "Use your browser's fullscreen controls and keep the assessment page active.",
+      color:
+        "warning",
+    });
+  }
+}
 
 function syncServerClock(
   serverNow: string | null,
@@ -625,6 +1310,10 @@ function handleBeforeUnload(
     saveRecovery();
   }
 
+  if (integrityEventQueue.value.length > 0) {
+    persistIntegrityQueue();
+  }
+
   event.preventDefault();
   event.returnValue =
     "";
@@ -635,9 +1324,39 @@ function handleVisibilityChange():
   if (
     document.visibilityState
     === "hidden"
-    && pendingSync.value
   ) {
-    saveRecovery();
+    if (pendingSync.value) {
+      saveRecovery();
+    }
+
+    if (integrityMonitoringActive.value) {
+      visibilitySignalPending.value =
+        true;
+      queueIntegrityEvent(
+        "tab_hidden",
+      );
+    }
+
+    return;
+  }
+
+  if (
+    visibilitySignalPending.value
+    && integrityMonitoringActive.value
+  ) {
+    visibilitySignalPending.value =
+      false;
+
+    toast.add({
+      title:
+        "Focus change recorded",
+      description:
+        "The assessment tab became inactive. Stay on this assessment page while your attempt is in progress.",
+      color:
+        "warning",
+    });
+
+    scheduleIntegrityFlush();
   }
 }
 
@@ -697,6 +1416,14 @@ async function leaveAssessment(
 ): Promise<void> {
   allowRouteLeave.value =
     true;
+
+  if (
+    import.meta.client
+    && document.fullscreenElement
+  ) {
+    await document.exitFullscreen()
+      .catch(() => undefined);
+  }
 
   await navigateTo(path);
 }
@@ -1123,6 +1850,10 @@ async function loadDelivery():
   if (!policyReady) {
     return false;
   }
+
+  await ensureAttemptIntegrityPolicy(
+    attempt.id,
+  );
 
   currentIndex.value =
     Math.min(
@@ -1562,6 +2293,18 @@ async function submit(
     }
   }
 
+  if (
+    integrityEventQueue.value.length > 0
+    && isOnline.value
+  ) {
+    await Promise.race([
+      flushIntegrityEvents(),
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 600);
+      }),
+    ]);
+  }
+
   const result =
     await submitAttempt(
       delivery.value.attempt.id,
@@ -1782,6 +2525,8 @@ async function handleOnline():
   isOnline.value =
     true;
 
+  scheduleIntegrityFlush();
+
   if (
     scheduleSeconds.value
     === 0
@@ -1831,6 +2576,10 @@ function handleOffline():
   if (pendingSync.value) {
     saveRecovery();
   }
+
+  if (integrityEventQueue.value.length > 0) {
+    persistIntegrityQueue();
+  }
 }
 
 onMounted(
@@ -1862,12 +2611,21 @@ onMounted(
       await loadDelivery();
 
     if (ready) {
+      activateIntegrityListeners();
+
+      if (focusGateRequired.value) {
+        isLoading.value =
+          false;
+        return;
+      }
+
       await loadQuestion(
         currentIndex.value,
         true,
       );
 
       startTimer();
+      scheduleIntegrityFlush();
     } else {
       isLoading.value =
         false;
@@ -1900,6 +2658,47 @@ onBeforeUnmount(
       "visibilitychange",
       handleVisibilityChange,
     );
+
+    if (integrityFlushTimer) {
+      clearTimeout(
+        integrityFlushTimer,
+      );
+    }
+
+    if (blurDetectionTimer) {
+      clearTimeout(
+        blurDetectionTimer,
+      );
+    }
+
+    if (integrityListenersActive.value) {
+      window.removeEventListener(
+        "blur",
+        handleWindowBlur,
+      );
+      document.removeEventListener(
+        "fullscreenchange",
+        handleFullscreenChange,
+      );
+      document.removeEventListener(
+        "copy",
+        handleCopyAttempt,
+      );
+      document.removeEventListener(
+        "cut",
+        handleCutAttempt,
+      );
+      document.removeEventListener(
+        "paste",
+        handlePasteAttempt,
+      );
+      document.removeEventListener(
+        "contextmenu",
+        handleContextMenuAttempt,
+      );
+    }
+
+    persistIntegrityQueue();
   },
 );
 
@@ -1913,6 +2712,10 @@ onBeforeRouteLeave(
 
     if (pendingSync.value) {
       saveRecovery();
+    }
+
+    if (integrityEventQueue.value.length > 0) {
+      persistIntegrityQueue();
     }
 
     return window.confirm(
@@ -2021,6 +2824,22 @@ onBeforeRouteLeave(
             }}
           </UBadge>
 
+          <UBadge
+            v-if="integrityMonitoringActive"
+            :color="focusModeExited ? 'warning' : 'info'"
+            variant="soft"
+          >
+            <UIcon
+              :name="focusModeExited ? 'i-lucide-shield-alert' : 'i-lucide-shield-check'"
+              class="mr-1 size-3.5"
+            />
+            {{
+              focusModeExited
+                ? "Focus Mode exited"
+                : "Integrity monitoring"
+            }}
+          </UBadge>
+
         </div>
       </div>
     </header>
@@ -2049,8 +2868,48 @@ onBeforeRouteLeave(
         :description="deadlineWarning"
       />
 
+      <UCard
+        v-if="focusGateRequired"
+        class="mx-auto max-w-2xl"
+      >
+        <div class="py-5 text-center">
+          <div class="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <UIcon
+              name="i-lucide-scan"
+              class="size-7"
+            />
+          </div>
+
+          <h1 class="mt-4 text-2xl font-black text-highlighted">
+            Enter Focus Mode
+          </h1>
+
+          <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">
+            This assessment uses integrity monitoring. Fullscreen Focus Mode helps keep the assessment active and records when fullscreen or the assessment tab is left. Integrity signals are shown to your instructor but do not automatically change your score.
+          </p>
+
+          <UAlert
+            class="mt-5 text-left"
+            color="info"
+            variant="soft"
+            icon="i-lucide-timer-reset"
+            title="Your question timer has not started yet"
+            description="The first question will be delivered only after you enter Focus Mode."
+          />
+
+          <UButton
+            class="mt-5"
+            size="xl"
+            icon="i-lucide-maximize"
+            @click="enterFocusModeAndContinue"
+          >
+            Enter Focus Mode and Begin
+          </UButton>
+        </div>
+      </UCard>
+
       <div
-        v-if="isLoading"
+        v-else-if="isLoading"
         class="space-y-4"
       >
         <USkeleton class="h-12 rounded-xl" />
@@ -2062,6 +2921,37 @@ onBeforeRouteLeave(
           questionPayload
         "
       >
+        <div
+          v-if="focusModeExited"
+          class="mb-4 flex flex-col gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div class="flex items-start gap-3">
+            <UIcon
+              name="i-lucide-shield-alert"
+              class="mt-0.5 size-5 shrink-0 text-warning"
+            />
+            <div>
+              <p class="font-bold text-highlighted">
+                Focus Mode is not active
+              </p>
+              <p class="mt-1 text-sm text-muted">
+                The fullscreen session was exited and the event was recorded. The question timer continues while Focus Mode is inactive.
+              </p>
+            </div>
+          </div>
+
+          <UButton
+            v-if="fullscreenSupported"
+            color="warning"
+            variant="soft"
+            icon="i-lucide-maximize"
+            class="shrink-0"
+            @click="returnToFocusMode"
+          >
+            Return to Focus Mode
+          </UButton>
+        </div>
+
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p class="font-black text-highlighted">
@@ -2199,7 +3089,8 @@ onBeforeRouteLeave(
           </p>
         </div>
 
-        <UCard>
+        <div ref="questionAreaRef">
+          <UCard>
           <h1 class="text-2xl font-black leading-tight text-highlighted lg:text-3xl">
             {{ questionPayload.question.questionText }}
           </h1>
@@ -2303,7 +3194,8 @@ onBeforeRouteLeave(
               {{ nextActionLabel }}
             </UButton>
           </div>
-        </UCard>
+          </UCard>
+        </div>
       </template>
     </main>
 

@@ -433,3 +433,13 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/auth-sign-in/index.ts"
 
+
+[functions.assessment-integrity]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/assessment-integrity/index.ts"
+
+[functions.assessment-monitor]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/assessment-monitor/index.ts"

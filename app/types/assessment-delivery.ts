@@ -3,6 +3,10 @@ import type {
   AssessmentType,
 } from "~/types/assessment";
 
+import type {
+  InstructorIntegritySummary,
+} from "~/types/assessment-integrity";
+
 export type DeliveryAvailabilityStatus =
   | "upcoming"
   | "open"
@@ -273,6 +277,7 @@ export interface InstructorMonitorStudent {
   timedOutCount: number;
   /** Questions that have not yet been resolved. */
   remainingCount: number;
+  integrity: InstructorIntegritySummary;
   rank: number | null;
   startedAt: string | null;
   expiresAt: string | null;
@@ -295,6 +300,9 @@ export interface InstructorDeliveryMonitor {
     submitted: number;
     autoSubmitted: number;
     notStarted: number;
+    integritySignals: number;
+    studentsWithIntegritySignals: number;
+    highPriorityIntegritySignals: number;
   };
   students: InstructorMonitorStudent[];
 }

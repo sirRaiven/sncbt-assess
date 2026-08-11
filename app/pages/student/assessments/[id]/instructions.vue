@@ -3,6 +3,10 @@ import type {
   StudentAssessmentDelivery,
 } from "~/types/assessment-delivery";
 
+import type {
+  AssessmentIntegrityPolicy,
+} from "~/types/assessment-integrity";
+
 definePageMeta({
   layout:
     "student",
@@ -34,6 +38,10 @@ const {
   beginAttempt,
 } = useAssessmentDelivery();
 
+const {
+  getAssignmentIntegrityPolicy,
+} = useAssessmentIntegrity();
+
 const delivery =
   ref<
     StudentAssessmentDelivery
@@ -41,6 +49,12 @@ const delivery =
   >(
     null,
   );
+
+const integrityPolicy =
+  ref<
+    AssessmentIntegrityPolicy
+    | null
+  >(null);
 
 const isLoading =
   ref(true);
@@ -109,6 +123,18 @@ function scorePolicyLabel(
   return "Server-managed";
 }
 
+const integrityStartNotice =
+  computed(
+    () =>
+      integrityPolicy.value
+        ?.enabled
+        ? integrityPolicy.value
+            .focusModeEnabled
+          ? " Focus monitoring is active. If your browser supports fullscreen, you will enter Focus Mode before the first question timer starts."
+          : " Assessment integrity monitoring is active during this attempt."
+        : "",
+  );
+
 const startConfirmationDescription =
   computed(
     () => {
@@ -127,14 +153,14 @@ const startConfirmationDescription =
           attemptPolicy.value.nextAttemptNumber
           || attemptPolicy.value.attemptsUsed + 1;
 
-        return `This will start attempt ${nextNumber} of ${attemptPolicy.value.maxAttempts}. The first question timer starts when the question is delivered. The class closes at ${closesAt}.`;
+        return `This will start attempt ${nextNumber} of ${attemptPolicy.value.maxAttempts}. The first question timer starts when the question is delivered. The class closes at ${closesAt}.${integrityStartNotice.value}`;
       }
 
       if (canStartAnotherAttempt.value) {
-        return `This will start another assessment attempt. Each question has its own answer timer, and the class closes at ${closesAt}.`;
+        return `This will start another assessment attempt. Each question has its own answer timer, and the class closes at ${closesAt}.${integrityStartNotice.value}`;
       }
 
-      return `The first question timer starts when the question is delivered. Each question has its own answer time, and the class closes at ${closesAt}.`;
+      return `The first question timer starts when the question is delivered. Each question has its own answer time, and the class closes at ${closesAt}.${integrityStartNotice.value}`;
     },
   );
 
@@ -225,6 +251,22 @@ const canProceed =
       ),
   );
 
+async function loadIntegrityPolicy():
+  Promise<void> {
+  const result =
+    await getAssignmentIntegrityPolicy(
+      assignmentId.value,
+    );
+
+  if (
+    !result.error
+    && result.data
+  ) {
+    integrityPolicy.value =
+      result.data;
+  }
+}
+
 async function loadDelivery():
   Promise<void> {
   isLoading.value =
@@ -254,6 +296,8 @@ async function loadDelivery():
 
   delivery.value =
     result.data.delivery;
+
+  await loadIntegrityPolicy();
 
   isLoading.value =
     false;
@@ -459,6 +503,20 @@ onMounted(
           icon="i-lucide-hourglass"
           title="Question timeout rule"
           description="If a question's answer time reaches zero, the server finalizes that question. If no answer was saved before timeout, it is recorded as unanswered due to timeout and the assessment automatically proceeds to the next question. The next question receives its own configured time unless the class closing deadline is reached first."
+        />
+
+        <UAlert
+          v-if="integrityPolicy?.enabled"
+          class="mt-4"
+          color="info"
+          variant="soft"
+          icon="i-lucide-shield-check"
+          title="Assessment integrity monitoring is active"
+          :description="
+            integrityPolicy.focusModeEnabled
+              ? 'SNCBT Assess records focus-related signals while this attempt is active, including leaving the assessment tab, exiting fullscreen Focus Mode, or attempting to copy, paste, cut, or open the context menu in the question area. These signals are visible to your instructor but do not automatically determine misconduct or change your score.'
+              : 'SNCBT Assess records focus-related browser signals while this attempt is active. These signals are visible to your instructor but do not automatically determine misconduct or change your score.'
+          "
         />
 
         <div class="mt-6 grid gap-4 md:grid-cols-2">
