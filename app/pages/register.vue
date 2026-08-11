@@ -246,7 +246,7 @@ async function register(
 
 <template>
   <div class="mx-auto w-full max-w-7xl px-1 sm:px-2">
-    <div class="overflow-hidden rounded-xl border border-default bg-default shadow-2xl shadow-slate-950/10">
+    <div class="overflow-hidden rounded-lg border border-default bg-default shadow-2xl shadow-slate-950/10">
       <div class="grid lg:grid-cols-[0.5fr_1.5fr] xl:grid-cols-[0.46fr_1.54fr]">
         <aside
           class="relative hidden overflow-hidden border-r border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-7 lg:flex xl:p-8"
@@ -265,7 +265,7 @@ async function register(
 
               <div>
                 <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
-                  SNCBT Digital Learning
+                  SNCBT E-Learning
                 </p>
                 <p class="mt-0.5 text-sm font-semibold text-highlighted">
                   Account Registration
@@ -408,7 +408,7 @@ async function register(
                 :description="errorMessage"
               />
 
-              <section class="rounded-xl border border-default p-4 sm:p-5">
+              <section class="rounded-lg border border-default p-4 sm:p-5">
                 <div class="mb-3 flex items-center gap-2.5">
                   <div class="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <UIcon
@@ -467,7 +467,7 @@ async function register(
                 </div>
               </section>
 
-              <section class="rounded-xl border border-default p-4 sm:p-5">
+              <section class="rounded-lg border border-default p-4 sm:p-5">
                 <div class="mb-3 flex items-center gap-2.5">
                   <div class="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <UIcon
@@ -552,7 +552,7 @@ async function register(
                 />
               </section>
 
-              <section class="rounded-xl border border-default p-4 sm:p-5">
+              <section class="rounded-lg border border-default p-4 sm:p-5">
                 <div class="mb-3 flex items-center gap-2.5">
                   <div class="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <UIcon
@@ -608,7 +608,7 @@ async function register(
 
               <UFormField
                 name="acceptedPolicy"
-                class="rounded-xl border border-default bg-muted/20 px-4 py-3.5"
+                class="rounded-lg border border-default bg-muted/20 px-4 py-3.5"
               >
                 <UCheckbox
                   v-model="state.acceptedPolicy"
