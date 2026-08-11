@@ -141,15 +141,7 @@ const integrityStudents =
         )
         .sort(
           (first, second) =>
-            second.integrity
-              .highPriorityCount
-            - first.integrity
-              .highPriorityCount
-            || second.integrity
-              .signalCount
-            - first.integrity
-              .signalCount
-            || Date.parse(
+            Date.parse(
               second.integrity
                 .latestSignalAt
               || "1970-01-01",
@@ -158,7 +150,11 @@ const integrityStudents =
               first.integrity
                 .latestSignalAt
               || "1970-01-01",
-            ),
+            )
+            || second.integrity
+              .signalCount
+            - first.integrity
+              .signalCount,
         ),
   );
 
@@ -166,57 +162,70 @@ function integrityEventLabel(
   eventType: string | null,
 ): string {
   if (eventType === "tab_hidden") {
-    return "Assessment tab left";
+    return "Left the assessment tab";
   }
 
   if (eventType === "window_blur") {
-    return "Window lost focus";
+    return "Switched away from the assessment window";
   }
 
   if (eventType === "fullscreen_exit") {
-    return "Focus Mode exited";
+    return "Exited Focus Mode";
   }
 
   if (eventType === "copy_attempt") {
-    return "Copy attempted";
+    return "Tried to copy assessment content";
   }
 
   if (eventType === "cut_attempt") {
-    return "Cut attempted";
+    return "Tried to cut assessment content";
   }
 
   if (eventType === "paste_attempt") {
-    return "Paste attempted";
+    return "Tried to paste content";
   }
 
   if (eventType === "context_menu_attempt") {
-    return "Context menu attempted";
+    return "Opened the right-click menu";
   }
 
-  return "Integrity signal";
+  return "Assessment activity recorded";
 }
 
-function integritySeverityColor(
-  severity: string,
-):
-  | "neutral"
-  | "info"
-  | "warning"
-  | "error" {
-  if (severity === "high") {
-    return "error";
+function integrityEventIcon(
+  eventType: string | null,
+): string {
+  if (eventType === "tab_hidden") {
+    return "i-lucide-panels-top-left";
   }
 
-  if (severity === "medium") {
-    return "warning";
+  if (eventType === "window_blur") {
+    return "i-lucide-monitor-off";
   }
 
-  if (severity === "low") {
-    return "info";
+  if (eventType === "fullscreen_exit") {
+    return "i-lucide-minimize-2";
   }
 
-  return "neutral";
+  if (eventType === "copy_attempt") {
+    return "i-lucide-copy";
+  }
+
+  if (eventType === "cut_attempt") {
+    return "i-lucide-scissors";
+  }
+
+  if (eventType === "paste_attempt") {
+    return "i-lucide-clipboard-paste";
+  }
+
+  if (eventType === "context_menu_attempt") {
+    return "i-lucide-mouse-pointer-click";
+  }
+
+  return "i-lucide-activity";
 }
+
 
 function formatDate(
   value: string | null,
@@ -356,10 +365,10 @@ async function loadMonitor(
     toast.add({
       title:
         newHighPriorityCount > 0
-          ? "High-priority integrity signal"
-          : "New assessment integrity signal",
+          ? "Assessment activity needs review"
+          : "New assessment activity",
       description:
-        `${newSignalCount} new integrity ${newSignalCount === 1 ? "signal was" : "signals were"} recorded. Open Integrity Signals to review the context.`,
+        `${newSignalCount} new assessment ${newSignalCount === 1 ? "event was" : "events were"} recorded. Open Activity Review to see what happened.`,
       color:
         newHighPriorityCount > 0
           ? "error"
@@ -482,7 +491,7 @@ onBeforeUnmount(
             </h1>
 
             <p class="mt-2 text-sm text-blue-100">
-              Monitoring updates every five seconds. Live progress and assessment integrity signals are shown without exposing numeric scores.
+              Monitoring updates every five seconds. Live progress and assessment activity are shown without exposing numeric scores.
             </p>
           </div>
 
@@ -571,26 +580,19 @@ onBeforeUnmount(
 
       </section>
 
-      <section class="grid gap-4 sm:grid-cols-3">
+      <section class="grid gap-4 sm:grid-cols-2">
         <StatCard
-          label="Integrity signals"
+          label="Recorded activity"
           :value="String(monitor.summary.integritySignals)"
-          icon="i-lucide-shield-alert"
+          icon="i-lucide-activity"
           :tone="monitor.summary.integritySignals > 0 ? 'warning' : 'success'"
         />
 
         <StatCard
-          label="Students with signals"
+          label="Students to review"
           :value="String(monitor.summary.studentsWithIntegritySignals)"
           icon="i-lucide-user-round-search"
           :tone="monitor.summary.studentsWithIntegritySignals > 0 ? 'warning' : 'success'"
-        />
-
-        <StatCard
-          label="High-priority signals"
-          :value="String(monitor.summary.highPriorityIntegritySignals)"
-          icon="i-lucide-triangle-alert"
-          :tone="monitor.summary.highPriorityIntegritySignals > 0 ? 'warning' : 'neutral'"
         />
       </section>
 
@@ -645,7 +647,7 @@ onBeforeUnmount(
                   'integrity'
               "
             >
-              Integrity Signals
+              Activity Review
             </button>
           </div>
 
@@ -696,7 +698,7 @@ onBeforeUnmount(
                   Answer outcomes
                 </th>
                 <th>
-                  Integrity
+                  Activity
                 </th>
                 <th>
                   Last activity
@@ -789,7 +791,7 @@ onBeforeUnmount(
                       class="mr-1 size-3.5"
                     />
                     {{ student.integrity.signalCount }}
-                    signal{{ student.integrity.signalCount === 1 ? '' : 's' }}
+                    event{{ student.integrity.signalCount === 1 ? '' : 's' }}
                   </UBadge>
 
                   <UBadge
@@ -797,7 +799,7 @@ onBeforeUnmount(
                     color="success"
                     variant="soft"
                   >
-                    No signals
+                    No recorded activity
                   </UBadge>
                 </td>
 
@@ -895,125 +897,185 @@ onBeforeUnmount(
 
       <UCard v-else>
         <template #header>
-          <div>
-            <h2 class="font-black text-highlighted">
-              Assessment integrity signals
-            </h2>
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 class="font-black text-highlighted">
+                Student assessment activity
+              </h2>
 
-            <p class="mt-1 text-sm text-muted">
-              These are browser focus and restricted-action indicators, not automatic proof of misconduct. Review the pattern and context before taking any academic action.
-            </p>
+              <p class="mt-1 max-w-3xl text-sm text-muted">
+                Students with recorded activity appear below. Open a student only when you need to review the details.
+              </p>
+            </div>
+
+            <div class="flex shrink-0 flex-wrap gap-x-4 gap-y-1.5 text-xs">
+              <span class="inline-flex items-center gap-1.5 text-muted">
+                <span class="size-2 rounded-full bg-error" aria-hidden="true" />
+                Needs closer review
+              </span>
+              <span class="inline-flex items-center gap-1.5 text-muted">
+                <span class="size-2 rounded-full bg-warning" aria-hidden="true" />
+                Check context
+              </span>
+              <span class="inline-flex items-center gap-1.5 text-muted">
+                <span class="size-2 rounded-full bg-primary" aria-hidden="true" />
+                Recorded activity
+              </span>
+            </div>
           </div>
         </template>
 
         <EmptyPanel
           v-if="integrityStudents.length === 0"
-          icon="i-lucide-shield-check"
-          title="No integrity signals recorded"
-          description="No focus changes or restricted browser actions have been recorded for the students in this session."
+          icon="i-lucide-circle-check-big"
+          title="No activity to review"
+          description="No focus changes or restricted browser actions have been recorded for students in this session."
         />
 
         <div
           v-else
-          class="space-y-4"
+          class="space-y-2"
         >
-          <div
+          <UCollapsible
             v-for="student in integrityStudents"
             :key="student.studentId"
-            class="rounded-xl border border-default p-4"
+            class="overflow-hidden rounded-xl border border-default bg-elevated/20"
           >
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <p class="font-black text-highlighted">
-                    {{ student.studentName }}
+            <template #default="{ open }">
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 px-3.5 py-3 text-left transition hover:bg-elevated/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset sm:px-4"
+              >
+                <div
+                  class="flex size-9 shrink-0 items-center justify-center rounded-lg"
+                  :class="{
+                    'bg-error/10 text-error': student.integrity.highPriorityCount > 0,
+                    'bg-warning/10 text-warning': student.integrity.highPriorityCount === 0 && student.integrity.mediumPriorityCount > 0,
+                    'bg-primary/10 text-primary': student.integrity.highPriorityCount === 0 && student.integrity.mediumPriorityCount === 0,
+                  }"
+                >
+                  <UIcon
+                    name="i-lucide-activity"
+                    class="size-4"
+                  />
+                </div>
+
+                <div class="min-w-0 flex-1 sm:max-w-56">
+                  <div class="flex items-center gap-2">
+                    <p class="truncate font-black text-highlighted">
+                      {{ student.studentName }}
+                    </p>
+
+                    <UBadge
+                      color="neutral"
+                      variant="soft"
+                      size="sm"
+                    >
+                      {{ student.integrity.signalCount }}
+                      event{{ student.integrity.signalCount === 1 ? '' : 's' }}
+                    </UBadge>
+                  </div>
+
+                  <p class="mt-0.5 truncate text-xs text-muted">
+                    {{ student.studentNumber || 'No student number' }}
+                    <span class="md:hidden">
+                      · {{ integrityEventLabel(student.integrity.latestEventType) }}
+                    </span>
+                  </p>
+                </div>
+
+                <div class="hidden min-w-0 flex-1 md:block">
+                  <p class="truncate text-sm font-semibold text-highlighted">
+                    {{ integrityEventLabel(student.integrity.latestEventType) }}
                   </p>
 
-                  <UBadge
-                    :color="student.integrity.highPriorityCount > 0 ? 'error' : 'warning'"
-                    variant="soft"
-                  >
-                    {{ student.integrity.signalCount }}
-                    signal{{ student.integrity.signalCount === 1 ? '' : 's' }}
-                  </UBadge>
-
-                  <UBadge
-                    v-if="student.integrity.highPriorityCount > 0"
-                    color="error"
-                    variant="soft"
-                  >
-                    {{ student.integrity.highPriorityCount }} high priority
-                  </UBadge>
+                  <p class="mt-0.5 text-xs text-muted">
+                    {{ formatDate(student.integrity.latestSignalAt) }}
+                  </p>
                 </div>
 
-                <p class="mt-1 text-xs text-muted">
-                  {{ student.studentNumber || 'No student number' }}
-                </p>
-              </div>
-
-              <div class="text-sm lg:text-right">
-                <p class="font-semibold text-highlighted">
-                  {{ integrityEventLabel(student.integrity.latestEventType) }}
-                </p>
-                <p class="mt-1 text-xs text-muted">
-                  Latest: {{ formatDate(student.integrity.latestSignalAt) }}
-                </p>
-              </div>
-            </div>
-
-            <div class="mt-4 grid gap-2 sm:grid-cols-3">
-              <div class="rounded-lg bg-elevated p-3">
-                <p class="text-xs text-muted">High priority</p>
-                <p class="mt-1 text-lg font-black text-error">
-                  {{ student.integrity.highPriorityCount }}
-                </p>
-              </div>
-              <div class="rounded-lg bg-elevated p-3">
-                <p class="text-xs text-muted">Medium priority</p>
-                <p class="mt-1 text-lg font-black text-warning">
-                  {{ student.integrity.mediumPriorityCount }}
-                </p>
-              </div>
-              <div class="rounded-lg bg-elevated p-3">
-                <p class="text-xs text-muted">Low priority</p>
-                <p class="mt-1 text-lg font-black text-primary">
-                  {{ student.integrity.lowPriorityCount }}
-                </p>
-              </div>
-            </div>
-
-            <div class="mt-4 space-y-2">
-              <div
-                v-for="event in student.integrity.recentEvents"
-                :key="`${event.eventType}-${event.receivedAt}-${event.questionIndex ?? 'none'}`"
-                class="flex flex-col gap-2 rounded-lg border border-default bg-elevated/40 p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div class="flex flex-wrap items-center gap-2">
-                  <UBadge
-                    :color="integritySeverityColor(event.severity)"
-                    variant="soft"
-                  >
-                    {{ event.severity }}
-                  </UBadge>
-
-                  <span class="text-sm font-semibold text-highlighted">
-                    {{ integrityEventLabel(event.eventType) }}
+                <div class="ml-auto flex shrink-0 items-center gap-2">
+                  <span class="hidden text-xs font-medium text-muted sm:inline">
+                    {{ open ? 'Hide activity' : 'Review activity' }}
                   </span>
 
-                  <span
-                    v-if="event.questionIndex !== null"
-                    class="text-xs text-muted"
-                  >
-                    Question {{ event.questionIndex + 1 }}
-                  </span>
+                  <UIcon
+                    :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                    class="size-4 text-muted"
+                  />
+                </div>
+              </button>
+            </template>
+
+            <template #content>
+              <div class="border-t border-default bg-default/30 px-3.5 py-2 sm:px-4">
+                <div class="mb-2 flex items-center justify-between gap-3 md:hidden">
+                  <div class="min-w-0">
+                    <p class="text-[11px] font-medium uppercase tracking-wide text-muted">
+                      Most recent activity
+                    </p>
+                    <p class="truncate text-sm font-semibold text-highlighted">
+                      {{ integrityEventLabel(student.integrity.latestEventType) }}
+                    </p>
+                  </div>
+
+                  <p class="shrink-0 text-xs text-muted">
+                    {{ formatDate(student.integrity.latestSignalAt) }}
+                  </p>
                 </div>
 
-                <span class="text-xs text-muted">
-                  {{ formatDate(event.receivedAt) }}
-                </span>
+                <div class="max-h-72 divide-y divide-default overflow-y-auto pr-1">
+                  <div
+                    v-for="event in student.integrity.recentEvents"
+                    :key="`${event.eventType}-${event.receivedAt}-${event.questionIndex ?? 'none'}`"
+                    class="flex items-center gap-3 py-2.5"
+                  >
+                    <div
+                      class="flex size-8 shrink-0 items-center justify-center rounded-lg"
+                      :class="{
+                        'bg-error/10 text-error': event.severity === 'high',
+                        'bg-warning/10 text-warning': event.severity === 'medium',
+                        'bg-primary/10 text-primary': event.severity === 'low',
+                        'bg-elevated text-muted': !['high', 'medium', 'low'].includes(event.severity),
+                      }"
+                    >
+                      <UIcon
+                        :name="integrityEventIcon(event.eventType)"
+                        class="size-4"
+                      />
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-semibold text-highlighted">
+                        {{ integrityEventLabel(event.eventType) }}
+                      </p>
+
+                      <p class="mt-0.5 text-xs text-muted sm:hidden">
+                        <span v-if="event.questionIndex !== null">
+                          Question {{ event.questionIndex + 1 }} ·
+                        </span>
+                        {{ formatDate(event.receivedAt) }}
+                      </p>
+                    </div>
+
+                    <UBadge
+                      v-if="event.questionIndex !== null"
+                      color="neutral"
+                      variant="soft"
+                      size="sm"
+                      class="hidden shrink-0 sm:inline-flex"
+                    >
+                      Question {{ event.questionIndex + 1 }}
+                    </UBadge>
+
+                    <span class="hidden shrink-0 text-xs text-muted sm:inline">
+                      {{ formatDate(event.receivedAt) }}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </template>
+          </UCollapsible>
         </div>
       </UCard>
     </template>
