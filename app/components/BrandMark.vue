@@ -37,7 +37,7 @@ const props = withDefaults(
             : 'text-highlighted'
         "
       >
-        SNCBT Assess
+      SNCBT-AMS
       </p>
     </div>
   </div>

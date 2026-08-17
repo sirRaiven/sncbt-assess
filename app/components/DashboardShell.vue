@@ -339,12 +339,12 @@ onBeforeUnmount(
       mode="slideover"
       rail
       close
-      title="SNCBT Assess"
+      title="SNCBT-AMS"
       :description="roleLabel"
       class="border-r border-white/10 bg-slate-950 text-white"
       :menu="{
         title:
-          'SNCBT Assess',
+          'SNCBT-AMS',
         description:
           `${roleLabel} navigation`,
         side:
