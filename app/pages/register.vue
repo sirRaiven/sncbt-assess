@@ -22,6 +22,11 @@ useSeoMeta({
 const supabase = useSupabaseClient();
 const requestUrl = useRequestURL();
 
+const studentNumberFormat = /^\d{2,}-\d{3,}$/;
+const employeeNumberFormat = /^[A-Za-z]+\d{2,}-\d{2,}$/;
+const studentNumberAllowedCharacters = /^[0-9-]+$/;
+const employeeNumberAllowedCharacters = /^[A-Za-z0-9-]+$/;
+
 const schema = z
   .object({
     firstName: z
@@ -114,6 +119,86 @@ const schema = z
       data,
       context,
     ) => {
+      const accountNumber =
+        data.accountNumber.trim();
+
+      if (
+        accountNumber
+        && data.accountType === "Student"
+      ) {
+        if (
+          accountNumber.includes("@")
+          || accountNumber.includes(".")
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: [
+              "accountNumber",
+            ],
+            message:
+              "Enter your Student Number, not an email address.",
+          });
+        } else if (
+          !studentNumberAllowedCharacters.test(accountNumber)
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: [
+              "accountNumber",
+            ],
+            message:
+              "Student Number can only contain numbers and a hyphen (-).",
+          });
+        } else if (
+          !studentNumberFormat.test(accountNumber)
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: [
+              "accountNumber",
+            ],
+            message:
+              "Use your SNCBT Student Number format, for example 26-12345.",
+          });
+        }
+      } else if (accountNumber) {
+        if (
+          accountNumber.includes("@")
+          || accountNumber.includes(".")
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: [
+              "accountNumber",
+            ],
+            message:
+              "Enter your Employee Number, not an email address.",
+          });
+        } else if (
+          !employeeNumberAllowedCharacters.test(accountNumber)
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: [
+              "accountNumber",
+            ],
+            message:
+              "Employee Number can only contain letters, numbers, and a hyphen (-).",
+          });
+        } else if (
+          !employeeNumberFormat.test(accountNumber)
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: [
+              "accountNumber",
+            ],
+            message:
+              "Use your SNCBT Employee Number format, for example F26-123.",
+          });
+        }
+      }
+
       if (
         data.password
         !== data.confirmPassword
@@ -202,7 +287,9 @@ async function register(
 
           employee_number:
             isInstructor
-              ? event.data.accountNumber.trim()
+              ? event.data.accountNumber
+                  .trim()
+                  .toUpperCase()
               : null,
         },
       },
@@ -524,10 +611,18 @@ async function register(
                       spellcheck="false"
                       :placeholder="
                         state.accountType === 'Student'
-                          ? 'Enter Student Number'
-                          : 'Enter Employee Number'
+                          ? 'e.g., 26-12345'
+                          : 'e.g., F26-123'
                       "
                     />
+
+                    <p class="mt-1.5 text-[11px] leading-4 text-muted">
+                      {{
+                        state.accountType === 'Student'
+                          ? 'Use your official Student Number. Numbers and one hyphen only.'
+                          : 'Use your official Employee Number. Letters, numbers, and one hyphen only.'
+                      }}
+                    </p>
                   </UFormField>
 
                   <UFormField
