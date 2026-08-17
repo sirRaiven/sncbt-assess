@@ -1,5 +1,14 @@
 <script setup lang="ts">
 import type {
+  FormSubmitEvent,
+} from "@nuxt/ui";
+
+import {
+  z,
+} from "zod";
+
+import type {
+  Classroom,
   StudentClassListItem,
 } from "~/types/classroom";
 
@@ -12,7 +21,10 @@ useSeoMeta({
   title: "My classes",
 });
 
+const route = useRoute();
+
 const {
+  joinClass,
   listStudentClasses,
 } = useClassrooms();
 
@@ -22,6 +34,39 @@ const classes =
 const isLoading = ref(true);
 const errorMessage = ref("");
 const query = ref("");
+
+const joinModalOpen = ref(false);
+const isJoining = ref(false);
+const joinErrorMessage = ref("");
+const joinSuccessMessage = ref("");
+const matchedClass =
+  ref<Classroom | null>(null);
+const matchedInstructorName = ref("");
+const joinedImmediately = ref(false);
+
+const joinSchema = z.object({
+  joinCode: z
+    .string()
+    .trim()
+    .transform(
+      (value) =>
+        value
+          .toUpperCase()
+          .replace(/\s+/g, ""),
+    )
+    .refine(
+      (value) =>
+        /^SNC-[A-Z0-9]{6}$/.test(value),
+      "Enter a valid class code such as SNC-7K2P9A.",
+    ),
+});
+
+type JoinClassSchema =
+  z.output<typeof joinSchema>;
+
+const joinState = reactive({
+  joinCode: "",
+});
 
 const filteredClasses = computed(() => {
   const keyword =
@@ -46,6 +91,30 @@ const filteredClasses = computed(() => {
         .includes(keyword),
   );
 });
+
+function resetJoinForm(): void {
+  joinState.joinCode = "";
+  joinErrorMessage.value = "";
+  joinSuccessMessage.value = "";
+  matchedClass.value = null;
+  matchedInstructorName.value = "";
+  joinedImmediately.value = false;
+  isJoining.value = false;
+}
+
+function openJoinModal(
+  initialCode = "",
+): void {
+  resetJoinForm();
+
+  joinState.joinCode =
+    initialCode
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "");
+
+  joinModalOpen.value = true;
+}
 
 async function loadClasses(): Promise<void> {
   isLoading.value = true;
@@ -72,8 +141,77 @@ async function loadClasses(): Promise<void> {
   isLoading.value = false;
 }
 
+async function submitJoin(
+  event: FormSubmitEvent<JoinClassSchema>,
+): Promise<void> {
+  isJoining.value = true;
+  joinErrorMessage.value = "";
+  joinSuccessMessage.value = "";
+  matchedClass.value = null;
+  matchedInstructorName.value = "";
+  joinedImmediately.value = false;
+
+  const result =
+    await joinClass(
+      event.data.joinCode,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    joinErrorMessage.value =
+      result.error
+      || "Unable to join the class.";
+
+    isJoining.value = false;
+    return;
+  }
+
+  matchedClass.value =
+    result.data.classroom;
+
+  matchedInstructorName.value =
+    result.data.instructor.name;
+
+  joinedImmediately.value =
+    result.data.membership.membership_status
+    === "active";
+
+  joinSuccessMessage.value =
+    joinedImmediately.value
+      ? "You joined the class successfully and can open it now."
+      : "Your request was sent to the instructor for approval.";
+
+  isJoining.value = false;
+
+  await loadClasses();
+}
+
+watch(
+  joinModalOpen,
+  (open) => {
+    if (!open) {
+      resetJoinForm();
+    }
+  },
+);
+
 onMounted(
-  loadClasses,
+  async () => {
+    await loadClasses();
+
+    const sharedJoinCode =
+      typeof route.query.join === "string"
+        ? route.query.join
+        : "";
+
+    if (sharedJoinCode) {
+      openJoinModal(
+        sharedJoinCode,
+      );
+    }
+  },
 );
 </script>
 
@@ -86,8 +224,9 @@ onMounted(
     >
       <template #actions>
         <UButton
-          to="/student/classes/join"
+          type="button"
           icon="i-lucide-plus"
+          @click="openJoinModal()"
         >
           Join Class
         </UButton>
@@ -138,12 +277,13 @@ onMounted(
       v-else-if="filteredClasses.length === 0"
       icon="i-lucide-book-open"
       title="No classes yet"
-      description="Enter a class code from your instructor to request membership."
+      description="Enter a class code from your instructor to join a class."
     >
       <template #actions>
         <UButton
-          to="/student/classes/join"
+          type="button"
           icon="i-lucide-plus"
+          @click="openJoinModal()"
         >
           Join Class
         </UButton>
@@ -229,6 +369,7 @@ onMounted(
               variant="soft"
               icon="i-lucide-user-round"
             >
+              Instructor:
               {{ item.instructor.name }}
             </UBadge>
 
@@ -265,5 +406,146 @@ onMounted(
         </div>
       </UCard>
     </div>
+
+    <UModal
+      v-model:open="joinModalOpen"
+      title="Join a class"
+      description="Enter the class code provided by your instructor."
+      :dismissible="!isJoining"
+      :close="!isJoining"
+      :ui="{
+        content: 'w-[calc(100%-1rem)] sm:max-w-xl',
+        header: 'border-b border-default px-4 py-4 sm:px-6',
+        body: 'px-4 py-5 sm:px-6',
+      }"
+    >
+      <template #body>
+        <div class="text-center">
+          <div class="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <UIcon
+              name="i-lucide-school"
+              class="size-6"
+            />
+          </div>
+
+          <h2 class="mt-4 text-lg font-black text-highlighted">
+            Enter the class code
+          </h2>
+
+          <p class="mt-1.5 text-sm leading-6 text-muted">
+            Class codes begin with SNC followed by six letters or numbers.
+            Most classes let you join immediately, while some require instructor approval.
+          </p>
+        </div>
+
+        <UAlert
+          v-if="joinErrorMessage"
+          class="mt-5"
+          color="error"
+          variant="soft"
+          title="Unable to join class"
+          :description="joinErrorMessage"
+        />
+
+        <UAlert
+          v-if="joinSuccessMessage"
+          class="mt-5"
+          color="success"
+          variant="soft"
+          :title="joinedImmediately ? 'Class joined' : 'Request sent'"
+          :description="joinSuccessMessage"
+        />
+
+        <UForm
+          v-if="!matchedClass"
+          :schema="joinSchema"
+          :state="joinState"
+          class="mt-6"
+          @submit="submitJoin"
+        >
+          <UFormField
+            label="Class code"
+            name="joinCode"
+          >
+            <UInput
+              v-model="joinState.joinCode"
+              size="xl"
+              class="w-full text-center font-mono uppercase tracking-[0.14em]"
+              placeholder="SNC-7K2P9A"
+              autocomplete="off"
+              autofocus
+            />
+          </UFormField>
+
+          <UButton
+            type="submit"
+            block
+            size="lg"
+            class="mt-4"
+            :loading="isJoining"
+            icon="i-lucide-log-in"
+          >
+            Join Class
+          </UButton>
+        </UForm>
+
+        <div
+          v-if="matchedClass"
+          class="mt-5 rounded-xl border border-success/30 bg-success/5 p-4 sm:p-5"
+        >
+          <div class="flex items-start gap-4">
+            <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+              <UIcon
+                name="i-lucide-circle-check-big"
+                class="size-5"
+              />
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <p class="font-black text-highlighted">
+                {{ matchedClass.name }}
+              </p>
+
+              <p class="mt-1 text-sm text-muted">
+                {{ matchedClass.subject_code }}
+                ·
+                {{ matchedClass.section }}
+              </p>
+
+              <p class="mt-2 text-sm text-muted">
+                <span class="font-semibold text-highlighted">
+                  Instructor:
+                </span>
+                {{ matchedInstructorName }}
+              </p>
+
+              <StatusPill
+                class="mt-3"
+                :status="joinedImmediately ? 'Active' : 'Pending approval'"
+              />
+
+              <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+                <UButton
+                  v-if="joinedImmediately"
+                  :to="`/student/classes/${matchedClass.id}`"
+                  trailing-icon="i-lucide-arrow-right"
+                  @click="joinModalOpen = false"
+                >
+                  Open Class
+                </UButton>
+
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  @click="joinModalOpen = false"
+                >
+                  {{ joinedImmediately ? "Close" : "Done" }}
+                </UButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

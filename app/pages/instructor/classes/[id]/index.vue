@@ -270,7 +270,7 @@ async function shareCode(): Promise<void> {
           `${classroom.value.name} — SNCBT Assess`,
         text,
         url:
-          `${window.location.origin}/student/classes/join`,
+          `${window.location.origin}/student/classes?join=${encodeURIComponent(classroom.value.join_code)}`,
       });
       return;
     } catch (error) {
