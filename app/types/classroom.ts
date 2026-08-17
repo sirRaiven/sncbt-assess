@@ -28,10 +28,23 @@ export interface Classroom {
   semester: string;
   join_code: string;
   join_enabled: boolean;
+  join_requires_approval?: boolean;
   status: ClassroomStatus;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
+}
+
+
+export interface ClassroomEnrollmentSettings {
+  joinEnabled: boolean;
+  requiresApproval: boolean;
+  pendingCount: number;
+}
+
+export interface ClassroomEnrollmentApprovalUpdate {
+  requiresApproval: boolean;
+  pendingCount: number;
 }
 
 export interface InstructorClassroom

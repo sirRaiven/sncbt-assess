@@ -226,6 +226,7 @@ export type Database = {
           instructor_id: string
           join_code: string
           join_enabled: boolean
+          join_requires_approval: boolean
           name: string
           school_year: string
           section: string
@@ -242,6 +243,7 @@ export type Database = {
           instructor_id: string
           join_code: string
           join_enabled?: boolean
+          join_requires_approval?: boolean
           name: string
           school_year: string
           section: string
@@ -258,6 +260,7 @@ export type Database = {
           instructor_id?: string
           join_code?: string
           join_enabled?: boolean
+          join_requires_approval?: boolean
           name?: string
           school_year?: string
           section?: string
@@ -429,6 +432,10 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      get_classroom_enrollment_settings: {
+        Args: { p_classroom_id: string }
+        Returns: Json
+      }
       delete_assessment_question: {
         Args: { p_instructor_id: string; p_question_id: string }
         Returns: string
@@ -448,6 +455,10 @@ export type Database = {
           p_question_ids: string[]
         }
         Returns: undefined
+      }
+      set_classroom_enrollment_approval: {
+        Args: { p_classroom_id: string; p_required: boolean }
+        Returns: Json
       }
       save_assessment_question: {
         Args: {

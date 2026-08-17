@@ -7,6 +7,10 @@ import {
   z,
 } from "zod";
 
+import {
+  toUserFacingError,
+} from "~/utils/user-facing-error";
+
 definePageMeta({
   layout: "auth",
 });
@@ -64,9 +68,10 @@ async function requestPasswordReset(
     requestCompleted.value = true;
   } catch (error) {
     errorMessage.value =
-      error instanceof Error
-        ? error.message
-        : "Unable to request a password reset.";
+      toUserFacingError(
+        error,
+        "We couldn't send the password-reset email right now. Please try again.",
+      );
   } finally {
     isSubmitting.value = false;
   }
@@ -125,7 +130,7 @@ async function requestPasswordReset(
           color="error"
           variant="soft"
           icon="i-lucide-circle-alert"
-          title="Request unsuccessful"
+          title="Unable to send reset link"
           :description="errorMessage"
         />
 

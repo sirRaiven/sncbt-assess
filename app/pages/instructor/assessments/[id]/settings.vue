@@ -393,7 +393,7 @@ onMounted(
       v-if="errorMessage"
       color="error"
       variant="soft"
-      title="Assessment settings error"
+      title="Unable to load assessment settings"
       :description="errorMessage"
     />
 

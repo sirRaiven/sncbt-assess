@@ -1,8 +1,4 @@
 import type {
-  FunctionsHttpError,
-} from "@supabase/supabase-js";
-
-import type {
   Assessment,
   AssessmentClassOption,
   AssessmentCreateInput,
@@ -11,11 +7,9 @@ import type {
   StudentPublishedAssessment,
 } from "~/types/assessment";
 
-interface FunctionErrorBody {
-  code?: string;
-  message?: string;
-  issues?: unknown;
-}
+import {
+  parseUserFacingFunctionError,
+} from "~/utils/user-facing-error";
 
 interface FunctionResult<T> {
   data: T | null;
@@ -36,44 +30,10 @@ export function useAssessments() {
     message: string;
     code: string | null;
   }> {
-    const fallback =
-      error instanceof Error
-        ? error.message
-        : "The assessment request could not be completed.";
-
-    const functionError =
-      error as FunctionsHttpError;
-
-    if (
-      !functionError?.context
-      || typeof functionError.context.json
-        !== "function"
-    ) {
-      return {
-        message: fallback,
-        code: null,
-      };
-    }
-
-    try {
-      const body =
-        await functionError.context
-          .json() as FunctionErrorBody;
-
-      return {
-        message:
-          body.message
-          || fallback,
-        code:
-          body.code
-          || null,
-      };
-    } catch {
-      return {
-        message: fallback,
-        code: null,
-      };
-    }
+    return await parseUserFacingFunctionError(
+      error,
+      "We couldn't complete the assessment action right now. Please try again.",
+    );
   }
 
   async function invoke<T>(

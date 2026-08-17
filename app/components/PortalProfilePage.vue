@@ -11,6 +11,10 @@ import type {
   AppRole,
 } from "~/types/ui";
 
+import {
+  toUserFacingError,
+} from "~/utils/user-facing-error";
+
 const props = defineProps<{
   role: AppRole;
 }>();
@@ -479,9 +483,12 @@ async function signOutFromProfile(): Promise<void> {
   if (error) {
     toast.add({
       title:
-        "Sign-out unsuccessful",
+        "Unable to sign out",
       description:
-        error.message,
+        toUserFacingError(
+          error,
+          "We couldn't sign you out right now. Check your connection and try again.",
+        ),
       color:
         "error",
     });
@@ -572,9 +579,10 @@ async function confirmPasswordChange(): Promise<void> {
       title:
         "Password could not be updated",
       description:
-        error instanceof Error
-          ? error.message
-          : "The password update failed.",
+        toUserFacingError(
+          error,
+          "We couldn't update your password right now. Please try again.",
+        ),
       color:
         "error",
     });

@@ -1,15 +1,10 @@
 import type {
-  FunctionsHttpError,
-} from "@supabase/supabase-js";
-
-import type {
   IdentifierSignInResponse,
 } from "~/types/auth-sign-in";
 
-interface FunctionErrorBody {
-  code?: string;
-  message?: string;
-}
+import {
+  parseUserFacingFunctionError,
+} from "~/utils/user-facing-error";
 
 interface IdentifierSignInResult {
   userId: string | null;
@@ -27,44 +22,10 @@ export function useIdentifierSignIn() {
     message: string;
     code: string | null;
   }> {
-    const fallback =
-      error instanceof Error
-        ? error.message
-        : "The sign-in request could not be completed.";
-
-    const functionError =
-      error as FunctionsHttpError;
-
-    if (
-      !functionError?.context
-      || typeof functionError.context.json
-        !== "function"
-    ) {
-      return {
-        message: fallback,
-        code: null,
-      };
-    }
-
-    try {
-      const body =
-        await functionError.context
-          .json() as FunctionErrorBody;
-
-      return {
-        message:
-          body.message
-          || fallback,
-        code:
-          body.code
-          || null,
-      };
-    } catch {
-      return {
-        message: fallback,
-        code: null,
-      };
-    }
+    return await parseUserFacingFunctionError(
+      error,
+      "We couldn't sign you in right now. Check your connection and try again.",
+    );
   }
 
   async function signInWithIdentifier(
@@ -104,7 +65,7 @@ export function useIdentifierSignIn() {
         return {
           userId: null,
           error:
-            "The sign-in service returned an incomplete session. Please try again.",
+            "We couldn't finish signing you in. Please try again.",
           code:
             "INCOMPLETE_SESSION",
         };
@@ -127,7 +88,7 @@ export function useIdentifierSignIn() {
         return {
           userId: null,
           error:
-            "Your session could not be established. Please try again.",
+            "We couldn't finish signing you in. Please try again.",
           code:
             "SESSION_SETUP_FAILED",
         };

@@ -2,6 +2,10 @@ import type {
   Profile,
 } from "~/types/profile";
 
+import {
+  toUserFacingError,
+} from "~/utils/user-facing-error";
+
 interface LoadProfileOptions {
   force?: boolean;
   userId?: string;
@@ -88,9 +92,10 @@ export function useCurrentProfile() {
       profile.value = null;
 
       profileError.value =
-        error instanceof Error
-          ? error.message
-          : "Unable to load your account profile.";
+        toUserFacingError(
+          error,
+          "We couldn't load your account information right now. Please try again.",
+        );
 
       return null;
     } finally {

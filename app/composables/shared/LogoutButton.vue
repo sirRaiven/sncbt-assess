@@ -1,3 +1,7 @@
+
+import {
+  toUserFacingError,
+} from "~/utils/user-facing-error";
 <script setup lang="ts">
 const supabase = useSupabaseClient();
 
@@ -20,12 +24,13 @@ async function signOut(): Promise<void> {
     const { clearProfile } = useCurrentProfile();
     clearProfile();
 
-    await navigateTo("/login");
+    await navigateTo("/");
   } catch (error) {
     errorMessage.value =
-      error instanceof Error
-        ? error.message
-        : "Unable to sign out.";
+      toUserFacingError(
+        error,
+        "We couldn't sign you out right now. Check your connection and try again.",
+      );
   } finally {
     isSigningOut.value = false;
   }

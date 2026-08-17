@@ -3,6 +3,10 @@ import {
   getAccountDestination,
 } from "~/utils/auth-navigation";
 
+import {
+  toUserFacingError,
+} from "~/utils/user-facing-error";
+
 definePageMeta({
   layout: "auth",
 });
@@ -37,7 +41,7 @@ async function completeConfirmation(): Promise<void> {
 
     if (!profile) {
       throw new Error(
-        "Your email was confirmed, but the SNCBT Assess profile could not be loaded.",
+        "Your email was confirmed, but we couldn't finish preparing your account. Please sign in again or contact the system administrator.",
       );
     }
 
@@ -52,9 +56,10 @@ async function completeConfirmation(): Promise<void> {
     isProcessing.value = false;
 
     errorMessage.value =
-      error instanceof Error
-        ? error.message
-        : "Unable to complete account confirmation.";
+      toUserFacingError(
+        error,
+        "We couldn't complete your account confirmation. Please try the confirmation link again.",
+      );
   }
 }
 
@@ -107,7 +112,7 @@ onBeforeUnmount(() => {
           </h1>
 
           <p class="mt-2 text-sm leading-6 text-muted">
-            Please wait while Supabase verifies your email and loads your SNCBT Assess profile.
+            Please wait while we verify your email and prepare your SNCBT Assess account.
           </p>
         </template>
 

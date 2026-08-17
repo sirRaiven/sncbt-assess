@@ -15,6 +15,10 @@ import {
   resolveRequestedDestination,
 } from "~/utils/auth-navigation";
 
+import {
+  toUserFacingError,
+} from "~/utils/user-facing-error";
+
 definePageMeta({
   layout: "auth",
 });
@@ -158,9 +162,10 @@ async function signIn(
     await navigateTo(destination);
   } catch (error) {
     errorMessage.value =
-      error instanceof Error
-        ? error.message
-        : "Unable to sign in.";
+      toUserFacingError(
+        error,
+        "We couldn't sign you in right now. Please try again.",
+      );
   } finally {
     isSubmitting.value = false;
   }
@@ -295,7 +300,7 @@ async function signIn(
               color="error"
               variant="soft"
               icon="i-lucide-circle-alert"
-              title="Sign-in unsuccessful"
+              title="Unable to sign in"
               :description="errorMessage"
             />
 

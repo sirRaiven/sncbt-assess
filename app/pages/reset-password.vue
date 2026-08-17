@@ -12,6 +12,10 @@ import {
   z,
 } from "zod";
 
+import {
+  toUserFacingError,
+} from "~/utils/user-facing-error";
+
 definePageMeta({
   layout: "auth",
 });
@@ -148,9 +152,10 @@ async function updatePassword(
     });
   } catch (error) {
     errorMessage.value =
-      error instanceof Error
-        ? error.message
-        : "Unable to update the password.";
+      toUserFacingError(
+        error,
+        "We couldn't update your password right now. Please try again.",
+      );
   } finally {
     isSubmitting.value = false;
   }
@@ -264,7 +269,7 @@ onBeforeUnmount(() => {
           color="error"
           variant="soft"
           icon="i-lucide-circle-alert"
-          title="Password update unsuccessful"
+          title="Unable to update password"
           :description="errorMessage"
         />
 

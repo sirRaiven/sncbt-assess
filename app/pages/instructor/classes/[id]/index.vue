@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type {
-  InstructorClassroom,
+  AssessmentWithClassroom,
+} from "~/types/assessment";
+
+import type {
+  ClassroomEnrollmentSettings,
 } from "~/types/classroom";
 
 definePageMeta({
@@ -8,37 +12,103 @@ definePageMeta({
 });
 
 useSeoMeta({
-  title: "Class details",
+  title: "Class overview",
 });
 
-const route = useRoute();
 const toast = useToast();
 
-const classroomId = computed(
-  () => String(route.params.id),
-);
+const {
+  classroomId,
+  classroom,
+  refreshClass,
+} = useInstructorClassShell();
 
 const {
-  getInstructorClass,
   archiveClass,
   reactivateClass,
   regenerateCode,
   setCodeEnabled,
+  getEnrollmentSettings,
+  setEnrollmentApprovalRequired,
 } = useClassrooms();
 
-const classroom =
-  ref<InstructorClassroom | null>(null);
+const {
+  listInstructorAssessments,
+} = useAssessments();
 
-const isLoading = ref(true);
+const enrollmentSettings =
+  ref<ClassroomEnrollmentSettings | null>(null);
+
+const assessments =
+  ref<AssessmentWithClassroom[]>([]);
+
+const isLoadingEnrollment = ref(true);
+const isLoadingAssessments = ref(true);
 const isUpdating = ref(false);
-const errorMessage = ref("");
+const isApprovalUpdating = ref(false);
+const enrollmentSettingsError = ref("");
+const assessmentError = ref("");
 
-async function loadClass(): Promise<void> {
-  isLoading.value = true;
-  errorMessage.value = "";
+const approvalConfirmationOpen = ref(false);
+const requestedApprovalValue = ref(false);
+
+const assignedAssessments = computed(
+  () => assessments.value
+    .filter(
+      (assessment) =>
+        assessment.status !== "archived"
+        && assessment.assignedClassrooms.some(
+          (assignedClassroom) =>
+            assignedClassroom.id === classroomId.value,
+        ),
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime()
+        - new Date(a.updated_at).getTime(),
+    ),
+);
+
+function typeLabel(value: string): string {
+  return value
+    .split("_")
+    .map(
+      (part) =>
+        part.charAt(0).toUpperCase()
+        + part.slice(1),
+    )
+    .join(" ");
+}
+
+async function loadAssignedAssessments(): Promise<void> {
+  isLoadingAssessments.value = true;
+  assessmentError.value = "";
 
   const result =
-    await getInstructorClass(
+    await listInstructorAssessments();
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    assessmentError.value =
+      result.error
+      || "We couldn't load the assigned assessments right now.";
+    isLoadingAssessments.value = false;
+    return;
+  }
+
+  assessments.value =
+    result.data.assessments;
+  isLoadingAssessments.value = false;
+}
+
+async function loadEnrollmentSettings(): Promise<void> {
+  isLoadingEnrollment.value = true;
+  enrollmentSettingsError.value = "";
+
+  const result =
+    await getEnrollmentSettings(
       classroomId.value,
     );
 
@@ -46,18 +116,29 @@ async function loadClass(): Promise<void> {
     result.error
     || !result.data
   ) {
-    errorMessage.value =
+    enrollmentSettingsError.value =
       result.error
-      || "Unable to load the class.";
+      || "We couldn't load the enrollment settings.";
 
-    isLoading.value = false;
+    enrollmentSettings.value = {
+      joinEnabled:
+        classroom.value?.join_enabled
+        ?? false,
+      requiresApproval:
+        classroom.value?.join_requires_approval
+        ?? false,
+      pendingCount:
+        classroom.value?.memberCounts.pending
+        ?? 0,
+    };
+
+    isLoadingEnrollment.value = false;
     return;
   }
 
-  classroom.value =
-    result.data.classroom;
-
-  isLoading.value = false;
+  enrollmentSettings.value =
+    result.data;
+  isLoadingEnrollment.value = false;
 }
 
 async function runClassAction(
@@ -107,13 +188,11 @@ async function runClassAction(
     || !result.data
   ) {
     toast.add({
-      title:
-        "Class action failed",
+      title: "Unable to update class",
       description:
         result.error
-        || "The action could not be completed.",
-      color:
-        "error",
+        || "The class couldn't be updated right now.",
+      color: "error",
     });
 
     isUpdating.value = false;
@@ -127,8 +206,7 @@ async function runClassAction(
         : "Class updated",
     description:
       result.data.message,
-    color:
-      "success",
+    color: "success",
   });
 
   if (action === "archive") {
@@ -141,224 +219,387 @@ async function runClassAction(
     return;
   }
 
-  await loadClass();
-
+  await refreshClass();
+  await loadEnrollmentSettings();
   isUpdating.value = false;
 }
 
-function copyCode(): void {
+async function copyCode(): Promise<void> {
   if (!classroom.value) {
     return;
   }
 
-  void navigator.clipboard
-    .writeText(
+  try {
+    await navigator.clipboard.writeText(
       classroom.value.join_code,
     );
 
-  toast.add({
-    title:
-      "Class code copied",
-    description:
-      classroom.value.join_code,
-    color:
-      "success",
-  });
+    toast.add({
+      title: "Class code copied",
+      description: classroom.value.join_code,
+      color: "success",
+    });
+  } catch {
+    toast.add({
+      title: "Unable to copy class code",
+      description:
+        "Select the code and copy it manually.",
+      color: "warning",
+    });
+  }
 }
 
-onMounted(
-  loadClass,
+async function shareCode(): Promise<void> {
+  if (!classroom.value) {
+    return;
+  }
+
+  const text =
+    `Join ${classroom.value.name} in SNCBT Assess using class code ${classroom.value.join_code}.`;
+
+  if (
+    typeof navigator.share
+    === "function"
+  ) {
+    try {
+      await navigator.share({
+        title:
+          `${classroom.value.name} — SNCBT Assess`,
+        text,
+        url:
+          `${window.location.origin}/student/classes/join`,
+      });
+      return;
+    } catch (error) {
+      if (
+        error instanceof DOMException
+        && error.name === "AbortError"
+      ) {
+        return;
+      }
+    }
+  }
+
+  await copyCode();
+}
+
+function requestApprovalChange(
+  required: boolean,
+): void {
+  if (
+    !enrollmentSettings.value
+    || required
+      === enrollmentSettings.value.requiresApproval
+  ) {
+    return;
+  }
+
+  requestedApprovalValue.value =
+    required;
+
+  if (
+    !required
+    && enrollmentSettings.value.pendingCount > 0
+  ) {
+    approvalConfirmationOpen.value = true;
+    return;
+  }
+
+  void applyApprovalChange(required);
+}
+
+async function applyApprovalChange(
+  required = requestedApprovalValue.value,
+): Promise<void> {
+  if (!classroom.value) {
+    return;
+  }
+
+  approvalConfirmationOpen.value = false;
+  isApprovalUpdating.value = true;
+
+  const result =
+    await setEnrollmentApprovalRequired(
+      classroom.value.id,
+      required,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title: "Unable to update enrollment",
+      description:
+        result.error
+        || "The enrollment setting couldn't be updated right now.",
+      color: "error",
+    });
+
+    isApprovalUpdating.value = false;
+    return;
+  }
+
+  enrollmentSettings.value = {
+    joinEnabled:
+      classroom.value.join_enabled,
+    requiresApproval:
+      result.data.requiresApproval,
+    pendingCount:
+      result.data.pendingCount,
+  };
+
+  toast.add({
+    title:
+      required
+        ? "Approval required"
+        : "Automatic joining enabled",
+    description:
+      required
+        ? "New students who use the class code will wait for your approval."
+        : "New students with a valid class code will join immediately.",
+    color: "success",
+  });
+
+  isApprovalUpdating.value = false;
+}
+
+watch(
+  classroomId,
+  () => {
+    void Promise.all([
+      loadEnrollmentSettings(),
+      loadAssignedAssessments(),
+    ]);
+  },
 );
+
+onMounted(() => {
+  void Promise.all([
+    loadEnrollmentSettings(),
+    loadAssignedAssessments(),
+  ]);
+});
 </script>
 
 <template>
-  <div class="page-stack">
-    <PortalBackButton
-      fallback-to="/instructor/classes"
-    />
-    <UAlert
-      v-if="errorMessage"
-      color="error"
-      variant="soft"
-      title="Class could not be loaded"
-      :description="errorMessage"
-    />
-
-    <div
-      v-if="isLoading"
-      class="space-y-5"
-    >
-      <USkeleton class="h-48 rounded-xl" />
-      <USkeleton class="h-72 rounded-xl" />
-    </div>
-
-    <template v-else-if="classroom">
-      <section class="rounded-xl bg-gradient-to-r from-brand-900 via-brand-700 to-indigo-700 p-6 text-white sm:p-8">
-        <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div class="flex flex-wrap items-center gap-2">
-              <UBadge
-                color="neutral"
-                variant="soft"
-                class="bg-white/10 text-blue-50"
-              >
-                {{ classroom.subject_code }}
-              </UBadge>
-
-              <UBadge
-                color="neutral"
-                variant="soft"
-                class="bg-white/10 text-blue-50"
-              >
-                {{ classroom.section }}
-              </UBadge>
-
-              <StatusPill
-                :status="classroom.status"
-              />
-            </div>
-
-            <h1 class="mt-4 text-3xl font-black tracking-tight">
-              {{ classroom.name }}
-            </h1>
-
-            <p class="mt-2 text-sm text-blue-100">
-              {{ classroom.school_year }}
-              ·
-              {{ classroom.semester }}
-            </p>
-          </div>
-
-          <div class="flex flex-wrap gap-3">
-            <UButton
-              :to="`/instructor/classes/${classroom.id}/students`"
-              color="neutral"
-              variant="solid"
-              icon="i-lucide-users"
-              class="bg-white text-brand-800 hover:bg-blue-50"
-            >
-              Manage Students
-            </UButton>
-
-            <UButton
-              :to="`/instructor/classes/${classroom.id}/edit`"
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-pencil"
-              class="border-white/30 text-white hover:bg-white/10"
-            >
-              Edit Class
-            </UButton>
-          </div>
-        </div>
-      </section>
-
-      <section class="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Enrolled students"
-          :value="String(classroom.memberCounts.active)"
-          icon="i-lucide-users"
-          tone="primary"
-        />
-
-        <StatCard
-          label="Pending requests"
-          :value="String(classroom.memberCounts.pending)"
-          icon="i-lucide-user-round-plus"
-          tone="warning"
-        />
-
-        <StatCard
-          label="Membership history"
-          :value="
-            String(
-              classroom.memberCounts.rejected
-              + classroom.memberCounts.removed
-              + classroom.memberCounts.left,
-            )
-          "
-          icon="i-lucide-history"
-          tone="neutral"
-        />
-      </section>
-
-      <section class="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <UCard>
+  <div class="space-y-6">
+    <template v-if="classroom">
+      <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <UCard
+          class="overflow-hidden"
+          :ui="{
+            body: 'p-0 sm:p-0',
+          }"
+        >
           <template #header>
-            <h2 class="font-bold text-highlighted">
-              Class information
-            </h2>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="font-bold text-highlighted">
+                    Assigned assessments
+                  </h2>
+
+                  <UBadge
+                    color="neutral"
+                    variant="soft"
+                  >
+                    {{ assignedAssessments.length }}
+                  </UBadge>
+                </div>
+
+                <p class="mt-1 text-sm text-muted">
+                  Assessments currently connected to this class.
+                </p>
+              </div>
+
+              <UButton
+                to="/instructor/assessments"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                icon="i-lucide-clipboard-list"
+              >
+                Assessment Library
+              </UButton>
+            </div>
           </template>
 
-          <dl class="grid gap-5 sm:grid-cols-2">
-            <div>
-              <dt class="text-sm text-muted">
-                Subject code
-              </dt>
-              <dd class="mt-1 font-semibold text-highlighted">
-                {{ classroom.subject_code }}
-              </dd>
+          <div
+            v-if="isLoadingAssessments"
+            class="space-y-3 p-5"
+            aria-label="Loading assigned assessments"
+          >
+            <div
+              v-for="number in 3"
+              :key="number"
+              class="flex items-center gap-4 rounded-xl border border-default p-4"
+            >
+              <USkeleton class="size-11 shrink-0 rounded-xl" />
+              <div class="min-w-0 flex-1 space-y-2">
+                <USkeleton class="h-4 w-2/3" />
+                <USkeleton class="h-3 w-1/3" />
+              </div>
+              <USkeleton class="h-8 w-20 rounded-lg" />
             </div>
-
-            <div>
-              <dt class="text-sm text-muted">
-                Section
-              </dt>
-              <dd class="mt-1 font-semibold text-highlighted">
-                {{ classroom.section }}
-              </dd>
-            </div>
-
-            <div>
-              <dt class="text-sm text-muted">
-                School year
-              </dt>
-              <dd class="mt-1 font-semibold text-highlighted">
-                {{ classroom.school_year }}
-              </dd>
-            </div>
-
-            <div>
-              <dt class="text-sm text-muted">
-                Semester
-              </dt>
-              <dd class="mt-1 font-semibold text-highlighted">
-                {{ classroom.semester }}
-              </dd>
-            </div>
-          </dl>
-
-          <USeparator class="my-6" />
-
-          <div>
-            <p class="text-sm text-muted">
-              Description
-            </p>
-
-            <p class="mt-2 whitespace-pre-line text-sm leading-6 text-highlighted">
-              {{
-                classroom.description
-                || "No class description was provided."
-              }}
-            </p>
           </div>
 
-          <USeparator class="my-6" />
+          <div
+            v-else-if="assessmentError"
+            class="p-5"
+          >
+            <UAlert
+              color="warning"
+              variant="soft"
+              title="Assigned assessments unavailable"
+              :description="assessmentError"
+            />
 
-          <EmptyPanel
-            icon="i-lucide-clipboard-list"
-            title="Assessments begin in Phase 2"
-            description="After classroom management is verified, published assessments will be assigned and displayed here."
-          />
+            <UButton
+              color="warning"
+              variant="soft"
+              size="sm"
+              icon="i-lucide-refresh-cw"
+              class="mt-3"
+              @click="loadAssignedAssessments"
+            >
+              Try Again
+            </UButton>
+          </div>
+
+          <div
+            v-else-if="assignedAssessments.length === 0"
+            class="p-5"
+          >
+            <div class="rounded-xl border border-dashed border-default bg-elevated/40 px-5 py-10 text-center">
+              <div class="mx-auto flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <UIcon
+                  name="i-lucide-clipboard-plus"
+                  class="size-5"
+                />
+              </div>
+
+              <h3 class="mt-4 font-bold text-highlighted">
+                No assessments assigned yet
+              </h3>
+              <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">
+                Open your Assessment Library to publish and schedule an assessment for this class.
+              </p>
+
+              <UButton
+                to="/instructor/assessments"
+                class="mt-4"
+                trailing-icon="i-lucide-arrow-right"
+              >
+                Open Assessments
+              </UButton>
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="divide-y divide-default"
+          >
+            <article
+              v-for="assessment in assignedAssessments"
+              :key="assessment.id"
+              class="group flex flex-col gap-4 p-5 transition-colors hover:bg-elevated/50 sm:flex-row sm:items-center"
+            >
+              <div class="flex min-w-0 flex-1 items-start gap-4">
+                <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+                  <UIcon
+                    name="i-lucide-clipboard-check"
+                    class="size-5"
+                  />
+                </div>
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UBadge
+                      color="neutral"
+                      variant="soft"
+                      size="sm"
+                    >
+                      {{ typeLabel(assessment.assessment_type) }}
+                    </UBadge>
+
+                    <StatusPill
+                      :status="assessment.status"
+                    />
+                  </div>
+
+                  <NuxtLink
+                    :to="`/instructor/assessments/${assessment.id}/edit`"
+                    class="mt-2 block w-fit max-w-full rounded-md focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+                  >
+                    <h3 class="truncate font-bold text-highlighted transition group-hover:text-primary">
+                      {{ assessment.title }}
+                    </h3>
+                  </NuxtLink>
+
+                  <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                    <span class="inline-flex items-center gap-1.5">
+                      <UIcon
+                        name="i-lucide-list-checks"
+                        class="size-3.5"
+                      />
+                      {{ assessment.question_count }} question{{ assessment.question_count === 1 ? "" : "s" }}
+                    </span>
+
+                    <span class="inline-flex items-center gap-1.5">
+                      <UIcon
+                        name="i-lucide-circle-dot"
+                        class="size-3.5"
+                      />
+                      {{ assessment.total_points }} point{{ assessment.total_points === 1 ? "" : "s" }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex shrink-0 items-center gap-2 sm:justify-end">
+                <UButton
+                  :to="`/instructor/assessments/${assessment.id}/assign`"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  icon="i-lucide-calendar-clock"
+                >
+                  Schedule
+                </UButton>
+
+                <UButton
+                  :to="`/instructor/assessments/${assessment.id}/edit`"
+                  color="primary"
+                  variant="soft"
+                  size="sm"
+                  trailing-icon="i-lucide-arrow-right"
+                >
+                  Open
+                </UButton>
+              </div>
+            </article>
+          </div>
         </UCard>
 
         <div class="space-y-6">
-          <UCard>
+          <USkeleton
+            v-if="isLoadingEnrollment"
+            class="h-96 rounded-xl"
+            aria-label="Loading student enrollment settings"
+          />
+
+          <UCard v-else>
             <template #header>
-              <div class="flex items-center justify-between gap-3">
-                <h2 class="font-bold text-highlighted">
-                  Class code
-                </h2>
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h2 class="font-bold text-highlighted">
+                    Student enrollment
+                  </h2>
+                  <p class="mt-1 text-xs text-muted">
+                    Share the code and choose how students enter the class.
+                  </p>
+                </div>
 
                 <StatusPill
                   :status="
@@ -370,17 +611,17 @@ onMounted(
               </div>
             </template>
 
-            <div class="rounded-xl bg-slate-950 p-6 text-center text-white">
-              <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+            <div class="rounded-xl bg-slate-950 p-5 text-center text-white">
+              <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
                 Student enrollment code
               </p>
 
-              <p class="mt-3 font-mono text-3xl font-black tracking-[0.16em]">
+              <p class="mt-3 break-all font-mono text-2xl font-black tracking-[0.14em] sm:text-3xl">
                 {{ classroom.join_code }}
               </p>
             </div>
 
-            <div class="mt-4 grid grid-cols-2 gap-3">
+            <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               <UButton
                 color="neutral"
                 variant="outline"
@@ -394,42 +635,111 @@ onMounted(
               <UButton
                 color="neutral"
                 variant="outline"
+                icon="i-lucide-share-2"
+                :disabled="!classroom.join_enabled"
+                @click="shareCode"
+              >
+                Share
+              </UButton>
+
+              <UButton
+                color="neutral"
+                variant="outline"
                 icon="i-lucide-refresh-cw"
                 :loading="isUpdating"
-                :disabled="
-                  classroom.status === 'archived'
-                "
-                @click="
-                  runClassAction('regenerate')
-                "
+                :disabled="classroom.status === 'archived'"
+                class="col-span-2 sm:col-span-1"
+                @click="runClassAction('regenerate')"
               >
-                Regenerate
+                New Code
               </UButton>
             </div>
 
-            <UButton
-              block
-              color="neutral"
+            <USeparator class="my-5" />
+
+            <div class="space-y-4">
+              <div class="flex items-start justify-between gap-5">
+                <div>
+                  <p class="text-sm font-semibold text-highlighted">
+                    Allow students to join
+                  </p>
+                  <p class="mt-1 text-xs leading-5 text-muted">
+                    Students can use this class code while enrollment is enabled.
+                  </p>
+                </div>
+
+                <USwitch
+                  :model-value="classroom.join_enabled"
+                  :loading="isUpdating"
+                  :disabled="classroom.status === 'archived'"
+                  aria-label="Allow students to join with the class code"
+                  @update:model-value="runClassAction('toggle-code')"
+                />
+              </div>
+
+              <div class="flex items-start justify-between gap-5 border-t border-default pt-4">
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p class="text-sm font-semibold text-highlighted">
+                      Require instructor approval
+                    </p>
+
+                    <UBadge
+                      v-if="enrollmentSettings"
+                      :color="enrollmentSettings.requiresApproval ? 'warning' : 'success'"
+                      variant="soft"
+                      size="sm"
+                    >
+                      {{
+                        enrollmentSettings.requiresApproval
+                          ? "Review requests"
+                          : "Automatic join"
+                      }}
+                    </UBadge>
+                  </div>
+
+                  <p class="mt-1 text-xs leading-5 text-muted">
+                    {{
+                      enrollmentSettings?.requiresApproval
+                        ? "Students wait in Requests until you approve them."
+                        : "Students with a valid code join the class immediately."
+                    }}
+                  </p>
+                </div>
+
+                <USwitch
+                  :model-value="enrollmentSettings?.requiresApproval || false"
+                  :loading="isApprovalUpdating"
+                  :disabled="
+                    !classroom.join_enabled
+                    || classroom.status === 'archived'
+                    || Boolean(enrollmentSettingsError)
+                  "
+                  aria-label="Require instructor approval for new students"
+                  @update:model-value="requestApprovalChange"
+                />
+              </div>
+            </div>
+
+            <UAlert
+              v-if="enrollmentSettingsError"
+              class="mt-4"
+              color="warning"
               variant="soft"
-              class="mt-3"
-              :icon="
-                classroom.join_enabled
-                  ? 'i-lucide-lock-keyhole'
-                  : 'i-lucide-key-round'
-              "
-              :loading="isUpdating"
-              :disabled="
-                classroom.status === 'archived'
-              "
-              @click="
-                runClassAction('toggle-code')
-              "
+              title="Enrollment setting unavailable"
+              :description="enrollmentSettingsError"
+            />
+
+            <UButton
+              v-if="classroom.memberCounts.pending > 0"
+              :to="`/instructor/classes/${classroom.id}/students?view=requests`"
+              block
+              color="warning"
+              variant="soft"
+              icon="i-lucide-user-round-clock"
+              class="mt-4"
             >
-              {{
-                classroom.join_enabled
-                  ? "Disable Enrollment Code"
-                  : "Enable Enrollment Code"
-              }}
+              Review {{ classroom.memberCounts.pending }} existing request{{ classroom.memberCounts.pending === 1 ? "" : "s" }}
             </UButton>
           </UCard>
 
@@ -441,13 +751,11 @@ onMounted(
             </template>
 
             <UAlert
-              v-if="
-                classroom.status === 'active'
-              "
+              v-if="classroom.status === 'active'"
               color="info"
               variant="soft"
               title="Active class"
-              description="Students with an active membership can open this class."
+              description="Enrolled students can open this class and access scheduled assessments."
             />
 
             <UAlert
@@ -455,31 +763,17 @@ onMounted(
               color="warning"
               variant="soft"
               title="Archived class"
-              description="New membership requests and enrollment-code access are disabled."
+              description="New enrollment and normal student access are disabled until the class is reactivated."
             />
 
             <UButton
               block
               class="mt-4"
-              :color="
-                classroom.status === 'active'
-                  ? 'warning'
-                  : 'success'
-              "
+              :color="classroom.status === 'active' ? 'warning' : 'success'"
               variant="soft"
-              :icon="
-                classroom.status === 'active'
-                  ? 'i-lucide-archive'
-                  : 'i-lucide-archive-restore'
-              "
+              :icon="classroom.status === 'active' ? 'i-lucide-archive' : 'i-lucide-archive-restore'"
               :loading="isUpdating"
-              @click="
-                runClassAction(
-                  classroom.status === 'active'
-                    ? 'archive'
-                    : 'reactivate',
-                )
-              "
+              @click="runClassAction(classroom.status === 'active' ? 'archive' : 'reactivate')"
             >
               {{
                 classroom.status === "active"
@@ -490,6 +784,17 @@ onMounted(
           </UCard>
         </div>
       </section>
+
+      <ConfirmationModal
+        v-model:open="approvalConfirmationOpen"
+        title="Turn off approval for new joins?"
+        :description="`New students with the class code will join immediately. ${enrollmentSettings?.pendingCount || 0} existing pending request${(enrollmentSettings?.pendingCount || 0) === 1 ? '' : 's'} will stay pending until you review them.`"
+        confirm-label="Use Automatic Join"
+        confirm-color="primary"
+        icon="i-lucide-user-check"
+        :loading="isApprovalUpdating"
+        @confirm="applyApprovalChange(false)"
+      />
     </template>
   </div>
 </template>

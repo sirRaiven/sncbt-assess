@@ -19,6 +19,7 @@ const toast = useToast();
 
 const {
   createClass,
+  setEnrollmentApprovalRequired,
 } = useClassrooms();
 
 const schema = z.object({
@@ -68,6 +69,7 @@ const schema = z.object({
   ]),
 
   joinEnabled: z.boolean(),
+  requireApproval: z.boolean(),
 });
 
 type CreateClassSchema =
@@ -81,10 +83,20 @@ const state = reactive<CreateClassSchema>({
   schoolYear: "2026-2027",
   semester: "First Semester",
   joinEnabled: true,
+  requireApproval: false,
 });
 
 const isSubmitting = ref(false);
 const errorMessage = ref("");
+
+watch(
+  () => state.joinEnabled,
+  (enabled) => {
+    if (!enabled) {
+      state.requireApproval = false;
+    }
+  },
+);
 
 async function submit(
   event: FormSubmitEvent<CreateClassSchema>,
@@ -127,6 +139,35 @@ async function submit(
 
     isSubmitting.value = false;
     return;
+  }
+
+  if (
+    event.data.joinEnabled
+    && event.data.requireApproval
+  ) {
+    const approvalResult =
+      await setEnrollmentApprovalRequired(
+        result.data.classroom.id,
+        true,
+      );
+
+    if (
+      approvalResult.error
+      || !approvalResult.data
+    ) {
+      toast.add({
+        title: "Class created",
+        description:
+          "The class was created, but the approval setting couldn't be saved. You can update it from the class page.",
+        color: "warning",
+      });
+
+      await navigateTo(
+        `/instructor/classes/${result.data.classroom.id}`,
+      );
+
+      return;
+    }
   }
 
   toast.add({
@@ -259,20 +300,55 @@ async function submit(
             />
           </UFormField>
 
-          <div class="flex items-start justify-between gap-6 rounded-xl border border-default p-4">
-            <div>
-              <p class="font-semibold text-highlighted">
-                Enable class-code enrollment
-              </p>
+          <div class="rounded-xl border border-default p-4 sm:p-5">
+            <div class="flex items-start justify-between gap-6">
+              <div>
+                <p class="font-semibold text-highlighted">
+                  Enable class-code enrollment
+                </p>
 
-              <p class="mt-1 text-sm text-muted">
-                Students may submit the generated code to request membership.
-              </p>
+                <p class="mt-1 text-sm text-muted">
+                  Students can use the generated class code to join this class.
+                </p>
+              </div>
+
+              <USwitch
+                v-model="state.joinEnabled"
+                aria-label="Enable class-code enrollment"
+              />
             </div>
 
-            <USwitch
-              v-model="state.joinEnabled"
-            />
+            <div class="mt-4 flex items-start justify-between gap-6 border-t border-default pt-4">
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="font-semibold text-highlighted">
+                    Require instructor approval
+                  </p>
+
+                  <UBadge
+                    :color="state.requireApproval ? 'warning' : 'success'"
+                    variant="soft"
+                    size="sm"
+                  >
+                    {{ state.requireApproval ? "Review requests" : "Automatic join" }}
+                  </UBadge>
+                </div>
+
+                <p class="mt-1 text-sm text-muted">
+                  {{
+                    state.requireApproval
+                      ? "Students wait for your approval after entering the class code."
+                      : "Students with a valid class code join immediately."
+                  }}
+                </p>
+              </div>
+
+              <USwitch
+                v-model="state.requireApproval"
+                :disabled="!state.joinEnabled"
+                aria-label="Require instructor approval for new students"
+              />
+            </div>
           </div>
 
           <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -327,7 +403,11 @@ async function submit(
               3
             </span>
             <span class="leading-6 text-muted">
-              You approve or reject each request.
+              {{
+                state.requireApproval
+                  ? "You review each enrollment request before the student is added."
+                  : "Students are added to the class immediately after entering a valid code."
+              }}
             </span>
           </li>
         </ol>

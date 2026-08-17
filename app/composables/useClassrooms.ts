@@ -1,9 +1,7 @@
 import type {
-  FunctionsHttpError,
-} from "@supabase/supabase-js";
-
-import type {
   Classroom,
+  ClassroomEnrollmentApprovalUpdate,
+  ClassroomEnrollmentSettings,
   ClassroomFormInput,
   ClassroomMember,
   InstructorClassroom,
@@ -12,11 +10,10 @@ import type {
   StudentClassMembership,
 } from "~/types/classroom";
 
-interface FunctionErrorBody {
-  code?: string;
-  message?: string;
-  issues?: unknown;
-}
+import {
+  parseUserFacingFunctionError,
+  toUserFacingError,
+} from "~/utils/user-facing-error";
 
 interface FunctionResult<T> {
   data: T | null;
@@ -38,45 +35,10 @@ export function useClassrooms() {
     message: string;
     code: string | null;
   }> {
-    const fallback =
-      error instanceof Error
-        ? error.message
-        : "The classroom request could not be completed.";
-
-    const functionError =
-      error as FunctionsHttpError;
-
-    if (
-      !functionError?.context
-      || typeof functionError.context.json
-        !== "function"
-    ) {
-      return {
-        message: fallback,
-        code: null,
-      };
-    }
-
-    try {
-      const body =
-        await functionError.context
-          .json() as FunctionErrorBody;
-
-      return {
-        message:
-          body.message
-          || fallback,
-
-        code:
-          body.code
-          || null,
-      };
-    } catch {
-      return {
-        message: fallback,
-        code: null,
-      };
-    }
+    return await parseUserFacingFunctionError(
+      error,
+      "We couldn't complete the class action right now. Please try again.",
+    );
   }
 
   async function invoke<T>(
@@ -246,6 +208,112 @@ export function useClassrooms() {
     );
   }
 
+  async function getEnrollmentSettings(
+    classroomId: string,
+  ): Promise<FunctionResult<ClassroomEnrollmentSettings>> {
+    try {
+      const {
+        data,
+        error,
+      } = await supabase.rpc(
+        "get_classroom_enrollment_settings",
+        {
+          p_classroom_id: classroomId,
+        },
+      );
+
+      if (error) {
+        return {
+          data: null,
+          error: toUserFacingError(
+            error.message,
+            "We couldn't load the enrollment settings right now. Please try again.",
+            error.code,
+          ),
+          code: error.code || null,
+        };
+      }
+
+      const payload = (data || {}) as {
+        joinEnabled?: boolean;
+        requiresApproval?: boolean;
+        pendingCount?: number;
+      };
+
+      return {
+        data: {
+          joinEnabled: Boolean(payload.joinEnabled),
+          requiresApproval: Boolean(payload.requiresApproval),
+          pendingCount: Number(payload.pendingCount || 0),
+        },
+        error: null,
+        code: null,
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: toUserFacingError(
+          error,
+          "We couldn't load the enrollment settings right now. Please try again.",
+        ),
+        code: null,
+      };
+    }
+  }
+
+  async function setEnrollmentApprovalRequired(
+    classroomId: string,
+    required: boolean,
+  ): Promise<FunctionResult<ClassroomEnrollmentApprovalUpdate>> {
+    try {
+      const {
+        data,
+        error,
+      } = await supabase.rpc(
+        "set_classroom_enrollment_approval",
+        {
+          p_classroom_id: classroomId,
+          p_required: required,
+        },
+      );
+
+      if (error) {
+        return {
+          data: null,
+          error: toUserFacingError(
+            error.message,
+            "We couldn't update the enrollment approval setting right now. Please try again.",
+            error.code,
+          ),
+          code: error.code || null,
+        };
+      }
+
+      const payload = (data || {}) as {
+        requiresApproval?: boolean;
+        pendingCount?: number;
+      };
+
+      return {
+        data: {
+          requiresApproval: Boolean(payload.requiresApproval),
+          pendingCount: Number(payload.pendingCount || 0),
+        },
+        error: null,
+        code: null,
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: toUserFacingError(
+          error,
+          "We couldn't update the enrollment approval setting right now. Please try again.",
+        ),
+        code: null,
+      };
+    }
+  }
+
   async function listMembers(
     classroomId: string,
     status?: MembershipStatus,
@@ -386,6 +454,8 @@ export function useClassrooms() {
     reactivateClass,
     regenerateCode,
     setCodeEnabled,
+    getEnrollmentSettings,
+    setEnrollmentApprovalRequired,
     listMembers,
     approveMember,
     rejectMember,

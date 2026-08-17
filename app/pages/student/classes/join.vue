@@ -56,6 +56,7 @@ const matchedClass =
   ref<Classroom | null>(null);
 
 const instructorName = ref("");
+const joinedImmediately = ref(false);
 
 async function submit(
   event: FormSubmitEvent<JoinClassSchema>,
@@ -64,6 +65,7 @@ async function submit(
   errorMessage.value = "";
   successMessage.value = "";
   matchedClass.value = null;
+  joinedImmediately.value = false;
 
   const result =
     await joinClass(
@@ -88,8 +90,14 @@ async function submit(
   instructorName.value =
     result.data.instructor.name;
 
+  joinedImmediately.value =
+    result.data.membership.membership_status
+    === "active";
+
   successMessage.value =
-    result.data.message;
+    joinedImmediately.value
+      ? "You joined the class successfully and can open it now."
+      : "Your request was sent to the instructor for approval.";
 
   isSubmitting.value = false;
 }
@@ -103,7 +111,7 @@ async function submit(
     <PageHeader
       eyebrow="Class enrollment"
       title="Join a class"
-      description="Ask your instructor for the class code, then submit it below."
+      description="Enter the class code provided by your instructor. Most classes let you join immediately; some may require approval."
     />
 
     <div class="mx-auto w-full max-w-2xl">
@@ -130,7 +138,7 @@ async function submit(
           class="mt-6"
           color="error"
           variant="soft"
-          title="Class request unsuccessful"
+          title="Unable to join class"
           :description="errorMessage"
         />
 
@@ -139,7 +147,7 @@ async function submit(
           class="mt-6"
           color="success"
           variant="soft"
-          title="Request submitted"
+          :title="joinedImmediately ? 'Class joined' : 'Request sent'"
           :description="successMessage"
         />
 
@@ -168,7 +176,7 @@ async function submit(
             class="mt-4"
             :loading="isSubmitting"
           >
-            Submit Join Request
+            Join Class
           </UButton>
         </UForm>
 
@@ -202,8 +210,18 @@ async function submit(
 
               <StatusPill
                 class="mt-3"
-                status="Pending approval"
+                :status="joinedImmediately ? 'Active' : 'Pending approval'"
               />
+
+              <UButton
+                v-if="joinedImmediately"
+                :to="`/student/classes/${matchedClass.id}`"
+                size="sm"
+                trailing-icon="i-lucide-arrow-right"
+                class="mt-4"
+              >
+                Open Class
+              </UButton>
             </div>
           </div>
         </div>

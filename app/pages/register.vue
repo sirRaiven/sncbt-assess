@@ -7,6 +7,10 @@ import {
   z,
 } from "zod";
 
+import {
+  toUserFacingError,
+} from "~/utils/user-facing-error";
+
 definePageMeta({
   layout: "auth",
 });
@@ -235,9 +239,10 @@ async function register(
     registrationCompleted.value = true;
   } catch (error) {
     errorMessage.value =
-      error instanceof Error
-        ? error.message
-        : "Unable to create the account.";
+      toUserFacingError(
+        error,
+        "We couldn't create your account right now. Please try again.",
+      );
   } finally {
     isSubmitting.value = false;
   }
@@ -404,7 +409,7 @@ async function register(
                 color="error"
                 variant="soft"
                 icon="i-lucide-circle-alert"
-                title="Registration unsuccessful"
+                title="Unable to create account"
                 :description="errorMessage"
               />
 

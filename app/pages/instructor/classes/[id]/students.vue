@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import type {
+  DropdownMenuItem,
+} from "@nuxt/ui";
+
+import type {
+  ClassroomEnrollmentSettings,
   ClassroomMember,
-  InstructorClassroom,
   MembershipStatus,
 } from "~/types/classroom";
 
@@ -16,26 +20,37 @@ useSeoMeta({
 const route = useRoute();
 const toast = useToast();
 
-const classroomId = computed(
-  () => String(route.params.id),
+const {
+  classroomId,
+  classroom,
+  refreshClass,
+} = useInstructorClassShell();
+
+const activeView = computed<"students" | "requests">(
+  () => route.query.view === "requests"
+    ? "requests"
+    : "students",
+);
+
+const membershipStatus = computed<MembershipStatus>(
+  () => activeView.value === "requests"
+    ? "pending"
+    : "active",
 );
 
 const {
-  getInstructorClass,
+  getEnrollmentSettings,
   listMembers,
   approveMember,
   rejectMember,
   removeMember,
 } = useClassrooms();
 
-const classroom =
-  ref<InstructorClassroom | null>(null);
+const enrollmentSettings =
+  ref<ClassroomEnrollmentSettings | null>(null);
 
 const members =
   ref<ClassroomMember[]>([]);
-
-const activeTab =
-  ref<MembershipStatus>("active");
 
 const isLoading = ref(true);
 const busyMembershipId =
@@ -44,31 +59,9 @@ const busyMembershipId =
 const errorMessage = ref("");
 const query = ref("");
 
-const tabs: Array<{
-  label: string;
-  value: MembershipStatus;
-}> = [
-  {
-    label: "Enrolled",
-    value: "active",
-  },
-  {
-    label: "Pending",
-    value: "pending",
-  },
-  {
-    label: "Rejected",
-    value: "rejected",
-  },
-  {
-    label: "Removed",
-    value: "removed",
-  },
-  {
-    label: "Left",
-    value: "left",
-  },
-];
+const removeModalOpen = ref(false);
+const memberToRemove =
+  ref<ClassroomMember | null>(null);
 
 const filteredMembers = computed(() => {
   const keyword =
@@ -94,35 +87,37 @@ const filteredMembers = computed(() => {
   );
 });
 
+const showRequests = computed(
+  () =>
+    Boolean(
+      enrollmentSettings.value?.requiresApproval,
+    )
+    || Boolean(
+      classroom.value?.memberCounts.pending,
+    ),
+);
+
 async function loadData(): Promise<void> {
+  if (!classroom.value) {
+    return;
+  }
+
   isLoading.value = true;
   errorMessage.value = "";
 
   const [
-    classResult,
+    settingsResult,
     memberResult,
   ] = await Promise.all([
-    getInstructorClass(
+    getEnrollmentSettings(
       classroomId.value,
     ),
 
     listMembers(
       classroomId.value,
-      activeTab.value,
+      membershipStatus.value,
     ),
   ]);
-
-  if (
-    classResult.error
-    || !classResult.data
-  ) {
-    errorMessage.value =
-      classResult.error
-      || "Unable to load the class.";
-
-    isLoading.value = false;
-    return;
-  }
 
   if (
     memberResult.error
@@ -130,17 +125,26 @@ async function loadData(): Promise<void> {
   ) {
     errorMessage.value =
       memberResult.error
-      || "Unable to load class memberships.";
+      || "We couldn't load the student list right now.";
 
     isLoading.value = false;
     return;
   }
 
-  classroom.value =
-    classResult.data.classroom;
-
   members.value =
     memberResult.data.members;
+
+  enrollmentSettings.value =
+    settingsResult.data
+    || {
+      joinEnabled:
+        classroom.value.join_enabled,
+      requiresApproval:
+        classroom.value.join_requires_approval
+        ?? false,
+      pendingCount:
+        classroom.value.memberCounts.pending,
+    };
 
   isLoading.value = false;
 }
@@ -184,39 +188,105 @@ async function runMemberAction(
     || !result.data
   ) {
     toast.add({
-      title:
-        "Membership action failed",
+      title: "Unable to update student",
       description:
         result.error
-        || "The action could not be completed.",
-      color:
-        "error",
+        || "The student record couldn't be updated right now.",
+      color: "error",
     });
 
-    busyMembershipId.value =
-      null;
-
+    busyMembershipId.value = null;
     return;
   }
 
   toast.add({
     title:
-      "Membership updated",
+      action === "approve"
+        ? "Student enrolled"
+        : action === "reject"
+          ? "Request declined"
+          : "Student removed",
     description:
       result.data.message,
     color:
-      "success",
+      action === "reject"
+      || action === "remove"
+        ? "warning"
+        : "success",
   });
 
+  await refreshClass();
   await loadData();
+  busyMembershipId.value = null;
+}
 
-  busyMembershipId.value =
-    null;
+function requestRemove(
+  member: ClassroomMember,
+): void {
+  memberToRemove.value = member;
+  removeModalOpen.value = true;
+}
+
+async function confirmRemove(): Promise<void> {
+  if (!memberToRemove.value) {
+    return;
+  }
+
+  const member = memberToRemove.value;
+  await runMemberAction(
+    member,
+    "remove",
+  );
+
+  removeModalOpen.value = false;
+  memberToRemove.value = null;
+}
+
+function studentMenuItems(
+  member: ClassroomMember,
+): DropdownMenuItem[][] {
+  return [
+    [
+      {
+        label: "Remove from class",
+        icon: "i-lucide-user-minus",
+        color: "error",
+        disabled:
+          busyMembershipId.value
+          === member.id,
+        onSelect: () => {
+          requestRemove(member);
+        },
+      },
+    ],
+  ];
+}
+
+function formatRequestedAt(
+  value: string,
+): string {
+  return new Intl.DateTimeFormat(
+    "en-PH",
+    {
+      dateStyle: "medium",
+      timeStyle: "short",
+    },
+  ).format(new Date(value));
 }
 
 watch(
-  activeTab,
-  loadData,
+  activeView,
+  () => {
+    query.value = "";
+    void loadData();
+  },
+);
+
+watch(
+  classroomId,
+  () => {
+    void loadData();
+  },
 );
 
 onMounted(
@@ -225,282 +295,305 @@ onMounted(
 </script>
 
 <template>
-  <div class="page-stack">
-    <PortalBackButton
-      :fallback-to="`/instructor/classes/${classroomId}`"
-    />
-    <PageHeader
-      :eyebrow="
-        classroom
-          ? `${classroom.subject_code} · ${classroom.section}`
-          : 'Class membership'
-      "
-      title="Class students"
-      description="Review enrolled students and respond to membership requests."
-    />
-
+  <div class="space-y-5">
     <UAlert
       v-if="errorMessage"
       color="error"
       variant="soft"
-      title="Memberships could not be loaded"
+      title="Students could not be loaded"
       :description="errorMessage"
     />
 
-    <section
-      v-if="classroom"
-      class="grid gap-4 sm:grid-cols-3"
+    <div
+      v-if="isLoading"
+      class="space-y-4"
+      aria-label="Loading students"
     >
-      <StatCard
-        label="Enrolled"
-        :value="
-          String(
-            classroom.memberCounts.active,
-          )
-        "
-        icon="i-lucide-users"
-        tone="primary"
-      />
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="space-y-2">
+          <USkeleton class="h-4 w-36 rounded" />
+          <USkeleton class="h-9 w-52 rounded-lg" />
+          <USkeleton class="h-5 w-64 rounded" />
+        </div>
+        <USkeleton class="h-10 w-full rounded-lg sm:w-80" />
+      </div>
 
-      <StatCard
-        label="Pending"
-        :value="
-          String(
-            classroom.memberCounts.pending,
-          )
-        "
-        icon="i-lucide-user-round-plus"
-        tone="warning"
-      />
+      <USkeleton class="h-11 w-64 rounded-lg" />
 
-      <StatCard
-        label="Left or removed"
-        :value="
-          String(
-            classroom.memberCounts.left
-            + classroom.memberCounts.removed,
-          )
-        "
-        icon="i-lucide-user-round-x"
-        tone="neutral"
-      />
-    </section>
+      <div class="overflow-hidden rounded-xl border border-default bg-default p-4">
+        <div class="space-y-2">
+          <USkeleton
+            v-for="number in 5"
+            :key="number"
+            class="h-16 rounded-lg"
+          />
+        </div>
+      </div>
+    </div>
 
-    <UCard>
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div class="flex flex-wrap gap-2">
-          <UButton
-            v-for="tab in tabs"
-            :key="tab.value"
-            :color="
-              activeTab === tab.value
-                ? 'primary'
-                : 'neutral'
-            "
-            :variant="
-              activeTab === tab.value
-                ? 'soft'
-                : 'ghost'
-            "
-            @click="
-              activeTab = tab.value
-            "
-          >
-            {{ tab.label }}
+    <template v-else-if="classroom">
+      <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-primary">
+            {{ classroom.subject_code }} · {{ classroom.section }}
+          </p>
+
+          <div class="mt-1 flex flex-wrap items-baseline gap-3">
+            <h1 class="text-3xl font-black tracking-tight text-highlighted">
+              Students
+            </h1>
+
+            <span class="text-2xl font-semibold text-muted">
+              {{ classroom.memberCounts.active }}
+            </span>
+          </div>
+
+          <div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+            <span>{{ classroom.name }}</span>
+            <span aria-hidden="true">·</span>
 
             <UBadge
-              v-if="classroom"
-              color="neutral"
+              :color="enrollmentSettings?.requiresApproval ? 'warning' : 'success'"
               variant="soft"
               size="sm"
             >
               {{
-                classroom.memberCounts[
-                  tab.value
-                ]
+                enrollmentSettings?.requiresApproval
+                  ? "Approval required"
+                  : "Automatic join"
               }}
             </UBadge>
-          </UButton>
+          </div>
         </div>
 
         <UInput
           v-model="query"
           icon="i-lucide-search"
-          placeholder="Search student"
-          class="w-full lg:w-72"
+          placeholder="Search students"
+          aria-label="Search students"
+          class="w-full sm:w-80"
         />
+      </section>
+
+      <div class="flex flex-wrap items-center gap-1 border-b border-default">
+        <UButton
+          :to="`/instructor/classes/${classroom.id}/students`"
+          :color="activeView === 'students' ? 'primary' : 'neutral'"
+          :variant="activeView === 'students' ? 'soft' : 'ghost'"
+          icon="i-lucide-users"
+          class="rounded-b-none"
+          :aria-current="activeView === 'students' ? 'page' : undefined"
+        >
+          Students
+          <UBadge
+            color="neutral"
+            variant="soft"
+            size="sm"
+          >
+            {{ classroom.memberCounts.active }}
+          </UBadge>
+        </UButton>
+
+        <UButton
+          v-if="showRequests"
+          :to="`/instructor/classes/${classroom.id}/students?view=requests`"
+          :color="activeView === 'requests' ? 'warning' : 'neutral'"
+          :variant="activeView === 'requests' ? 'soft' : 'ghost'"
+          icon="i-lucide-user-round-clock"
+          class="rounded-b-none"
+          :aria-current="activeView === 'requests' ? 'page' : undefined"
+        >
+          Requests
+          <UBadge
+            :color="classroom.memberCounts.pending ? 'warning' : 'neutral'"
+            variant="soft"
+            size="sm"
+          >
+            {{ classroom.memberCounts.pending }}
+          </UBadge>
+        </UButton>
       </div>
-    </UCard>
 
-    <USkeleton
-      v-if="isLoading"
-      class="h-80 rounded-xl"
-    />
+      <UAlert
+        v-if="activeView === 'requests' && !enrollmentSettings?.requiresApproval"
+        color="info"
+        variant="soft"
+        icon="i-lucide-info"
+        title="Automatic joining is currently enabled"
+        description="These are earlier requests that were already pending. New students with a valid class code now join immediately."
+      />
 
-    <EmptyPanel
-      v-else-if="
-        filteredMembers.length === 0
-      "
-      icon="i-lucide-users"
-      :title="
-        activeTab === 'pending'
-          ? 'No pending requests'
-          : 'No memberships found'
-      "
-      description="Membership records for the selected status will appear here."
-    />
+      <div class="overflow-hidden rounded-xl border border-default bg-default">
+        <div class="flex items-center justify-between gap-3 border-b border-default px-4 py-4 sm:px-5">
+          <div>
+            <h2 class="font-bold text-highlighted">
+              {{
+                activeView === "requests"
+                  ? "Enrollment requests"
+                  : "Class roster"
+              }}
+            </h2>
+            <p class="mt-0.5 text-xs text-muted">
+              {{
+                activeView === "requests"
+                  ? "Approve or decline students waiting to join this class."
+                  : "Students who currently have access to this class."
+              }}
+            </p>
+          </div>
 
-    <div
-      v-else
-      class="table-shell table-scroll"
-    >
-      <table class="app-table">
-        <thead>
-          <tr>
-            <th>Student</th>
-            <th>Student number</th>
-            <th>Requested</th>
-            <th>Status</th>
-            <th class="w-56">Action</th>
-          </tr>
-        </thead>
+          <span class="text-sm font-semibold text-muted">
+            {{ filteredMembers.length }}
+          </span>
+        </div>
 
-        <tbody>
-          <tr
+        <div
+          v-if="isLoading"
+          class="space-y-1 p-4"
+        >
+          <USkeleton
+            v-for="number in 4"
+            :key="number"
+            class="h-16 rounded-lg"
+          />
+        </div>
+
+        <EmptyPanel
+          v-else-if="filteredMembers.length === 0"
+          class="m-4"
+          :icon="activeView === 'requests' ? 'i-lucide-user-round-check' : 'i-lucide-users'"
+          :title="
+            activeView === 'requests'
+              ? 'No enrollment requests'
+              : query
+                ? 'No matching students'
+                : 'No students enrolled yet'
+          "
+          :description="
+            activeView === 'requests'
+              ? 'Students waiting for approval will appear here.'
+              : query
+                ? 'Try a different name or student number.'
+                : 'Share the class code so students can join.'
+          "
+        />
+
+        <div v-else>
+          <article
             v-for="member in filteredMembers"
             :key="member.id"
+            class="flex flex-col gap-3 border-b border-default px-4 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:px-5"
           >
-            <td>
-              <div class="flex items-center gap-3">
-                <UAvatar
-                  :text="
-                    member.student.name
-                      .split(' ')
-                      .map(
-                        (part) => part[0],
-                      )
-                      .slice(0, 2)
-                      .join('')
-                  "
-                  size="sm"
-                />
-
-                <div>
-                  <p class="font-semibold text-highlighted">
-                    {{ member.student.name }}
-                  </p>
-
-                  <p class="text-xs text-muted">
-                    {{ member.student.email }}
-                  </p>
-                </div>
-              </div>
-            </td>
-
-            <td class="font-mono text-xs">
-              {{
-                member.student.studentNumber
-                || "—"
-              }}
-            </td>
-
-            <td>
-              {{
-                new Date(
-                  member.requested_at,
-                ).toLocaleString()
-              }}
-            </td>
-
-            <td>
-              <StatusPill
-                :status="
-                  member.membership_status
+            <div class="flex min-w-0 items-center gap-3">
+              <UAvatar
+                :text="
+                  member.student.name
+                    .split(' ')
+                    .map((part) => part[0])
+                    .slice(0, 2)
+                    .join('')
                 "
+                size="md"
               />
-            </td>
 
-            <td>
-              <div class="flex flex-wrap gap-2">
-                <template
-                  v-if="
-                    member.membership_status
-                    === 'pending'
-                  "
+              <div class="min-w-0">
+                <p class="truncate font-semibold text-highlighted">
+                  {{ member.student.name }}
+                </p>
+
+                <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+                  <span class="font-mono">
+                    {{ member.student.studentNumber || "No student number" }}
+                  </span>
+                  <span v-if="member.student.email">
+                    {{ member.student.email }}
+                  </span>
+                </div>
+
+                <p
+                  v-if="activeView === 'requests'"
+                  class="mt-1 text-xs text-muted"
                 >
-                  <UButton
-                    color="success"
-                    variant="soft"
-                    size="sm"
-                    icon="i-lucide-user-check"
-                    :loading="
-                      busyMembershipId
-                      === member.id
-                    "
-                    @click="
-                      runMemberAction(
-                        member,
-                        'approve',
-                      )
-                    "
-                  >
-                    Approve
-                  </UButton>
-
-                  <UButton
-                    color="error"
-                    variant="ghost"
-                    size="sm"
-                    icon="i-lucide-user-x"
-                    :disabled="
-                      busyMembershipId
-                      === member.id
-                    "
-                    @click="
-                      runMemberAction(
-                        member,
-                        'reject',
-                      )
-                    "
-                  >
-                    Reject
-                  </UButton>
-                </template>
-
-                <UButton
-                  v-else-if="
-                    member.membership_status
-                    === 'active'
-                  "
-                  color="error"
-                  variant="soft"
-                  size="sm"
-                  icon="i-lucide-user-minus"
-                  :loading="
-                    busyMembershipId
-                    === member.id
-                  "
-                  @click="
-                    runMemberAction(
-                      member,
-                      'remove',
-                    )
-                  "
-                >
-                  Remove
-                </UButton>
-
-                <span
-                  v-else
-                  class="text-xs text-muted"
-                >
-                  No action available
-                </span>
+                  Requested {{ formatRequestedAt(member.requested_at) }}
+                </p>
               </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+            </div>
+
+            <div
+              v-if="activeView === 'requests'"
+              class="flex shrink-0 gap-2"
+            >
+              <UButton
+                color="success"
+                variant="soft"
+                size="sm"
+                icon="i-lucide-user-check"
+                :loading="busyMembershipId === member.id"
+                @click="runMemberAction(member, 'approve')"
+              >
+                Approve
+              </UButton>
+
+              <UButton
+                color="neutral"
+                variant="outline"
+                size="sm"
+                icon="i-lucide-user-x"
+                :disabled="busyMembershipId === member.id"
+                @click="runMemberAction(member, 'reject')"
+              >
+                Decline
+              </UButton>
+            </div>
+
+            <UDropdownMenu
+              v-else
+              :items="studentMenuItems(member)"
+              :content="{
+                align: 'end',
+              }"
+            >
+              <UButton
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-ellipsis-vertical"
+                aria-label="Student actions"
+                :disabled="busyMembershipId === member.id"
+              />
+            </UDropdownMenu>
+          </article>
+        </div>
+      </div>
+
+      <ConfirmationModal
+        v-model:open="removeModalOpen"
+        title="Remove student from class?"
+        :description="memberToRemove ? `${memberToRemove.student.name} will lose access to this class. Their existing assessment records are not deleted.` : ''"
+        confirm-label="Remove Student"
+        confirm-color="error"
+        icon="i-lucide-user-minus"
+        :loading="Boolean(memberToRemove && busyMembershipId === memberToRemove.id)"
+        @confirm="confirmRemove"
+      />
+    </template>
   </div>
 </template>
+
+<style scoped>
+.roster-view-enter-active,
+.roster-view-leave-active {
+  transition: opacity 140ms ease;
+}
+
+.roster-view-enter-from,
+.roster-view-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roster-view-enter-active,
+  .roster-view-leave-active {
+    transition: none;
+  }
+}
+</style>

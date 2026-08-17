@@ -332,7 +332,7 @@ onMounted(
       v-if="errorMessage"
       color="error"
       variant="soft"
-      title="Import preview error"
+      title="Unable to load import preview"
       :description="errorMessage"
     />
 

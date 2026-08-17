@@ -2110,7 +2110,7 @@ async function synchronizeAnswer(
           "Question time expired",
         description:
           selectedOptionIds.value.length > 0
-            ? "The server finalized the answer that was already saved before the question deadline."
+            ? "Your answer that was saved before the deadline has been finalized."
             : "No answer was saved before the question deadline. This question is recorded as unanswered due to timeout.",
         color:
           "warning",
@@ -2335,7 +2335,7 @@ async function submit(
           title:
             "Timer synchronized",
           description:
-            "The server confirmed that the class schedule is still open. The deadline has been synchronized and you can continue answering.",
+            "The class schedule is still open. The deadline has been synchronized and you can continue answering.",
           color:
             "info",
         });
@@ -2352,7 +2352,7 @@ async function submit(
         "Assessment could not be submitted",
       description:
         result.error
-        || "The server did not accept the submission.",
+        || "We couldn't submit your assessment right now. Please try again.",
       color:
         "error",
     });
@@ -3065,7 +3065,7 @@ onBeforeRouteLeave(
             "
             class="mt-2 text-xs font-semibold text-warning"
           >
-            Time expired. Contacting the server to finalize this question...
+            Time expired. Saving the question and preparing the next one...
           </p>
 
           <p
@@ -3075,7 +3075,7 @@ onBeforeRouteLeave(
             "
             class="mt-2 text-xs font-semibold text-warning"
           >
-            Time expired. The server did not respond; retrying automatically. Keep this page open.
+            Time expired. We couldn't confirm the question yet, so SNCBT Assess is retrying automatically. Keep this page open.
           </p>
 
           <p
@@ -3204,7 +3204,7 @@ onBeforeRouteLeave(
         submitModalOpen
       "
       title="Submit this assessment?"
-      description="Review your progress before final submission. Your answers cannot be changed after the server accepts the submission."
+      description="Review your progress before final submission. Your answers cannot be changed after the submission is confirmed."
       confirm-label="Submit Assessment"
       confirm-color="error"
       icon="i-lucide-send"

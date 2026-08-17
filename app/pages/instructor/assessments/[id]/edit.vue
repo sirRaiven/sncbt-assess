@@ -10,6 +10,10 @@ import type {
   QuestionOptionInput,
 } from "~/types/question";
 
+import {
+  toUserFacingError,
+} from "~/utils/user-facing-error";
+
 definePageMeta({
   layout: "instructor",
 });
@@ -162,7 +166,10 @@ function friendlyError(
     return "The selected question or assessment is no longer available. Refresh the page and try again.";
   }
 
-  return fallback;
+  return toUserFacingError(
+    message,
+    fallback,
+  );
 }
 
 const editor = reactive<{

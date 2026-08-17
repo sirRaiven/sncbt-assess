@@ -1,8 +1,4 @@
 import type {
-  FunctionsHttpError,
-} from "@supabase/supabase-js";
-
-import type {
   AttemptSelectionPolicyResponse,
   DeliveryQuestionPayload,
   InstructorDeliveryListItem,
@@ -13,10 +9,9 @@ import type {
   SubmitDeliveryAttemptResult,
 } from "~/types/assessment-delivery";
 
-interface FunctionErrorBody {
-  code?: string;
-  message?: string;
-}
+import {
+  parseUserFacingFunctionError,
+} from "~/utils/user-facing-error";
 
 interface FunctionResult<T> {
   data: T | null;
@@ -38,48 +33,10 @@ export function useAssessmentDelivery() {
     message: string;
     code: string | null;
   }> {
-    const fallback =
-      error instanceof Error
-        ? error.message
-        : "The assessment delivery request could not be completed.";
-
-    const functionError =
-      error as FunctionsHttpError;
-
-    if (
-      !functionError?.context
-      || typeof functionError.context.json
-        !== "function"
-    ) {
-      return {
-        message:
-          fallback,
-        code:
-          null,
-      };
-    }
-
-    try {
-      const body =
-        await functionError.context
-          .json() as FunctionErrorBody;
-
-      return {
-        message:
-          body.message
-          || fallback,
-        code:
-          body.code
-          || null,
-      };
-    } catch {
-      return {
-        message:
-          fallback,
-        code:
-          null,
-      };
-    }
+    return await parseUserFacingFunctionError(
+      error,
+      "We couldn't complete the assessment request. Check your connection and try again.",
+    );
   }
 
   async function invoke<T>(
@@ -172,7 +129,7 @@ export function useAssessmentDelivery() {
           data:
             null,
           error:
-            "The assessment server did not respond in time. Your selection is still kept on this device and can be retried.",
+            "We couldn't confirm that action in time. Your selection is still kept on this device and can be retried.",
           code:
             "REQUEST_TIMEOUT",
         };

@@ -1,16 +1,11 @@
 import type {
-  FunctionsHttpError,
-} from "@supabase/supabase-js";
-
-import type {
   AssessmentScheduleInput,
   InstructorAssessmentScheduleOverview,
 } from "~/types/assessment-schedule";
 
-interface FunctionErrorBody {
-  code?: string;
-  message?: string;
-}
+import {
+  parseUserFacingFunctionError,
+} from "~/utils/user-facing-error";
 
 interface FunctionResult<T> {
   data: T | null;
@@ -32,48 +27,10 @@ export function useAssessmentSchedules() {
     message: string;
     code: string | null;
   }> {
-    const fallback =
-      error instanceof Error
-        ? error.message
-        : "The assessment schedule request could not be completed.";
-
-    const functionError =
-      error as FunctionsHttpError;
-
-    if (
-      !functionError?.context
-      || typeof functionError.context.json
-        !== "function"
-    ) {
-      return {
-        message:
-          fallback,
-        code:
-          null,
-      };
-    }
-
-    try {
-      const body =
-        await functionError.context
-          .json() as FunctionErrorBody;
-
-      return {
-        message:
-          body.message
-          || fallback,
-        code:
-          body.code
-          || null,
-      };
-    } catch {
-      return {
-        message:
-          fallback,
-        code:
-          null,
-      };
-    }
+    return await parseUserFacingFunctionError(
+      error,
+      "We couldn't update the assessment schedule right now. Please try again.",
+    );
   }
 
   async function invoke<T>(
