@@ -308,13 +308,15 @@ async function submit(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      fallback-to="/instructor/assessments"
-    />
     <PageHeader
-      eyebrow="New reusable assessment"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments', to: '/instructor/assessments' },
+        { label: 'Create' },
+      ]"
+      eyebrow="New assessment"
       title="Create an assessment"
-      description="Create a reusable assessment in your library. Add questions, publish it, then schedule automatic class access."
+      description="Set the assessment details first. You can add questions, configure delivery, and preview it after creation."
     />
 
     <UAlert
@@ -642,6 +644,7 @@ async function submit(
 
                 <USwitch
                   v-model="state.randomizeQuestions"
+                  aria-label="Randomize questions"
                 />
               </div>
 
@@ -657,6 +660,7 @@ async function submit(
 
                 <USwitch
                   v-model="state.randomizeOptions"
+                  aria-label="Randomize answer choices"
                 />
               </div>
 
@@ -672,6 +676,7 @@ async function submit(
 
                 <USwitch
                   v-model="state.allowBacktracking"
+                  aria-label="Allow backtracking"
                 />
               </div>
 
@@ -681,12 +686,13 @@ async function submit(
                     Leaderboard available
                   </p>
                   <p class="mt-1 text-sm text-muted">
-                    A host may enable ranking in a future session.
+                    Allow class ranking when it is enabled for a scheduled assessment.
                   </p>
                 </div>
 
                 <USwitch
                   v-model="state.leaderboardEnabled"
+                  aria-label="Leaderboard available"
                 />
               </div>
             </div>

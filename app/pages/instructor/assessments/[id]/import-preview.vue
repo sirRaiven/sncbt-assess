@@ -308,11 +308,15 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      :fallback-to="`/instructor/assessments/${assessmentId}/import`"
-    />
     <PageHeader
-      eyebrow="Excel validation results"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments', to: '/instructor/assessments' },
+        { label: 'Questions', to: `/instructor/assessments/${assessmentId}/edit` },
+        { label: 'Import', to: `/instructor/assessments/${assessmentId}/import` },
+        { label: 'Review' },
+      ]"
+      eyebrow="Import review"
       title="Review imported questions"
       description="Check every detected row. Invalid and excluded rows will not be inserted into the assessment."
     >
@@ -327,6 +331,11 @@ onMounted(
         </UButton>
       </template>
     </PageHeader>
+
+    <AssessmentWorkspaceNavigation
+      :assessment-id="assessmentId"
+      active="questions"
+    />
 
     <UAlert
       v-if="errorMessage"
@@ -562,7 +571,7 @@ onMounted(
             </p>
 
             <p class="mt-1 text-sm text-muted">
-              The server will reload the staged rows and import only valid, non-excluded questions.
+              SNCBT Assess will import only the valid questions you have kept in this review.
             </p>
           </div>
 

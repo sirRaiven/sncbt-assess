@@ -1403,7 +1403,7 @@ function showDeadlineWarning(
     title:
       `${label} remaining`,
     description:
-      "This is the shared class closing deadline. The server will submit any active attempt when the scheduled closing time is reached.",
+      "This is the class closing deadline. Any active attempt is submitted when the scheduled closing time is reached.",
     color:
       threshold === 60
         ? "error"
@@ -2836,7 +2836,7 @@ onBeforeRouteLeave(
             {{
               focusModeExited
                 ? "Focus Mode exited"
-                : "Integrity monitoring"
+                : "Activity monitoring"
             }}
           </UBadge>
 
@@ -2885,7 +2885,7 @@ onBeforeRouteLeave(
           </h1>
 
           <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">
-            This assessment uses integrity monitoring. Fullscreen Focus Mode helps keep the assessment active and records when fullscreen or the assessment tab is left. Integrity signals are shown to your instructor but do not automatically change your score.
+            This assessment uses activity monitoring. Focus Mode helps keep the assessment active and records when you leave fullscreen or switch away from the assessment. These records do not automatically change your score.
           </p>
 
           <UAlert
@@ -3026,7 +3026,7 @@ onBeforeRouteLeave(
                 Answer time
               </p>
               <p class="text-xs text-muted">
-                This question has its own timer. At zero, the server finalizes it and automatically moves you forward.
+                This question has its own timer. When time runs out, the question closes and you move to the next question.
               </p>
             </div>
 
@@ -3055,7 +3055,7 @@ onBeforeRouteLeave(
             v-if="questionPayload.finalized"
             class="mt-2 text-xs font-semibold text-muted"
           >
-            This question is finalized. You can review it and move to another question.
+            This question is closed. You can review it and move to another question.
           </p>
 
           <p

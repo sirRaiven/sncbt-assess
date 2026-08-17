@@ -75,7 +75,7 @@ function automaticSubmissionDescription(
     return "This historical attempt was submitted by the previous whole-assessment timer.";
   }
 
-  return "The assessment was submitted automatically by a server-enforced deadline.";
+  return "The assessment was submitted automatically when the scheduled deadline was reached.";
 }
 
 function formatDate(
@@ -186,12 +186,14 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      fallback-to="/student/assessments"
-      :use-history="false"
-    />
     <PageHeader
-      eyebrow="Assessment result"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/student/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments', to: '/student/assessments' },
+        { label: delivery?.title || 'Assessment' },
+        { label: 'Submitted' },
+      ]"
+      eyebrow="Submission complete"
       :title="
         delivery?.title
         || 'Assessment Submitted'

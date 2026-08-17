@@ -1181,6 +1181,10 @@ onMounted(
 
     <PageHeader
       class="no-print"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Reports' },
+      ]"
       eyebrow="Assessment reporting"
       title="Reports"
       description="Review class performance, assessment results, student scores, and question analysis from completed classroom assessments."

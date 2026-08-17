@@ -174,6 +174,10 @@ onMounted(loadDeliveries);
 <template>
   <div class="page-stack">
     <PageHeader
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Live Sessions' },
+      ]"
       eyebrow="Assessment monitoring"
       title="Live Sessions"
       description="View scheduled classroom assessments and open a session to follow student progress."

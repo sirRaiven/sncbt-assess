@@ -220,11 +220,14 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      :fallback-to="`/instructor/assessments/${assessmentId}/edit`"
-    />
     <PageHeader
-      eyebrow="Student-view preview"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments', to: '/instructor/assessments' },
+        { label: assessment?.title || 'Assessment', to: `/instructor/assessments/${assessmentId}/edit` },
+        { label: 'Preview' },
+      ]"
+      eyebrow="Student preview"
       :title="
         assessment?.title
         || 'Assessment'
@@ -243,25 +246,13 @@ onMounted(
           Start Live
         </UButton>
 
-        <UButton
-          :to="`/instructor/assessments/${assessmentId}/edit`"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-pencil"
-        >
-          Question Builder
-        </UButton>
-
-        <UButton
-          :to="`/instructor/assessments/${assessmentId}/settings`"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-settings-2"
-        >
-          Settings
-        </UButton>
       </template>
     </PageHeader>
+
+    <AssessmentWorkspaceNavigation
+      :assessment-id="assessmentId"
+      active="preview"
+    />
 
     <UAlert
       v-if="errorMessage"

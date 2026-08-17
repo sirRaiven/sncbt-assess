@@ -140,6 +140,10 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
+      :breadcrumbs="[
+        { label: 'Overview', to: '/student/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'My Results' },
+      ]"
       eyebrow="Academic performance"
       title="My Results"
       description="Review your submitted classroom assessments and any scores your instructor has released."

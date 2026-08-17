@@ -1100,11 +1100,14 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      fallback-to="/instructor/assessments"
-    />
     <PageHeader
-      eyebrow="Question Builder"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments', to: '/instructor/assessments' },
+        { label: assessment?.title || 'Assessment', to: `/instructor/assessments/${assessmentId}/edit` },
+        { label: 'Questions' },
+      ]"
+      eyebrow="Question builder"
       :title="
         assessment?.title
         || 'Assessment questions'
@@ -1123,24 +1126,6 @@ onMounted(
         </UButton>
 
         <UButton
-          :to="`/instructor/assessments/${assessmentId}/settings`"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-settings-2"
-        >
-          Settings
-        </UButton>
-
-        <UButton
-          :to="`/instructor/assessments/${assessmentId}/preview`"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-eye"
-        >
-          Preview as Student
-        </UButton>
-
-        <UButton
           v-if="isDraft"
           color="success"
           icon="i-lucide-send"
@@ -1154,6 +1139,11 @@ onMounted(
         </UButton>
       </template>
     </PageHeader>
+
+    <AssessmentWorkspaceNavigation
+      :assessment-id="assessmentId"
+      active="questions"
+    />
 
     <div
       v-if="
@@ -1645,7 +1635,7 @@ onMounted(
 
             <UFormField
               label="Answer time (seconds)"
-              help="This timer applies only to this question. At zero, the response is finalized and the student automatically proceeds to the next question."
+              help="This timer applies only to this question. When time runs out, the question closes and the student moves to the next question."
             >
               <UInput
                 v-model.number="editor.timeLimitSeconds"

@@ -119,7 +119,7 @@ function automaticSubmissionDescription(
     return "This historical attempt was submitted by the previous whole-assessment timer.";
   }
 
-  return "The assessment was submitted automatically by a server-enforced deadline.";
+  return "The assessment was submitted automatically when the scheduled deadline was reached.";
 }
 
 function scorePolicyLabel(
@@ -141,7 +141,7 @@ function scorePolicyLabel(
     return "Average score";
   }
 
-  return "Server-managed";
+  return "Assessment policy";
 }
 
 const canShowScore =
@@ -396,7 +396,7 @@ async function loadReview():
 
     reviewError.value =
       result.error
-      || "Detailed answer review is not available from the server yet.";
+      || "Detailed answer review is not available yet.";
 
     isReviewLoading.value =
       false;
@@ -462,11 +462,12 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      fallback-to="/student/results"
-    />
-
     <PageHeader
+      :breadcrumbs="[
+        { label: 'Overview', to: '/student/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'My Results', to: '/student/results' },
+        { label: delivery?.title || 'Assessment result' },
+      ]"
       eyebrow="Assessment result"
       :title="
         delivery?.title
@@ -605,7 +606,7 @@ onMounted(
               </h2>
 
               <p class="mt-1 text-sm text-muted">
-                Server-recorded information for this assessment attempt.
+                Recorded information for this assessment attempt.
               </p>
             </div>
 
@@ -766,14 +767,14 @@ onMounted(
           color="warning"
           variant="soft"
           title="Detailed review is not available yet"
-          description="The score is available, but the secure question-review response has not been provided by the assessment server. No correct-answer data is reconstructed in the browser."
+          description="Your score is available, but question-by-question answer review is not available for this attempt."
         />
 
         <EmptyPanel
           v-else-if="review && review.questions.length === 0"
           icon="i-lucide-list-checks"
           title="No review questions were returned"
-          description="The server allowed answer review but did not return any question records for this attempt."
+          description="Answer review is enabled, but no question details are available for this attempt."
         />
 
         <div

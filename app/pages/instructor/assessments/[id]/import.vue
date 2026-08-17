@@ -234,16 +234,25 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      :fallback-to="`/instructor/assessments/${assessmentId}/edit`"
-    />
     <PageHeader
-      eyebrow="Excel question import"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments', to: '/instructor/assessments' },
+        { label: assessment?.title || 'Assessment', to: `/instructor/assessments/${assessmentId}/edit` },
+        { label: 'Questions', to: `/instructor/assessments/${assessmentId}/edit` },
+        { label: 'Import' },
+      ]"
+      eyebrow="Import questions"
       :title="
         assessment?.title
         || 'Import questions'
       "
       description="Use the supported template to validate and append questions to this draft assessment."
+    />
+
+    <AssessmentWorkspaceNavigation
+      :assessment-id="assessmentId"
+      active="questions"
     />
 
     <UAlert
@@ -286,6 +295,7 @@ onMounted(
           :disabled="
             assessment.status !== 'draft'
           "
+          aria-label="Choose an Excel workbook to import questions"
           @click="fileInput?.click()"
           @dragenter.prevent="isDragging = true"
           @dragover.prevent="isDragging = true"
@@ -429,8 +439,8 @@ onMounted(
         <UAlert
           color="info"
           variant="soft"
-          title="Server-side validation"
-          description="The uploaded workbook is parsed and validated by the authenticated Edge Function. The browser preview is not trusted during the final import."
+          title="Secure workbook validation"
+          description="SNCBT Assess checks the workbook before import and only accepts rows that match the supported assessment template."
         />
       </div>
     </div>

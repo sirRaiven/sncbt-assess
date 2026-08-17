@@ -439,18 +439,22 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="Reusable assessment library"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments' },
+      ]"
+      eyebrow="Assessment library"
       title="Assessments"
-      description="Create reusable assessments, publish them, and schedule automatic access for one or more classes."
+      description="Create, organize, publish, and schedule assessments for your classes."
     >
       <template #actions>
         <UButton
-          to="/instructor/archive"
+          to="/instructor/archive?section=assessments"
           color="neutral"
           variant="outline"
           icon="i-lucide-archive"
         >
-          Open Archive
+          Archive
         </UButton>
 
         <UButton
@@ -506,6 +510,7 @@ onMounted(
           v-model="query"
           icon="i-lucide-search"
           placeholder="Search assessment, subject, or class"
+          aria-label="Search assessments"
           class="w-full"
         />
 
@@ -516,6 +521,7 @@ onMounted(
             'Draft',
             'Published',
           ]"
+          aria-label="Filter assessments by status"
           class="w-full"
         />
 

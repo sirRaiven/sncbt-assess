@@ -565,6 +565,10 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Archive' },
+      ]"
       eyebrow="Records management"
       title="Archive"
       description="Review archived classes, archived assessments, and closed live sessions in one place."
@@ -796,7 +800,7 @@ onMounted(
 
         <div
           v-else
-          class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
+          class="grid gap-4 xl:grid-cols-2"
         >
           <UCard
             v-for="classroom in filteredClasses"

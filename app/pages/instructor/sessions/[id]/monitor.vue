@@ -356,10 +356,12 @@ onBeforeUnmount(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      fallback-to="/instructor/sessions"
-    />
     <PageHeader
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Live Sessions', to: '/instructor/sessions' },
+        { label: monitor?.delivery.title || 'Session' },
+      ]"
       eyebrow="Live session"
       :title="
         monitor?.delivery.title

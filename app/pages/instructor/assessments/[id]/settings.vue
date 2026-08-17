@@ -343,40 +343,18 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      :fallback-to="`/instructor/assessments/${assessmentId}/edit`"
-    />
     <PageHeader
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments', to: '/instructor/assessments' },
+        { label: assessment?.title || 'Assessment', to: `/instructor/assessments/${assessmentId}/edit` },
+        { label: 'Settings' },
+      ]"
       eyebrow="Assessment settings"
       :title="assessment?.title || 'Assessment'"
       description="Manage reusable assessment content, behavior, publication, and class availability."
     >
       <template #actions>
-        <UButton
-          :to="`/instructor/assessments/${assessmentId}/edit`"
-          icon="i-lucide-list-plus"
-        >
-          Question Builder
-        </UButton>
-
-        <UButton
-          :to="`/instructor/assessments/${assessmentId}/assign`"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-users-round"
-        >
-          Assign Classes
-        </UButton>
-
-        <UButton
-          :to="`/instructor/assessments/${assessmentId}/preview`"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-eye"
-        >
-          Preview
-        </UButton>
-
         <UButton
           color="neutral"
           variant="outline"
@@ -388,6 +366,11 @@ onMounted(
         </UButton>
       </template>
     </PageHeader>
+
+    <AssessmentWorkspaceNavigation
+      :assessment-id="assessmentId"
+      active="settings"
+    />
 
     <UAlert
       v-if="errorMessage"
@@ -686,8 +669,8 @@ onMounted(
                 color="info"
                 variant="soft"
                 icon="i-lucide-timer"
-                title="Timing is set in two places"
-                description="Use the Question Builder to set each question's answer time. Use Assign Classes to set the opening and closing deadline for the whole assessment."
+                title="Assessment timing"
+                description="Set each question's answer time in Questions, then set the class opening and closing schedule in Schedule."
               />
 
               <USeparator />
@@ -700,6 +683,7 @@ onMounted(
 
                   <USwitch
                     v-model="state.randomizeQuestions"
+                    aria-label="Randomize questions"
                   />
                 </div>
 
@@ -710,6 +694,7 @@ onMounted(
 
                   <USwitch
                     v-model="state.randomizeOptions"
+                    aria-label="Randomize choices"
                   />
                 </div>
 
@@ -720,6 +705,7 @@ onMounted(
 
                   <USwitch
                     v-model="state.allowBacktracking"
+                    aria-label="Allow backtracking"
                   />
                 </div>
 
@@ -730,6 +716,7 @@ onMounted(
 
                   <USwitch
                     v-model="state.leaderboardEnabled"
+                    aria-label="Leaderboard available"
                   />
                 </div>
               </div>

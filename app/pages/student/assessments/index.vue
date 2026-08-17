@@ -31,6 +31,9 @@ const isLoading =
 const errorMessage =
   ref("");
 
+const query =
+  ref("");
+
 const activeFilter =
   ref<
     | "all"
@@ -96,61 +99,59 @@ function hasCompletedAttempt(
 const filteredDeliveries =
   computed(
     () => {
-      if (
-        activeFilter.value
-        === "all"
-      ) {
-        return deliveries.value;
-      }
-
-      if (
-        activeFilter.value
-        === "completed"
-      ) {
-        return deliveries.value
-          .filter(
-            (delivery) =>
-              delivery.attempt
-              && completedStatuses
-                .includes(
-                  delivery.attempt.status,
-                ),
-          );
-      }
+      const keyword =
+        query.value
+          .trim()
+          .toLowerCase();
 
       return deliveries.value
-        .filter(
-          (delivery) => {
-            const completed =
-              hasCompletedAttempt(
-                delivery,
-              );
+        .filter((delivery) => {
+          if (!keyword) {
+            return true;
+          }
 
-            if (
-              activeFilter.value
-              === "open"
-            ) {
-              return (
-                delivery.status
-                  === "open"
-                && (
-                  !completed
-                  || delivery.canStart
-                  || delivery.canResume
-                )
-              );
-            }
+          return [
+            delivery.title,
+            delivery.subjectCode,
+            delivery.classroom.name,
+            delivery.classroom.section,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(keyword);
+        })
+        .filter((delivery) => {
+          if (activeFilter.value === "all") {
+            return true;
+          }
 
-            if (completed) {
-              return false;
-            }
-
-            return (
-              delivery.status
-              === activeFilter.value
+          if (activeFilter.value === "completed") {
+            return Boolean(
+              delivery.attempt
+              && completedStatuses.includes(delivery.attempt.status),
             );
-          },
-        );
+          }
+
+          const completed =
+            hasCompletedAttempt(delivery);
+
+          if (activeFilter.value === "open") {
+            return (
+              delivery.status === "open"
+              && (
+                !completed
+                || delivery.canStart
+                || delivery.canResume
+              )
+            );
+          }
+
+          if (completed) {
+            return false;
+          }
+
+          return delivery.status === activeFilter.value;
+        });
     },
   );
 
@@ -378,9 +379,13 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="Classroom assessments"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/student/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments' },
+      ]"
+      eyebrow="Your assessments"
       title="Assessments"
-      description="Assessments assigned to your classes open automatically according to the schedule set by your instructor."
+      description="Find assessments from your classes, check schedules, and continue any attempt already in progress."
     >
       <template #actions>
         <UButton
@@ -426,7 +431,7 @@ onMounted(
       />
 
       <StatCard
-        label="Closed without attempt"
+        label="Closed"
         :value="String(counts.closed)"
         icon="i-lucide-lock"
         tone="neutral"
@@ -434,16 +439,31 @@ onMounted(
     </section>
 
     <UCard>
-      <div class="flex flex-wrap gap-2">
-        <UButton
-          v-for="item in filterItems"
-          :key="item.value"
-          color="neutral"
-          :variant="activeFilter === item.value ? 'soft' : 'ghost'"
-          @click="activeFilter = item.value"
+      <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <UInput
+          v-model="query"
+          icon="i-lucide-search"
+          placeholder="Search assessment or class"
+          aria-label="Search your assessments"
+          class="w-full"
+        />
+
+        <div
+          role="group"
+          aria-label="Filter assessments"
+          class="flex flex-wrap gap-1"
         >
-          {{ item.label }}
-        </UButton>
+          <UButton
+            v-for="item in filterItems"
+            :key="item.value"
+            color="neutral"
+            :variant="activeFilter === item.value ? 'soft' : 'ghost'"
+            :aria-pressed="activeFilter === item.value"
+            @click="activeFilter = item.value"
+          >
+            {{ item.label }}
+          </UButton>
+        </div>
       </div>
     </UCard>
 
@@ -461,8 +481,8 @@ onMounted(
     <EmptyPanel
       v-else-if="filteredDeliveries.length === 0"
       icon="i-lucide-clipboard-list"
-      title="No assessments in this view"
-      description="Assigned classroom assessments will appear here when your instructor publishes and schedules them."
+      title="No assessments found"
+      :description="query ? 'Try a different search or filter.' : 'Assigned assessments will appear here when your instructor schedules them.'"
     />
 
     <div
@@ -626,7 +646,7 @@ onMounted(
             color="success"
             variant="soft"
             title="Another attempt is available"
-            description="You have already submitted an attempt, but the server currently allows you to start another one."
+            description="You have already submitted an attempt, and another attempt is currently available."
           />
 
           <div

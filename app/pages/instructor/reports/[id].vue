@@ -717,6 +717,11 @@ onMounted(
 
     <PageHeader
       class="no-print"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Reports', to: '/instructor/reports' },
+        { label: report?.assessment.title || 'Assessment report' },
+      ]"
       eyebrow="Assessment report"
       :title="
         report?.assessment.title

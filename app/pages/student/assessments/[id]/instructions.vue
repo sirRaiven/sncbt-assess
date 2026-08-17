@@ -120,7 +120,7 @@ function scorePolicyLabel(
     return "Average score";
   }
 
-  return "Server-managed";
+  return "Assessment policy";
 }
 
 const integrityStartNotice =
@@ -131,7 +131,7 @@ const integrityStartNotice =
         ? integrityPolicy.value
             .focusModeEnabled
           ? " Focus monitoring is active. If your browser supports fullscreen, you will enter Focus Mode before the first question timer starts."
-          : " Assessment integrity monitoring is active during this attempt."
+          : " Assessment activity monitoring is active during this attempt."
         : "",
   );
 
@@ -381,11 +381,13 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      fallback-to="/student/assessments"
-    />
     <PageHeader
-      eyebrow="Assessment instructions"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/student/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments', to: '/student/assessments' },
+        { label: delivery?.title || 'Assessment' },
+      ]"
+      eyebrow="Before you begin"
       :title="
         delivery?.title
         || 'Assessment'
@@ -502,7 +504,7 @@ onMounted(
           variant="soft"
           icon="i-lucide-hourglass"
           title="Question timeout rule"
-          description="If a question's answer time reaches zero, the server finalizes that question. If no answer was saved before timeout, it is recorded as unanswered due to timeout and the assessment automatically proceeds to the next question. The next question receives its own configured time unless the class closing deadline is reached first."
+          description="If a question's answer time reaches zero, that question closes and the assessment moves to the next one. An unsaved answer is recorded as timed out. Each new question receives its own configured time until the class deadline is reached."
         />
 
         <UAlert
@@ -511,7 +513,7 @@ onMounted(
           color="info"
           variant="soft"
           icon="i-lucide-shield-check"
-          title="Assessment integrity monitoring is active"
+          title="Assessment activity monitoring is active"
           :description="
             integrityPolicy.focusModeEnabled
               ? 'SNCBT Assess records focus-related signals while this attempt is active, including leaving the assessment tab, exiting fullscreen Focus Mode, or attempting to copy, paste, cut, or open the context menu in the question area. These signals are visible to your instructor but do not automatically determine misconduct or change your score.'
@@ -570,7 +572,7 @@ onMounted(
             />
 
             <p class="text-sm text-muted">
-              The server controls every question timer and the class closing deadline, saves your progress, and prevents answers after submission.
+              SNCBT Assess keeps track of each question timer, the class deadline, and your saved progress. Answers cannot be changed after submission.
             </p>
           </div>
 

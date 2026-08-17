@@ -562,16 +562,24 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      fallback-to="/instructor/assessments"
-    />
     <PageHeader
-      eyebrow="Classroom delivery"
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments', to: '/instructor/assessments' },
+        { label: overview?.assessment.title || 'Assessment', to: `/instructor/assessments/${assessmentId}/edit` },
+        { label: 'Schedule' },
+      ]"
+      eyebrow="Class schedule"
       :title="
         overview?.assessment.title
         || 'Assign Assessment'
       "
-      description="Select classes and configure when students can begin, the final submission deadline, and whether ranking is available."
+      description="Choose the classes that will receive this assessment and set when access opens and closes."
+    />
+
+    <AssessmentWorkspaceNavigation
+      :assessment-id="assessmentId"
+      active="schedule"
     />
 
     <UAlert
@@ -641,16 +649,16 @@ onMounted(
         color="info"
         variant="soft"
         icon="i-lucide-clock-3"
-        title="Automatic student access"
-        description="No session code or instructor Start button is required. The opening time allows students to begin, while the closing time is the final whole-assessment deadline."
+        title="Scheduled access"
+        description="Students can begin when the schedule opens. The closing time is the final deadline for the assessment."
       />
 
       <UAlert
         color="neutral"
         variant="soft"
         icon="i-lucide-list-timer"
-        title="Question timers stay independent"
-        description="The answering time configured on each question remains unchanged. If a student does not answer before a question timer expires, that question is finalized as timed out and the student moves to the next question."
+        title="Question timing"
+        description="Each question keeps the answering time configured in the Question Builder. When time expires, the student moves to the next question."
       />
 
       <UCard>
@@ -755,6 +763,7 @@ onMounted(
                   <USwitch
                     v-model="row.showLeaderboard"
                     label="Show leaderboard"
+                    aria-label="Show leaderboard for this class"
                   />
                 </div>
               </div>
@@ -805,7 +814,7 @@ onMounted(
         saveConfirmationOpen
       "
       title="Save classroom assessment schedules?"
-      description="Students can start independently after the opening time. The closing time is the final assessment deadline, and every question keeps its own server-controlled answer timer."
+      description="Students can start when access opens. The closing time is the final assessment deadline, and each question keeps its configured answer time."
       confirm-label="Save Schedules"
       icon="i-lucide-calendar-check"
       :loading="isSaving"
