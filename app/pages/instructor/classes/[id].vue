@@ -128,7 +128,7 @@ onMounted(() => {
     </div>
 
     <template v-else-if="classroom">
-      <section class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-brand-900 via-brand-700 to-indigo-700 p-6 text-white shadow-xl shadow-primary/15 ring-1 ring-white/10 sm:p-8 dark:shadow-black/25">
+      <section class="relative overflow-hidden rounded-xl bg-gradient-to-r from-brand-900 via-brand-700 to-indigo-700 p-6 text-white shadow-xl shadow-primary/15 ring-1 ring-white/10 sm:p-8 dark:shadow-black/25">
         <div class="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-white/10 blur-3xl" />
         <div class="pointer-events-none absolute -bottom-24 left-1/3 size-64 rounded-full bg-cyan-300/10 blur-3xl" />
 

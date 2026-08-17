@@ -14,7 +14,7 @@ const pendingCount = computed(
 <template>
   <nav
     aria-label="Class navigation"
-    class="flex flex-wrap items-center gap-1 rounded-2xl border border-primary/10 bg-gradient-to-r from-primary/10 via-primary/5 to-default/80 p-1.5 shadow-sm shadow-primary/5 backdrop-blur-sm dark:border-primary/15 dark:from-primary/15 dark:via-primary/5 dark:to-default/70"
+    class="flex flex-wrap items-center gap-1 rounded-xl border border-primary/10 bg-gradient-to-r from-primary/10 via-primary/5 to-default/80 p-1.5 shadow-sm shadow-primary/5 backdrop-blur-sm dark:border-primary/15 dark:from-primary/15 dark:via-primary/5 dark:to-default/70"
   >
     <UButton
       :to="`/instructor/classes/${classroomId}`"
