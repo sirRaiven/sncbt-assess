@@ -10,7 +10,7 @@ definePageMeta({
 
 useSeoMeta({
   title:
-    "Assessment Monitor",
+    "Live Session",
 });
 
 const route =
@@ -249,65 +249,6 @@ function formatDate(
     );
 }
 
-const serverClockOffsetMs = computed(() => {
-  const serverNow = monitor.value?.serverNow;
-
-  if (!serverNow) {
-    return 0;
-  }
-
-  const parsed = Date.parse(serverNow);
-
-  return Number.isFinite(parsed)
-    ? parsed - Date.now()
-    : 0;
-});
-
-function currentServerTimeMs(): number {
-  return Date.now() + serverClockOffsetMs.value;
-}
-
-function formatRemaining(
-  expiresAt: string | null,
-): string {
-  if (!expiresAt) {
-    return "—";
-  }
-
-  const seconds =
-    Math.max(
-      0,
-      Math.ceil(
-        (
-          new Date(expiresAt)
-            .getTime()
-          - currentServerTimeMs()
-        ) / 1000,
-      ),
-    );
-
-  const hours =
-    Math.floor(
-      seconds / 3600,
-    );
-
-  const minutes =
-    Math.floor(
-      (
-        seconds % 3600
-      ) / 60,
-    );
-
-  const remainingSeconds =
-    seconds % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-
-  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
-}
-
 async function loadMonitor(
   silent = false,
 ): Promise<void> {
@@ -330,7 +271,7 @@ async function loadMonitor(
     if (!silent) {
       errorMessage.value =
         result.error
-        || "Unable to load the assessment monitor.";
+        || "Unable to load this live session.";
     }
 
     isLoading.value = false;
@@ -368,7 +309,7 @@ async function loadMonitor(
           ? "Assessment activity needs review"
           : "New assessment activity",
       description:
-        `${newSignalCount} new assessment ${newSignalCount === 1 ? "event was" : "events were"} recorded. Open Activity Review to see what happened.`,
+        `${newSignalCount} new ${newSignalCount === 1 ? "activity item needs" : "activity items need"} review. Open Activity Review to see what happened.`,
       color:
         newHighPriorityCount > 0
           ? "error"
@@ -419,15 +360,15 @@ onBeforeUnmount(
       fallback-to="/instructor/sessions"
     />
     <PageHeader
-      eyebrow="Live assessment monitoring"
+      eyebrow="Live session"
       :title="
         monitor?.delivery.title
-        || 'Assessment Monitor'
+        || 'Assessment session'
       "
       :description="
         monitor
-          ? `${monitor.delivery.subjectCode} · ${monitor.delivery.classroom.section} · ${formatDate(monitor.delivery.startsAt)} to ${formatDate(monitor.delivery.endsAt)}`
-          : 'Loading delivery'
+          ? `${monitor.delivery.subjectCode} · ${monitor.delivery.classroom.section}`
+          : 'Loading session'
       "
     >
       <template #actions>
@@ -453,7 +394,7 @@ onBeforeUnmount(
       v-if="errorMessage"
       color="error"
       variant="soft"
-      title="Monitor could not be loaded"
+      title="Live session could not be loaded"
       :description="errorMessage"
     />
 
@@ -468,131 +409,69 @@ onBeforeUnmount(
     <template
       v-else-if="monitor"
     >
-      <section class="rounded-xl bg-gradient-to-r from-blue-900 via-blue-800 to-violet-800 p-6 text-white">
-        <div class="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <div class="flex flex-wrap gap-2">
-              <StatusPill
-                :status="
-                  monitor.delivery.status
-                "
-              />
+      <section class="rounded-xl bg-gradient-to-r from-blue-900 via-blue-800 to-violet-800 p-5 text-white sm:p-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <StatusPill :status="monitor.delivery.status" />
 
-              <UBadge
-                color="neutral"
-                variant="soft"
-              >
+              <UBadge color="neutral" variant="soft">
                 {{ monitor.delivery.classroom.name }}
               </UBadge>
             </div>
 
-            <h1 class="mt-4 text-3xl font-black">
-              {{ monitor.delivery.title }}
-            </h1>
-
-            <p class="mt-2 text-sm text-blue-100">
-              Monitoring updates every five seconds. Live progress and assessment activity are shown without exposing numeric scores.
+            <p class="mt-3 max-w-2xl text-sm leading-6 text-blue-100">
+              Student progress updates automatically. Scores stay hidden while you monitor the class.
             </p>
           </div>
 
-          <div class="rounded-xl bg-white/10 p-4">
+          <div class="shrink-0 rounded-xl bg-white/10 px-4 py-3">
             <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">
-              Assessment window
+              Schedule
             </p>
 
-            <p class="mt-2 font-bold">
+            <p class="mt-1.5 font-bold">
               {{ formatDate(monitor.delivery.startsAt) }}
             </p>
 
             <p class="text-sm text-blue-100">
-              to
-              {{ formatDate(monitor.delivery.endsAt) }}
+              Until {{ formatDate(monitor.delivery.endsAt) }}
             </p>
           </div>
         </div>
       </section>
 
-      <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Class members"
-          :value="
-            String(
-              monitor.summary.classMembers,
-            )
-          "
+          label="Students"
+          :value="String(monitor.summary.classMembers)"
           icon="i-lucide-users"
         />
 
         <StatCard
-          label="Started"
-          :value="
-            String(
-              monitor.summary.started,
-            )
-          "
-          icon="i-lucide-play"
-          tone="info"
-        />
-
-        <StatCard
           label="In progress"
-          :value="
-            String(
-              monitor.summary.inProgress,
-            )
-          "
+          :value="String(monitor.summary.inProgress)"
           icon="i-lucide-loader-circle"
           tone="warning"
         />
 
         <StatCard
-          label="Submitted"
-          :value="
-            String(
-              monitor.summary.submitted,
-            )
-          "
+          label="Completed"
+          :value="String(monitor.summary.submitted + monitor.summary.autoSubmitted)"
           icon="i-lucide-circle-check"
           tone="success"
-        />
-
-        <StatCard
-          label="Auto-submitted"
-          :value="
-            String(
-              monitor.summary.autoSubmitted,
-            )
+          :change="
+            monitor.summary.autoSubmitted > 0
+              ? `${monitor.summary.autoSubmitted} submitted when time ended`
+              : ''
           "
-          icon="i-lucide-clock-alert"
-          tone="neutral"
         />
 
         <StatCard
           label="Not started"
-          :value="
-            String(
-              monitor.summary.notStarted,
-            )
-          "
+          :value="String(monitor.summary.notStarted)"
           icon="i-lucide-circle-dashed"
           tone="neutral"
-        />
-
-      </section>
-
-      <section class="grid gap-4 sm:grid-cols-2">
-        <StatCard
-          label="Recorded activity"
-          :value="String(monitor.summary.integritySignals)"
-          icon="i-lucide-activity"
-          :tone="monitor.summary.integritySignals > 0 ? 'warning' : 'success'"
-        />
-
-        <StatCard
-          label="Students to review"
-          :value="String(monitor.summary.studentsWithIntegritySignals)"
-          icon="i-lucide-user-round-search"
-          :tone="monitor.summary.studentsWithIntegritySignals > 0 ? 'warning' : 'success'"
         />
       </section>
 
@@ -613,7 +492,7 @@ onBeforeUnmount(
                   'progress'
               "
             >
-              Student Progress
+              Progress
             </button>
 
             <button
@@ -630,7 +509,7 @@ onBeforeUnmount(
                   'ranking'
               "
             >
-              Live Ranking
+              Ranking
             </button>
 
             <button
@@ -647,7 +526,17 @@ onBeforeUnmount(
                   'integrity'
               "
             >
-              Activity Review
+              <span class="inline-flex items-center gap-2">
+                Activity Review
+                <UBadge
+                  v-if="monitor.summary.studentsWithIntegritySignals > 0"
+                  color="warning"
+                  variant="soft"
+                  size="sm"
+                >
+                  {{ monitor.summary.studentsWithIntegritySignals }}
+                </UBadge>
+              </span>
             </button>
           </div>
 
@@ -673,7 +562,7 @@ onBeforeUnmount(
             </h2>
 
             <p class="mt-1 text-sm text-muted">
-              The roster includes every active member. Progress is separated into correct, wrong, unanswered, timed-out, and remaining questions. "Closes in" is the shared class schedule deadline.
+              See who has started, completed, or still has questions remaining.
             </p>
           </div>
         </template>
@@ -689,19 +578,13 @@ onBeforeUnmount(
                   Status
                 </th>
                 <th>
-                  Progress
-                </th>
-                <th>
-                  Closes in
-                </th>
-                <th>
-                  Answer outcomes
+                  Questions
                 </th>
                 <th>
                   Activity
                 </th>
                 <th>
-                  Last activity
+                  Last active
                 </th>
               </tr>
             </thead>
@@ -733,51 +616,22 @@ onBeforeUnmount(
                 </td>
 
                 <td>
-                  <div class="min-w-36">
-                    <div class="flex justify-between text-xs text-muted">
-                      <span>
-                        {{ student.correctCount + student.wrongCount + student.unansweredCount }}
-                        /
-                        {{ student.questionCount }}
-                        resolved
-                      </span>
+                  <div class="min-w-72">
+                    <p class="mb-2 text-xs font-semibold text-muted">
+                      {{ student.correctCount + student.wrongCount + student.unansweredCount }}
+                      of {{ student.questionCount }} completed
+                    </p>
 
-                      <span>
-                        {{ student.progressPercent }}%
-                      </span>
-                    </div>
-
-                    <UProgress
-                      class="mt-2"
-                      :model-value="student.progressPercent"
-                      :max="100"
-                      color="primary"
-                      size="sm"
+                    <AssessmentOutcomeProgress
+                      :correct-count="student.correctCount"
+                      :wrong-count="student.wrongCount"
+                      :unanswered-count="student.unansweredCount"
+                      :timed-out-count="student.timedOutCount"
+                      :remaining-count="student.remainingCount"
+                      :total="student.questionCount"
+                      compact
                     />
                   </div>
-                </td>
-
-                <td class="font-mono text-sm">
-                  {{
-                    student.status
-                    === "in_progress"
-                      ? formatRemaining(
-                          monitor.delivery.endsAt,
-                        )
-                      : "—"
-                  }}
-                </td>
-
-                <td>
-                  <AssessmentOutcomeProgress
-                    :correct-count="student.correctCount"
-                    :wrong-count="student.wrongCount"
-                    :unanswered-count="student.unansweredCount"
-                    :timed-out-count="student.timedOutCount"
-                    :remaining-count="student.remainingCount"
-                    :total="student.questionCount"
-                    compact
-                  />
                 </td>
 
                 <td>
@@ -791,7 +645,7 @@ onBeforeUnmount(
                       class="mr-1 size-3.5"
                     />
                     {{ student.integrity.signalCount }}
-                    event{{ student.integrity.signalCount === 1 ? '' : 's' }}
+                    to review
                   </UBadge>
 
                   <UBadge
@@ -799,7 +653,7 @@ onBeforeUnmount(
                     color="success"
                     variant="soft"
                   >
-                    No recorded activity
+                    None
                   </UBadge>
                 </td>
 
@@ -829,7 +683,7 @@ onBeforeUnmount(
             </h2>
 
             <p class="mt-1 text-sm text-muted">
-              Ranking is server-calculated. Numeric scores stay hidden here; use the outcome colors to follow each student’s assessment progress.
+              See the current class order while students answer. Scores stay hidden on this screen.
             </p>
           </div>
         </template>
@@ -878,7 +732,7 @@ onBeforeUnmount(
                 {{ student.correctCount + student.wrongCount + student.unansweredCount }}
                 /
                 {{ student.questionCount }}
-                questions resolved
+                questions completed
               </p>
 
               <AssessmentOutcomeProgress
@@ -900,26 +754,26 @@ onBeforeUnmount(
           <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 class="font-black text-highlighted">
-                Student assessment activity
+                Activity review
               </h2>
 
               <p class="mt-1 max-w-3xl text-sm text-muted">
-                Students with recorded activity appear below. Open a student only when you need to review the details.
+                Review students who left the assessment screen or used restricted actions while answering.
               </p>
             </div>
 
             <div class="flex shrink-0 flex-wrap gap-x-4 gap-y-1.5 text-xs">
               <span class="inline-flex items-center gap-1.5 text-muted">
                 <span class="size-2 rounded-full bg-error" aria-hidden="true" />
-                Needs closer review
+                Needs review
               </span>
               <span class="inline-flex items-center gap-1.5 text-muted">
                 <span class="size-2 rounded-full bg-warning" aria-hidden="true" />
-                Check context
+                Check
               </span>
               <span class="inline-flex items-center gap-1.5 text-muted">
                 <span class="size-2 rounded-full bg-primary" aria-hidden="true" />
-                Recorded activity
+                Notice
               </span>
             </div>
           </div>
@@ -929,7 +783,7 @@ onBeforeUnmount(
           v-if="integrityStudents.length === 0"
           icon="i-lucide-circle-check-big"
           title="No activity to review"
-          description="No focus changes or restricted browser actions have been recorded for students in this session."
+          description="No student activity needs review for this session."
         />
 
         <div
@@ -972,7 +826,7 @@ onBeforeUnmount(
                       size="sm"
                     >
                       {{ student.integrity.signalCount }}
-                      event{{ student.integrity.signalCount === 1 ? '' : 's' }}
+                      item{{ student.integrity.signalCount === 1 ? '' : 's' }}
                     </UBadge>
                   </div>
 

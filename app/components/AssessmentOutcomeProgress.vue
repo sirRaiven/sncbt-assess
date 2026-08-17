@@ -107,16 +107,6 @@ function segmentWidth(count: number): string {
     :class="compact ? 'min-w-56' : 'min-w-64'"
     :aria-label="`${correct} correct, ${wrong} wrong, ${unanswered} unanswered, ${timedOut} timed out, ${remaining} remaining out of ${totalCount} questions`"
   >
-    <div class="flex items-center justify-between gap-3 text-xs">
-      <span class="font-bold text-highlighted">
-        {{ resolved }} / {{ totalCount }} resolved
-      </span>
-
-      <span class="font-mono text-muted">
-        {{ resolvedPercent }}%
-      </span>
-    </div>
-
     <div
       class="mt-2 flex h-2.5 overflow-hidden rounded-full bg-elevated ring-1 ring-default"
       aria-hidden="true"
