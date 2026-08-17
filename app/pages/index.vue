@@ -7,10 +7,6 @@ import {
   z,
 } from "zod";
 
-import type {
-  Profile,
-} from "~/types/profile";
-
 import {
   resolveRequestedDestination,
 } from "~/utils/auth-navigation";
@@ -105,36 +101,16 @@ async function signIn(
       signInResult.userId;
 
     const {
-      data: profileData,
-      error: profileError,
-    } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
+      loadProfile,
+    } = useCurrentProfile();
 
-    if (profileError) {
-      console.error(
-        "Profile lookup failed after sign in.",
-        {
-          code: profileError.code,
-          message: profileError.message,
-          details: profileError.details,
-          hint: profileError.hint,
-          userId,
-        },
-      );
-
-      await supabase.auth.signOut({
-        scope: "local",
+    const profile =
+      await loadProfile({
+        force: true,
+        userId,
       });
 
-      throw new Error(
-        "Your account information could not be loaded. Please try again or contact the system administrator.",
-      );
-    }
-
-    if (!profileData) {
+    if (!profile) {
       await supabase.auth.signOut({
         scope: "local",
       });
@@ -143,15 +119,6 @@ async function signIn(
         "Your account setup is incomplete. Please contact the system administrator.",
       );
     }
-
-    const profile =
-      profileData as Profile;
-
-    const {
-      setProfile,
-    } = useCurrentProfile();
-
-    setProfile(profile);
 
     const destination =
       resolveRequestedDestination(

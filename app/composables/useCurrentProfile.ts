@@ -1,5 +1,10 @@
 import type {
+  Account,
+  AdminProfile,
+  InstructorProfile,
   Profile,
+  StudentProfile,
+  UserRole,
 } from "~/types/profile";
 
 import {
@@ -9,6 +14,62 @@ import {
 interface LoadProfileOptions {
   force?: boolean;
   userId?: string;
+}
+
+type RoleProfile =
+  | StudentProfile
+  | InstructorProfile
+  | AdminProfile;
+
+function resolveProfileRole(
+  account: Account,
+): UserRole {
+  return account.account_status === "active"
+    ? account.role
+    : account.requested_role;
+}
+
+function flattenProfile(
+  account: Account,
+  roleProfile: RoleProfile | null,
+): Profile {
+  const base: Profile = {
+    ...account,
+    first_name:
+      roleProfile?.first_name
+      ?? null,
+    middle_name:
+      roleProfile?.middle_name
+      ?? null,
+    last_name:
+      roleProfile?.last_name
+      ?? null,
+    avatar_url:
+      roleProfile?.avatar_url
+      ?? null,
+    student_number:
+      null,
+    employee_number:
+      null,
+  };
+
+  if (
+    roleProfile
+    && "student_number" in roleProfile
+  ) {
+    base.student_number =
+      roleProfile.student_number;
+  }
+
+  if (
+    roleProfile
+    && "employee_number" in roleProfile
+  ) {
+    base.employee_number =
+      roleProfile.employee_number;
+  }
+
+  return base;
 }
 
 export function useCurrentProfile() {
@@ -29,6 +90,61 @@ export function useCurrentProfile() {
     "current-user-profile-error",
     () => null,
   );
+
+  async function loadRoleProfile(
+    account: Account,
+  ): Promise<RoleProfile | null> {
+    const role = resolveProfileRole(account);
+
+    if (role === "student") {
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("student_profiles")
+        .select("*")
+        .eq("user_id", account.id)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    }
+
+    if (role === "instructor") {
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("instructor_profiles")
+        .select("*")
+        .eq("user_id", account.id)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    }
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("admin_profiles")
+      .select("*")
+      .eq("user_id", account.id)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  }
 
   async function loadProfile(
     options: LoadProfileOptions = {},
@@ -54,38 +170,52 @@ export function useCurrentProfile() {
 
     try {
       const {
-        data,
-        error,
+        data: account,
+        error: accountError,
       } = await supabase
-        .from("profiles")
+        .from("accounts")
         .select("*")
         .eq("id", userId)
         .maybeSingle();
 
-      if (error) {
+      if (accountError) {
         console.error(
-          "Unable to load the authenticated profile.",
+          "Unable to load the authenticated account.",
           {
-            code: error.code,
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
+            code: accountError.code,
+            message: accountError.message,
+            details: accountError.details,
+            hint: accountError.hint,
             userId,
           },
         );
 
-        throw error;
+        throw accountError;
       }
 
-      if (!data) {
+      if (!account) {
         profile.value = null;
         profileError.value =
-          "No application profile was found for this account.";
+          "No application account was found for this user.";
 
         return null;
       }
 
-      profile.value = data as Profile;
+      const roleProfile =
+        await loadRoleProfile(account);
+
+      if (!roleProfile) {
+        profile.value = null;
+        profileError.value =
+          "Your role profile is incomplete. Please contact the system administrator.";
+
+        return null;
+      }
+
+      profile.value = flattenProfile(
+        account,
+        roleProfile,
+      );
 
       return profile.value;
     } catch (error) {

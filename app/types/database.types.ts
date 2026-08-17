@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          account_status: Database["public"]["Enums"]["account_status"]
+          created_at: string
+          email: string | null
+          id: string
+          requested_role: Database["public"]["Enums"]["user_role"]
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        Insert: {
+          account_status?: Database["public"]["Enums"]["account_status"]
+          created_at?: string
+          email?: string | null
+          id: string
+          requested_role?: Database["public"]["Enums"]["user_role"]
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Update: {
+          account_status?: Database["public"]["Enums"]["account_status"]
+          created_at?: string
+          email?: string | null
+          id?: string
+          requested_role?: Database["public"]["Enums"]["user_role"]
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       assessments: {
         Row: {
           allow_backtracking: boolean
@@ -105,7 +135,7 @@ export type Database = {
             foreignKeyName: "assessments_instructor_id_fkey"
             columns: ["instructor_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
           {
@@ -198,7 +228,7 @@ export type Database = {
             foreignKeyName: "classroom_members_approved_by_fkey"
             columns: ["approved_by"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
           {
@@ -212,7 +242,7 @@ export type Database = {
             foreignKeyName: "classroom_members_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -274,58 +304,130 @@ export type Database = {
             foreignKeyName: "classrooms_instructor_id_fkey"
             columns: ["instructor_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
       }
-      profiles: {
+      student_profiles: {
         Row: {
-          account_status: Database["public"]["Enums"]["account_status"]
           avatar_url: string | null
           created_at: string
-          email: string | null
-          employee_number: string | null
           first_name: string | null
-          id: string
           last_name: string | null
           middle_name: string | null
-          requested_role: Database["public"]["Enums"]["user_role"]
-          role: Database["public"]["Enums"]["user_role"]
-          student_number: string | null
+          student_number: string
           updated_at: string
+          user_id: string
         }
         Insert: {
-          account_status?: Database["public"]["Enums"]["account_status"]
           avatar_url?: string | null
           created_at?: string
-          email?: string | null
-          employee_number?: string | null
           first_name?: string | null
-          id: string
           last_name?: string | null
           middle_name?: string | null
-          requested_role?: Database["public"]["Enums"]["user_role"]
-          role?: Database["public"]["Enums"]["user_role"]
-          student_number?: string | null
+          student_number: string
           updated_at?: string
+          user_id: string
         }
         Update: {
-          account_status?: Database["public"]["Enums"]["account_status"]
           avatar_url?: string | null
           created_at?: string
-          email?: string | null
-          employee_number?: string | null
           first_name?: string | null
-          id?: string
           last_name?: string | null
           middle_name?: string | null
-          requested_role?: Database["public"]["Enums"]["user_role"]
-          role?: Database["public"]["Enums"]["user_role"]
-          student_number?: string | null
+          student_number?: string
           updated_at?: string
+          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "student_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          employee_number: string
+          first_name: string | null
+          last_name: string | null
+          middle_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          employee_number: string
+          first_name?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          employee_number?: string
+          first_name?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          first_name: string | null
+          last_name: string | null
+          middle_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          first_name?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          first_name?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       question_options: {
         Row: {
@@ -417,7 +519,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          account_status: Database["public"]["Enums"]["account_status"]
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          employee_number: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          middle_name: string | null
+          requested_role: Database["public"]["Enums"]["user_role"]
+          role: Database["public"]["Enums"]["user_role"]
+          student_number: string | null
+          updated_at: string
+        }
+        Relationships: []
+      }
     }
     Functions: {
       assert_assessment_publishable: {
