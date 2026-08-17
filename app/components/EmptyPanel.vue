@@ -12,7 +12,7 @@ withDefaults(
 </script>
 
 <template>
-  <div class="rounded-xl border border-dashed border-default bg-elevated/30 px-6 py-10 text-center">
+  <div class="empty-panel-surface rounded-xl border border-dashed border-default bg-elevated/45 px-6 py-10 text-center">
     <div class="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
       <UIcon
         :name="icon"

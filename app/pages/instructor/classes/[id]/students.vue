@@ -471,7 +471,7 @@ onMounted(
         <USkeleton class="h-10 w-full rounded-lg sm:w-80" />
       </div>
 
-      <div class="overflow-hidden rounded-xl border border-default bg-default">
+      <div class="overflow-hidden rounded-2xl border border-primary/10 bg-default/95 shadow-lg shadow-primary/5 ring-1 ring-primary/5 dark:border-primary/15 dark:bg-default/90 dark:shadow-black/15">
         <div class="border-b border-default px-4 py-4 sm:px-5">
           <USkeleton class="h-5 w-36 rounded" />
         </div>
@@ -486,10 +486,10 @@ onMounted(
     </div>
 
     <template v-else-if="classroom">
-      <section class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section class="flex flex-col gap-4 rounded-2xl border border-primary/10 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-5 py-4 shadow-sm shadow-primary/5 sm:flex-row sm:items-center sm:justify-between dark:border-primary/15 dark:from-primary/15 dark:via-primary/5">
         <div>
           <h1 class="text-2xl font-black tracking-tight text-highlighted">
-            {{ activeView === "requests" ? "Enrollment requests" : "Class list" }}
+            {{ activeView === "requests" ? "Enrollment requests" : "Class roster" }}
           </h1>
           <p class="mt-1 text-sm text-muted">
             {{
@@ -549,7 +549,7 @@ onMounted(
 
       <div
         v-if="activeView === 'students' && selectedMemberIds.length"
-        class="flex flex-col gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+        class="flex flex-col gap-3 rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-3 shadow-sm shadow-primary/5 sm:flex-row sm:items-center sm:justify-between"
         aria-live="polite"
       >
         <div class="flex items-center gap-3">
@@ -596,7 +596,7 @@ onMounted(
       </div>
 
       <div class="overflow-hidden rounded-xl border border-default bg-default">
-        <div class="flex items-center gap-3 border-b border-default px-4 py-3.5 sm:px-5">
+        <div class="flex items-center gap-3 border-b border-primary/10 bg-primary/5 px-4 py-3.5 sm:px-5 dark:bg-primary/10">
           <UCheckbox
             v-if="activeView === 'students' && filteredMembers.length"
             :model-value="someVisibleSelected ? 'indeterminate' : allVisibleSelected"
@@ -644,8 +644,8 @@ onMounted(
             :class="[
               'flex flex-col gap-3 border-b border-default px-4 py-3.5 transition-colors last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:px-5',
               activeView === 'students' && isSelected(member.id)
-                ? 'bg-primary/5'
-                : 'hover:bg-muted/25',
+                ? 'bg-primary/10'
+                : 'hover:bg-primary/5',
             ]"
           >
             <div class="flex min-w-0 items-center gap-3">

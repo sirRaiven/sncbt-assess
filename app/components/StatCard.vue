@@ -43,6 +43,7 @@ const toneClass =
 
 <template>
   <UCard
+    class="app-stat-card"
     :ui="{
       body:
         'p-4 sm:p-5',

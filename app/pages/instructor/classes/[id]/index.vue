@@ -390,18 +390,23 @@ onMounted(() => {
     <template v-if="classroom">
       <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <UCard
-          class="overflow-hidden"
+          class="overflow-hidden border-primary/10 border-t-primary/30 bg-gradient-to-br from-default via-default to-primary/5 shadow-lg shadow-primary/5 ring-1 ring-primary/5 dark:border-primary/15 dark:to-primary/10 dark:shadow-black/15"
           :ui="{
             body: 'p-0 sm:p-0',
           }"
         >
           <template #header>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <h2 class="font-bold text-highlighted">
-                    Assigned assessments
-                  </h2>
+              <div class="flex items-start gap-3">
+                <div class="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+                  <UIcon name="i-lucide-notebook-tabs" class="size-5" />
+                </div>
+
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="font-bold text-highlighted">
+                      Assigned assessments
+                    </h2>
 
                   <UBadge
                     color="neutral"
@@ -411,9 +416,10 @@ onMounted(() => {
                   </UBadge>
                 </div>
 
-                <p class="mt-1 text-sm text-muted">
-                  Assessments currently connected to this class.
-                </p>
+                  <p class="mt-1 text-sm text-muted">
+                    Assessments currently connected to this class.
+                  </p>
+                </div>
               </div>
 
               <UButton
@@ -436,7 +442,7 @@ onMounted(() => {
             <div
               v-for="number in 3"
               :key="number"
-              class="flex items-center gap-4 rounded-xl border border-default p-4"
+              class="flex items-center gap-4 rounded-2xl border border-primary/10 bg-default/80 p-4 shadow-sm"
             >
               <USkeleton class="size-11 shrink-0 rounded-xl" />
               <div class="min-w-0 flex-1 space-y-2">
@@ -474,7 +480,7 @@ onMounted(() => {
             v-else-if="assignedAssessments.length === 0"
             class="p-5"
           >
-            <div class="rounded-xl border border-dashed border-default bg-elevated/40 px-5 py-10 text-center">
+            <div class="rounded-2xl border border-dashed border-primary/20 bg-gradient-to-br from-primary/5 via-default to-primary/10 px-5 py-12 text-center shadow-inner dark:from-primary/10 dark:to-primary/5">
               <div class="mx-auto flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <UIcon
                   name="i-lucide-clipboard-plus"
@@ -501,13 +507,13 @@ onMounted(() => {
 
           <div
             v-else
-            class="divide-y divide-default"
+            class="space-y-3 p-4 sm:p-5"
           >
             <NuxtLink
               v-for="assessment in assignedAssessments"
               :key="assessment.id"
               :to="`/instructor/assessments/${assessment.id}/edit`"
-              class="group flex items-center gap-4 p-5 transition-colors hover:bg-elevated/50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-primary/30"
+              class="group flex items-center gap-4 rounded-2xl border border-primary/10 bg-gradient-to-r from-default via-default to-primary/5 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md hover:shadow-primary/10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30 sm:p-5 dark:border-primary/15 dark:to-primary/10"
               :aria-label="`Edit ${assessment.title}`"
             >
               <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
@@ -575,16 +581,25 @@ onMounted(() => {
             aria-label="Loading student enrollment settings"
           />
 
-          <UCard v-else>
+          <UCard
+            v-else
+            class="overflow-hidden border-primary/10 border-t-primary/30 bg-gradient-to-br from-default via-default to-primary/5 shadow-lg shadow-primary/5 ring-1 ring-primary/5 dark:border-primary/15 dark:to-primary/10 dark:shadow-black/15"
+          >
             <template #header>
               <div class="flex items-start justify-between gap-3">
-                <div>
-                  <h2 class="font-bold text-highlighted">
-                    Student enrollment
-                  </h2>
-                  <p class="mt-1 text-xs text-muted">
-                    Share the code and choose how students enter the class.
-                  </p>
+                <div class="flex items-start gap-3">
+                  <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+                    <UIcon name="i-lucide-users-round" class="size-4" />
+                  </div>
+
+                  <div>
+                    <h2 class="font-bold text-highlighted">
+                      Student enrollment
+                    </h2>
+                    <p class="mt-1 text-xs text-muted">
+                      Share the code and choose how students enter the class.
+                    </p>
+                  </div>
                 </div>
 
                 <StatusPill
@@ -597,7 +612,7 @@ onMounted(() => {
               </div>
             </template>
 
-            <div class="rounded-xl bg-slate-950 p-5 text-center text-white">
+            <div class="rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-brand-950 p-5 text-center text-white shadow-lg shadow-slate-950/20 ring-1 ring-white/10">
               <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
                 Student enrollment code
               </p>
@@ -612,6 +627,7 @@ onMounted(() => {
                 color="neutral"
                 variant="outline"
                 icon="i-lucide-copy"
+                class="bg-default/70 shadow-xs hover:bg-primary/5"
                 :disabled="!classroom.join_enabled"
                 @click="copyCode"
               >
@@ -622,6 +638,7 @@ onMounted(() => {
                 color="neutral"
                 variant="outline"
                 icon="i-lucide-share-2"
+                class="bg-default/70 shadow-xs hover:bg-primary/5"
                 :disabled="!classroom.join_enabled"
                 @click="shareCode"
               >
@@ -634,7 +651,7 @@ onMounted(() => {
                 icon="i-lucide-refresh-cw"
                 :loading="isUpdating"
                 :disabled="classroom.status === 'archived'"
-                class="col-span-2 sm:col-span-1"
+                class="col-span-2 bg-default/70 shadow-xs hover:bg-primary/5 sm:col-span-1"
                 @click="runClassAction('regenerate')"
               >
                 New Code
@@ -729,11 +746,18 @@ onMounted(() => {
             </UButton>
           </UCard>
 
-          <UCard>
+          <UCard
+            class="overflow-hidden border-primary/10 border-t-primary/30 bg-gradient-to-br from-default via-default to-primary/5 shadow-md shadow-primary/5 ring-1 ring-primary/5 dark:border-primary/15 dark:to-primary/10 dark:shadow-black/15"
+          >
             <template #header>
-              <h2 class="font-bold text-highlighted">
-                Class status
-              </h2>
+              <div class="flex items-center gap-3">
+                <div class="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <UIcon name="i-lucide-shield-check" class="size-4" />
+                </div>
+                <h2 class="font-bold text-highlighted">
+                  Class status
+                </h2>
+              </div>
             </template>
 
             <UAlert

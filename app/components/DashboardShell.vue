@@ -330,7 +330,7 @@ onBeforeUnmount(
 </script>
 
 <template>
-  <div class="min-h-screen bg-muted/30 lg:flex">
+  <div class="app-shell min-h-screen lg:flex">
     <USidebar
       id="portal-side-navigation"
       v-model:open="sidebarOpen"
@@ -466,7 +466,7 @@ onBeforeUnmount(
         :toggle="false"
         :ui="{
           root:
-            'safe-area-top sticky top-0 z-30 border-b border-default bg-default/90 backdrop-blur-xl',
+            'safe-area-top sticky top-0 z-30 border-b border-default/70 bg-default/88 shadow-[0_1px_0_rgba(15,23,42,0.03),0_8px_24px_rgba(15,23,42,0.04)] backdrop-blur-xl dark:shadow-black/10',
           container:
             'mx-0 h-full min-h-16 w-full max-w-none px-3 sm:px-5 lg:px-8',
           left:
@@ -533,7 +533,7 @@ onBeforeUnmount(
         </template>
       </UHeader>
 
-      <main class="safe-area-bottom mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-6 lg:px-8 lg:py-8">
+      <main class="portal-main safe-area-bottom mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-6 lg:px-8 lg:py-8">
         <slot />
       </main>
     </div>
