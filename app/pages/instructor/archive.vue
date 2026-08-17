@@ -796,7 +796,7 @@ onMounted(
 
         <div
           v-else
-          class="grid gap-4 xl:grid-cols-2"
+          class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
         >
           <UCard
             v-for="classroom in filteredClasses"
