@@ -7,6 +7,10 @@ import type {
   StudentPublishedAssessment,
 } from "~/types/assessment";
 
+import type {
+  InstructorDeliveryListItem,
+} from "~/types/assessment-delivery";
+
 import {
   parseUserFacingFunctionError,
 } from "~/utils/user-facing-error";
@@ -90,6 +94,109 @@ export function useAssessments() {
     }
   }
 
+  async function loadScheduledAssignments(): Promise<
+    InstructorDeliveryListItem[] | null
+  > {
+    try {
+      const {
+        data,
+        error,
+      } = await supabase.functions.invoke<{
+        serverNow: string;
+        deliveries: InstructorDeliveryListItem[];
+      }>(
+        "assessment-delivery",
+        {
+          body: {
+            action: "list-instructor-deliveries",
+          },
+        },
+      );
+
+      if (error || !data) {
+        return null;
+      }
+
+      return data.deliveries ?? [];
+    } catch {
+      return null;
+    }
+  }
+
+  function mergeScheduledClassrooms(
+    assessments: AssessmentWithClassroom[],
+    deliveries: InstructorDeliveryListItem[] | null,
+  ): AssessmentWithClassroom[] {
+    if (!deliveries) {
+      return assessments;
+    }
+
+    const deliveryMap = new Map<
+      string,
+      Map<string, AssessmentWithClassroom["assignedClassrooms"][number]>
+    >();
+
+    for (const delivery of deliveries) {
+      let classroomMap = deliveryMap.get(
+        delivery.assessmentId,
+      );
+
+      if (!classroomMap) {
+        classroomMap = new Map();
+        deliveryMap.set(
+          delivery.assessmentId,
+          classroomMap,
+        );
+      }
+
+      classroomMap.set(
+        delivery.classroom.id,
+        {
+          id: delivery.classroom.id,
+          name: delivery.classroom.name,
+          subjectCode: delivery.classroom.subjectCode,
+          section: delivery.classroom.section,
+          schoolYear: delivery.classroom.schoolYear,
+          semester: delivery.classroom.semester,
+          // Scheduled deliveries are created only for valid classes.
+          // Keep the legacy summary shape expected by assessment UI.
+          status: "active",
+        },
+      );
+    }
+
+    return assessments.map(
+      (assessment) => {
+        const merged = new Map(
+          assessment.assignedClassrooms.map(
+            (classroom) => [
+              classroom.id,
+              classroom,
+            ],
+          ),
+        );
+
+        for (
+          const [classroomId, classroom]
+          of deliveryMap.get(assessment.id)
+            ?? []
+        ) {
+          merged.set(
+            classroomId,
+            classroom,
+          );
+        }
+
+        return {
+          ...assessment,
+          assignedClassrooms: Array.from(
+            merged.values(),
+          ),
+        };
+      },
+    );
+  }
+
   async function listClassOptions() {
     return await invoke<{
       classes: AssessmentClassOption[];
@@ -99,17 +206,38 @@ export function useAssessments() {
   }
 
   async function listInstructorAssessments() {
-    return await invoke<{
+    const result = await invoke<{
       assessments: AssessmentWithClassroom[];
     }>(
       "list-instructor-assessments",
     );
+
+    if (
+      result.error
+      || !result.data
+    ) {
+      return result;
+    }
+
+    const deliveries =
+      await loadScheduledAssignments();
+
+    return {
+      ...result,
+      data: {
+        assessments:
+          mergeScheduledClassrooms(
+            result.data.assessments,
+            deliveries,
+          ),
+      },
+    };
   }
 
   async function getInstructorAssessment(
     assessmentId: string,
   ) {
-    return await invoke<{
+    const result = await invoke<{
       assessment: AssessmentWithClassroom;
     }>(
       "get-instructor-assessment",
@@ -117,6 +245,31 @@ export function useAssessments() {
         assessmentId,
       },
     );
+
+    if (
+      result.error
+      || !result.data
+    ) {
+      return result;
+    }
+
+    const deliveries =
+      await loadScheduledAssignments();
+
+    const mergedAssessments =
+      mergeScheduledClassrooms(
+        [result.data.assessment],
+        deliveries,
+      );
+
+    return {
+      ...result,
+      data: {
+        assessment:
+          mergedAssessments[0]
+          ?? result.data.assessment,
+      },
+    };
   }
 
   async function createAssessment(

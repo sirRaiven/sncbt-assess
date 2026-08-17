@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const props = defineProps<{
   classroomId: string;
-  active: "overview" | "students";
+  active: "assessments" | "students";
   studentCount: number;
   pendingCount?: number;
 }>();
@@ -18,12 +18,12 @@ const pendingCount = computed(
   >
     <UButton
       :to="`/instructor/classes/${classroomId}`"
-      :color="active === 'overview' ? 'primary' : 'neutral'"
-      :variant="active === 'overview' ? 'soft' : 'ghost'"
-      icon="i-lucide-layout-dashboard"
-      :aria-current="active === 'overview' ? 'page' : undefined"
+      :color="active === 'assessments' ? 'primary' : 'neutral'"
+      :variant="active === 'assessments' ? 'soft' : 'ghost'"
+      icon="i-lucide-clipboard-list"
+      :aria-current="active === 'assessments' ? 'page' : undefined"
     >
-      Overview
+      Assessments
     </UButton>
 
     <UButton

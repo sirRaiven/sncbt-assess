@@ -17,10 +17,10 @@ const isWorkspaceRoute = computed(
   () => !route.path.endsWith("/edit"),
 );
 
-const activeSection = computed<"overview" | "students">(
+const activeSection = computed<"assessments" | "students">(
   () => route.path.includes("/students")
     ? "students"
-    : "overview",
+    : "assessments",
 );
 
 const {

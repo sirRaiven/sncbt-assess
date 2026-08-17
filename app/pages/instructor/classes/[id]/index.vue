@@ -12,7 +12,7 @@ definePageMeta({
 });
 
 useSeoMeta({
-  title: "Class overview",
+  title: "Class assessments",
 });
 
 const toast = useToast();
@@ -57,9 +57,12 @@ const assignedAssessments = computed(
     .filter(
       (assessment) =>
         assessment.status !== "archived"
-        && assessment.assignedClassrooms.some(
-          (assignedClassroom) =>
-            assignedClassroom.id === classroomId.value,
+        && (
+          assessment.classroom_id === classroomId.value
+          || assessment.assignedClassrooms.some(
+            (assignedClassroom) =>
+              assignedClassroom.id === classroomId.value,
+          )
         ),
     )
     .sort(
@@ -500,85 +503,68 @@ onMounted(() => {
             v-else
             class="divide-y divide-default"
           >
-            <article
+            <NuxtLink
               v-for="assessment in assignedAssessments"
               :key="assessment.id"
-              class="group flex flex-col gap-4 p-5 transition-colors hover:bg-elevated/50 sm:flex-row sm:items-center"
+              :to="`/instructor/assessments/${assessment.id}/edit`"
+              class="group flex items-center gap-4 p-5 transition-colors hover:bg-elevated/50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-primary/30"
+              :aria-label="`Edit ${assessment.title}`"
             >
-              <div class="flex min-w-0 flex-1 items-start gap-4">
-                <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
-                  <UIcon
-                    name="i-lucide-clipboard-check"
-                    class="size-5"
+              <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+                <UIcon
+                  name="i-lucide-clipboard-check"
+                  class="size-5"
+                />
+              </div>
+
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <UBadge
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                  >
+                    {{ typeLabel(assessment.assessment_type) }}
+                  </UBadge>
+
+                  <StatusPill
+                    :status="assessment.status"
                   />
                 </div>
 
-                <div class="min-w-0 flex-1">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <UBadge
-                      color="neutral"
-                      variant="soft"
-                      size="sm"
-                    >
-                      {{ typeLabel(assessment.assessment_type) }}
-                    </UBadge>
+                <h3 class="mt-2 truncate font-bold text-highlighted transition-colors group-hover:text-primary">
+                  {{ assessment.title }}
+                </h3>
 
-                    <StatusPill
-                      :status="assessment.status"
+                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                  <span class="inline-flex items-center gap-1.5">
+                    <UIcon
+                      name="i-lucide-list-checks"
+                      class="size-3.5"
                     />
-                  </div>
+                    {{ assessment.question_count }} question{{ assessment.question_count === 1 ? "" : "s" }}
+                  </span>
 
-                  <NuxtLink
-                    :to="`/instructor/assessments/${assessment.id}/edit`"
-                    class="mt-2 block w-fit max-w-full rounded-md focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
-                  >
-                    <h3 class="truncate font-bold text-highlighted transition group-hover:text-primary">
-                      {{ assessment.title }}
-                    </h3>
-                  </NuxtLink>
-
-                  <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-                    <span class="inline-flex items-center gap-1.5">
-                      <UIcon
-                        name="i-lucide-list-checks"
-                        class="size-3.5"
-                      />
-                      {{ assessment.question_count }} question{{ assessment.question_count === 1 ? "" : "s" }}
-                    </span>
-
-                    <span class="inline-flex items-center gap-1.5">
-                      <UIcon
-                        name="i-lucide-circle-dot"
-                        class="size-3.5"
-                      />
-                      {{ assessment.total_points }} point{{ assessment.total_points === 1 ? "" : "s" }}
-                    </span>
-                  </div>
+                  <span class="inline-flex items-center gap-1.5">
+                    <UIcon
+                      name="i-lucide-circle-dot"
+                      class="size-3.5"
+                    />
+                    {{ assessment.total_points }} point{{ assessment.total_points === 1 ? "" : "s" }}
+                  </span>
                 </div>
               </div>
 
-              <div class="flex shrink-0 items-center gap-2 sm:justify-end">
-                <UButton
-                  :to="`/instructor/assessments/${assessment.id}/assign`"
-                  color="neutral"
-                  variant="outline"
-                  size="sm"
-                  icon="i-lucide-calendar-clock"
-                >
-                  Schedule
-                </UButton>
-
-                <UButton
-                  :to="`/instructor/assessments/${assessment.id}/edit`"
-                  color="primary"
-                  variant="soft"
-                  size="sm"
-                  trailing-icon="i-lucide-arrow-right"
-                >
-                  Open
-                </UButton>
+              <div class="flex shrink-0 items-center gap-2 text-muted transition-colors group-hover:text-primary">
+                <span class="hidden text-xs font-medium sm:inline">
+                  Edit assessment
+                </span>
+                <UIcon
+                  name="i-lucide-chevron-right"
+                  class="size-5"
+                />
               </div>
-            </article>
+            </NuxtLink>
           </div>
         </UCard>
 
