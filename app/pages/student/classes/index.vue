@@ -135,8 +135,14 @@ async function loadClasses(): Promise<void> {
     return;
   }
 
+  // Defense in depth: the backend already excludes archived classes.
+  // Keep the Student UI safe if a stale Edge Function is still cached/deployed.
   classes.value =
-    result.data.classes;
+    result.data.classes.filter(
+      (item) =>
+        item.classroom.status
+        === "active",
+    );
 
   isLoading.value = false;
 }
@@ -220,7 +226,7 @@ onMounted(
     <PageHeader
       eyebrow="Learning spaces"
       title="My classes"
-      description="View joined classes and pending membership requests."
+      description="Open your active classes and pending join requests."
     >
       <template #actions>
         <UButton

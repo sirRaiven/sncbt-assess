@@ -190,32 +190,45 @@ async function loadClass():
   errorMessage.value =
     "";
 
-  const [
-    classResult,
-    deliveryResult,
-  ] =
-    await Promise.all([
-      getStudentClass(
-        classroomId.value,
-      ),
-      listStudentDeliveries(
-        classroomId.value,
-      ),
-    ]);
+  const classResult =
+    await getStudentClass(
+      classroomId.value,
+    );
 
   if (
     classResult.error
     || !classResult.data
+    || classResult.data
+      .classroom.status
+      !== "active"
   ) {
-    errorMessage.value =
-      classResult.error
-      || "Unable to load the class.";
-
     isLoading.value =
       false;
 
+    toast.add({
+      title:
+        "Class unavailable",
+      description:
+        "This class has been archived and is no longer available in My Classes.",
+      color:
+        "neutral",
+    });
+
+    await navigateTo(
+      "/student/classes",
+      {
+        replace:
+          true,
+      },
+    );
+
     return;
   }
+
+  const deliveryResult =
+    await listStudentDeliveries(
+      classroomId.value,
+    );
 
   if (
     deliveryResult.error

@@ -102,7 +102,13 @@ async function loadResults():
     "";
 
   const result =
-    await listStudentDeliveries();
+    await listStudentDeliveries(
+      undefined,
+      {
+        includeArchivedCompleted:
+          true,
+      },
+    );
 
   if (
     result.error

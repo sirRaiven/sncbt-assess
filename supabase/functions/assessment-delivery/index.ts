@@ -130,7 +130,13 @@ const actionSchema =
             classroomId:
               z
                 .string()
-                .uuid(),
+                .uuid()
+                .optional(),
+
+            includeArchivedCompleted:
+              z
+                .boolean()
+                .optional(),
           })
           .optional(),
       }),
@@ -865,6 +871,35 @@ async function requireStudentMembership(
   }
 }
 
+async function requireActiveStudentClassAccess(
+  supabaseAdmin: any,
+  studentId: string,
+  classroomId: string,
+): Promise<void> {
+  await requireStudentMembership(
+    supabaseAdmin,
+    studentId,
+    classroomId,
+  );
+
+  const classroom =
+    await loadClassroom(
+      supabaseAdmin,
+      classroomId,
+    );
+
+  if (
+    classroom.status
+    !== "active"
+  ) {
+    throw new AppError(
+      404,
+      "CLASSROOM_NOT_AVAILABLE",
+      "This class is no longer available.",
+    );
+  }
+}
+
 async function buildStudentDelivery(
   supabaseAdmin: any,
   assignment: AssignmentRecord,
@@ -982,6 +1017,7 @@ async function listStudentDeliveries(
   supabaseAdmin: any,
   studentId: string,
   classroomId?: string,
+  includeArchivedCompleted = false,
 ) {
   let membershipQuery =
     supabaseAdmin
@@ -1038,6 +1074,57 @@ async function listStudentDeliveries(
   }
 
   const {
+    data: activeClassroomData,
+    error: activeClassroomError,
+  } =
+    await supabaseAdmin
+      .from(
+        "classrooms",
+      )
+      .select("id")
+      .in(
+        "id",
+        classroomIds,
+      )
+      .eq(
+        "status",
+        "active",
+      );
+
+  if (activeClassroomError) {
+    throw new AppError(
+      500,
+      "ACTIVE_CLASSES_LOAD_FAILED",
+      "Your active classes could not be loaded.",
+    );
+  }
+
+  const activeClassroomIds =
+    (
+      activeClassroomData
+      ?? []
+    ).map(
+      (
+        classroom: {
+          id: string;
+        },
+      ) =>
+        classroom.id,
+    );
+
+  const assignmentClassroomIds =
+    includeArchivedCompleted
+      ? classroomIds
+      : activeClassroomIds;
+
+  if (
+    assignmentClassroomIds.length
+    === 0
+  ) {
+    return [];
+  }
+
+  const {
     data,
     error,
   } =
@@ -1062,7 +1149,7 @@ async function listStudentDeliveries(
       )
       .in(
         "classroom_id",
-        classroomIds,
+        assignmentClassroomIds,
       )
       .is(
         "cancelled_at",
@@ -1099,10 +1186,54 @@ async function listStudentDeliveries(
       ),
     );
 
+  const activeClassroomIdSet =
+    new Set(
+      activeClassroomIds,
+    );
+
   return deliveries.filter(
-    (delivery) =>
-      delivery.status
-        !== "cancelled",
+    (
+      delivery,
+      index,
+    ) => {
+      if (
+        delivery.status
+        === "cancelled"
+      ) {
+        return false;
+      }
+
+      const assignment =
+        assignments[index];
+
+      if (!assignment) {
+        return false;
+      }
+
+      if (
+        activeClassroomIdSet.has(
+          assignment.classroom_id,
+        )
+      ) {
+        return true;
+      }
+
+      if (
+        !includeArchivedCompleted
+      ) {
+        return false;
+      }
+
+      return Boolean(
+        delivery.attempt
+        && [
+          "submitted",
+          "auto_submitted",
+        ].includes(
+          delivery.attempt.status,
+        ),
+      );
+    },
   );
 }
 
@@ -2826,11 +2957,47 @@ export default {
                   userId,
                   input.payload
                     ?.classroomId,
+                  input.payload
+                    ?.includeArchivedCompleted
+                    ?? false,
                 ),
             });
           }
 
-          case "get-student-delivery":
+          case "get-student-delivery": {
+            requireRole(
+              profile,
+              "student",
+            );
+
+            const assignment =
+              await loadAssignment(
+                context.supabaseAdmin,
+                input.payload
+                  .assignmentId,
+              );
+
+            await requireActiveStudentClassAccess(
+              context.supabaseAdmin,
+              userId,
+              assignment.classroom_id,
+            );
+
+            const delivery =
+              await buildStudentDelivery(
+                context.supabaseAdmin,
+                assignment,
+                userId,
+              );
+
+            return jsonResponse({
+              serverNow:
+                new Date()
+                  .toISOString(),
+              delivery,
+            });
+          }
+
           case "get-result": {
             requireRole(
               profile,
@@ -2844,6 +3011,7 @@ export default {
                   .assignmentId,
               );
 
+            // Historical result access is preserved after a class is archived.
             await requireStudentMembership(
               context.supabaseAdmin,
               userId,
@@ -2894,7 +3062,7 @@ export default {
                   .assignmentId,
               );
 
-            await requireStudentMembership(
+            await requireActiveStudentClassAccess(
               context.supabaseAdmin,
               userId,
               assignment.classroom_id,

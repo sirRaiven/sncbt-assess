@@ -1392,6 +1392,10 @@ async function studentClassList(
       .in(
         "id",
         classroomIds,
+      )
+      .eq(
+        "status",
+        "active",
       );
 
     if (error) {
@@ -1403,7 +1407,13 @@ async function studentClassList(
     }
 
     classrooms =
-      data as ClassroomRecord[];
+      (
+        data as ClassroomRecord[]
+      ).filter(
+        (classroom) =>
+          classroom.status
+          === "active",
+      );
   }
 
   const instructorIds =
@@ -1544,6 +1554,10 @@ async function studentClassDetails(
       "id",
       classroomId,
     )
+    .eq(
+      "status",
+      "active",
+    )
     .maybeSingle();
 
   if (
@@ -1552,8 +1566,8 @@ async function studentClassDetails(
   ) {
     throw new AppError(
       404,
-      "CLASSROOM_NOT_FOUND",
-      "The class was not found.",
+      "CLASSROOM_NOT_AVAILABLE",
+      "This class is no longer available in your active classes.",
     );
   }
 

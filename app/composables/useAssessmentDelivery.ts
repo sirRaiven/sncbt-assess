@@ -204,16 +204,32 @@ export function useAssessmentDelivery() {
 
   async function listStudentDeliveries(
     classroomId?: string,
+    options?: {
+      includeArchivedCompleted?:
+        boolean;
+    },
   ) {
+    const includeArchivedCompleted =
+      options
+        ?.includeArchivedCompleted
+      ?? false;
+
     return await invoke<{
       serverNow: string;
       deliveries:
         StudentAssessmentDelivery[];
     }>(
       "list-student-deliveries",
-      classroomId
+      (
+        classroomId
+        || includeArchivedCompleted
+      )
         ? {
-            classroomId,
+            classroomId:
+              classroomId
+              || undefined,
+
+            includeArchivedCompleted,
           }
         : undefined,
     );
