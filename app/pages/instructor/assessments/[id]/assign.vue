@@ -85,6 +85,17 @@ const errorMessage =
 const saveConfirmationOpen =
   ref(false);
 
+const saveSuccessOpen =
+  ref(false);
+
+const classSearchQuery =
+  ref("");
+
+const lastSavedSchedules =
+  ref<AssessmentScheduleItem[]>(
+    [],
+  );
+
 const closeConfirmationOpen =
   ref(false);
 
@@ -103,6 +114,61 @@ const selectedRows =
         (row) =>
           row.selected,
       ),
+  );
+
+const visibleRows =
+  computed(
+    () => {
+      const query =
+        classSearchQuery.value
+          .trim()
+          .toLowerCase();
+
+      if (!query) {
+        return rows.value;
+      }
+
+      return rows.value.filter(
+        (row) =>
+          [
+            row.classroom.name,
+            row.classroom.subjectCode,
+            row.classroom.section,
+          ]
+            .join(" " )
+            .toLowerCase()
+            .includes(query),
+      );
+    },
+  );
+
+const removedExistingRows =
+  computed(
+    () =>
+      rows.value.filter(
+        (row) =>
+          Boolean(
+            row.existing,
+          )
+          && !row.selected,
+      ),
+  );
+
+const singleSavedSchedule =
+  computed(
+    () =>
+      lastSavedSchedules.value.length
+        === 1
+        ? lastSavedSchedules.value[0]
+        : null,
+  );
+
+const liveSessionActionLabel =
+  computed(
+    () =>
+      singleSavedSchedule.value
+        ? "Open Session Monitor"
+        : "Open Live Sessions",
   );
 
 const canEdit =
@@ -202,6 +268,39 @@ function formatDate(
     .format(
       new Date(value),
     );
+}
+
+function formatLocalDate(
+  value: string,
+): string {
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return "Invalid date";
+  }
+
+  return formatDate(
+    date.toISOString(),
+  );
+}
+
+function selectVisibleClasses(): void {
+  if (!canEdit.value) {
+    return;
+  }
+
+  for (
+    const row
+    of visibleRows.value
+  ) {
+    row.selected =
+      true;
+  }
 }
 
 function buildRows(
@@ -387,6 +486,16 @@ async function loadData():
 }
 
 function requestSave(): void {
+  if (
+    selectedRows.value.length
+    === 0
+  ) {
+    errorMessage.value =
+      "Choose at least one class before reviewing the assignment.";
+
+    return;
+  }
+
   const validationError =
     validateRows();
 
@@ -459,22 +568,80 @@ async function save():
     return;
   }
 
+  const selectedClassroomIds =
+    new Set(
+      schedules.map(
+        (schedule) =>
+          schedule.classroomId,
+      ),
+    );
+
+  lastSavedSchedules.value =
+    result.data.schedules.filter(
+      (schedule) =>
+        selectedClassroomIds.has(
+          schedule.classroomId,
+        )
+        && !schedule.cancelledAt,
+    );
+
+  overview.value =
+    result.data;
+
+  rows.value =
+    buildRows(
+      rows.value.map(
+        (row) =>
+          row.classroom,
+      ),
+      result.data.schedules,
+    );
+
   saveConfirmationOpen.value =
     false;
+
+  saveSuccessOpen.value =
+    true;
 
   toast.add({
     title:
       "Assessment assigned",
     description:
-      "Students will receive access automatically during the selected schedule.",
+      `${lastSavedSchedules.value.length} ${lastSavedSchedules.value.length === 1 ? "class is" : "classes are"} ready in Live Sessions.`,
     color:
       "success",
   });
 
-  await loadData();
-
   isSaving.value =
     false;
+}
+
+async function openLiveSessions():
+  Promise<void> {
+  saveSuccessOpen.value =
+    false;
+
+  if (singleSavedSchedule.value) {
+    await navigateTo(
+      `/instructor/sessions/${singleSavedSchedule.value.id}/monitor`,
+    );
+
+    return;
+  }
+
+  await navigateTo(
+    "/instructor/sessions",
+  );
+}
+
+async function backToAssessments():
+  Promise<void> {
+  saveSuccessOpen.value =
+    false;
+
+  await navigateTo(
+    "/instructor/assessments",
+  );
 }
 
 function requestClose(
@@ -551,7 +718,7 @@ onMounted(
 </script>
 
 <template>
-  <div class="page-stack">
+  <div class="page-stack pb-24">
     <PageHeader
       :breadcrumbs="[
         { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
@@ -559,12 +726,12 @@ onMounted(
         { label: overview?.assessment.title || 'Assessment', to: `/instructor/assessments/${assessmentId}/edit` },
         { label: 'Schedule' },
       ]"
-      eyebrow="Class schedule"
+      eyebrow="Assign to classes"
       :title="
         overview?.assessment.title
         || 'Assign Assessment'
       "
-      description="Choose the classes that will receive this assessment and set when access opens and closes."
+      description="Choose the classes that should receive this assessment, then set their access window."
     />
 
     <AssessmentWorkspaceNavigation
@@ -576,7 +743,7 @@ onMounted(
       v-if="errorMessage"
       color="error"
       variant="soft"
-      title="Class assignment could not be updated"
+      title="Assignment needs attention"
       :description="errorMessage"
     />
 
@@ -584,8 +751,8 @@ onMounted(
       v-if="isLoading"
       class="space-y-5"
     >
-      <USkeleton class="h-32 rounded-xl" />
-      <USkeleton class="h-96 rounded-xl" />
+      <USkeleton class="h-20 rounded-xl" />
+      <USkeleton class="h-[420px] rounded-xl" />
     </div>
 
     <template
@@ -596,144 +763,190 @@ onMounted(
         color="warning"
         variant="soft"
         title="Publish before assigning"
-        description="Only published assessments can be opened for student answering."
+        description="This assessment must be published before it can be assigned to a class."
       />
 
-      <section class="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Questions"
-          :value="
-            String(
-              overview.assessment
-                .questionCount,
-            )
-          "
+      <div
+        class="flex flex-wrap items-center gap-2 text-sm"
+      >
+        <UBadge
+          color="neutral"
+          variant="soft"
           icon="i-lucide-list-checks"
-        />
+        >
+          {{ overview.assessment.questionCount }} questions
+        </UBadge>
 
-        <StatCard
-          label="Total points"
-          :value="
-            String(
-              overview.assessment
-                .totalPoints,
-            )
-          "
+        <UBadge
+          color="neutral"
+          variant="soft"
           icon="i-lucide-award"
-          tone="info"
-        />
+        >
+          {{ overview.assessment.totalPoints }} points
+        </UBadge>
 
-        <StatCard
-          label="Selected classes"
-          :value="
-            String(
-              selectedRows.length,
-            )
-          "
+        <UBadge
+          :color="selectedRows.length > 0 ? 'primary' : 'neutral'"
+          variant="soft"
           icon="i-lucide-school"
-          tone="success"
-        />
-      </section>
+        >
+          {{ selectedRows.length }} selected
+        </UBadge>
+      </div>
 
-      <UAlert
-        color="info"
-        variant="soft"
-        icon="i-lucide-clock-3"
-        title="Scheduled access"
-        description="Students can begin when the schedule opens. The closing time is the final deadline for the assessment."
-      />
+      <UCard
+        class="overflow-hidden"
+        :ui="{
+          body: 'p-0 sm:p-0',
+        }"
+      >
+        <div
+          class="border-b border-default bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 sm:p-6"
+        >
+          <div
+            class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+          >
+            <div class="flex items-start gap-3">
+              <div
+                class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary"
+              >
+                <span class="text-sm font-black">1</span>
+              </div>
 
-      <UAlert
-        color="neutral"
-        variant="soft"
-        icon="i-lucide-list-timer"
-        title="Question timing"
-        description="Each question keeps the answering time configured in the Question Builder. When time expires, the student moves to the next question."
-      />
+              <div>
+                <h2 class="font-black text-highlighted">
+                  Choose classes
+                </h2>
 
-      <UCard>
-        <template #header>
-          <div>
-            <h2 class="font-black text-highlighted">
-              Classroom schedules
-            </h2>
+                <p class="mt-1 text-sm text-muted">
+                  Select the classes that should receive this assessment.
+                </p>
+              </div>
+            </div>
 
-            <p class="mt-1 text-sm text-muted">
-              Each class may use a different opening time and closing deadline. Question timers are configured separately in the Question Builder.
-            </p>
+            <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+              <UInput
+                v-model="classSearchQuery"
+                icon="i-lucide-search"
+                placeholder="Search class"
+                aria-label="Search classes"
+                class="w-full sm:w-64"
+              />
+
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-check-check"
+                :disabled="!canEdit || visibleRows.length === 0"
+                @click="selectVisibleClasses"
+              >
+                Select all
+              </UButton>
+            </div>
           </div>
-        </template>
+        </div>
 
         <EmptyPanel
-          v-if="
-            rows.length === 0
-          "
+          v-if="rows.length === 0"
+          class="m-5"
           icon="i-lucide-school"
           title="No active classes"
           description="Create or reactivate a class before assigning this assessment."
         />
 
+        <EmptyPanel
+          v-else-if="visibleRows.length === 0"
+          class="m-5"
+          icon="i-lucide-search-x"
+          title="No matching classes"
+          description="Try a different class name, subject code, or section."
+        />
+
         <div
           v-else
-          class="space-y-4"
+          class="divide-y divide-default"
         >
           <article
-            v-for="row in rows"
+            v-for="row in visibleRows"
             :key="row.classroom.id"
-            class="rounded-xl border p-4 transition"
+            class="transition"
             :class="
               row.selected
-                ? 'border-primary bg-primary/5'
-                : 'border-default bg-default'
+                ? 'bg-primary/[0.035]'
+                : 'bg-default'
             "
           >
-            <div class="flex flex-col gap-4">
-              <button
-                type="button"
-                class="flex items-start gap-3 text-left"
-                :disabled="!canEdit"
-                @click="
-                  toggleRow(
-                    row,
-                  )
+            <button
+              type="button"
+              class="flex w-full items-center gap-3 p-4 text-left transition hover:bg-elevated/40 sm:px-5"
+              :disabled="!canEdit"
+              :aria-pressed="row.selected"
+              @click="toggleRow(row)"
+            >
+              <span
+                class="flex size-6 shrink-0 items-center justify-center rounded-md border transition"
+                :class="
+                  row.selected
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-default bg-default text-transparent'
                 "
               >
-                <span
-                  class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border"
-                  :class="
-                    row.selected
-                      ? 'border-primary bg-primary text-white'
-                      : 'border-default text-transparent'
-                  "
-                >
-                  <UIcon
-                    name="i-lucide-check"
-                    class="size-4"
-                  />
-                </span>
+                <UIcon
+                  name="i-lucide-check"
+                  class="size-4"
+                />
+              </span>
 
-                <span>
-                  <span class="block font-black text-highlighted">
+              <span class="min-w-0 flex-1">
+                <span class="flex flex-wrap items-center gap-2">
+                  <span class="font-black text-highlighted">
                     {{ row.classroom.subjectCode }}
                     ·
                     {{ row.classroom.section }}
                   </span>
 
-                  <span class="mt-1 block text-sm text-muted">
-                    {{ row.classroom.name }}
-                    ·
-                    {{ row.classroom.schoolYear }}
-                    ·
-                    {{ row.classroom.semester }}
-                  </span>
+                  <UBadge
+                    v-if="row.existing"
+                    color="success"
+                    variant="soft"
+                    size="sm"
+                  >
+                    Assigned
+                  </UBadge>
                 </span>
-              </button>
 
+                <span class="mt-1 block truncate text-sm text-muted">
+                  {{ row.classroom.name }}
+                </span>
+              </span>
+
+              <UIcon
+                :name="row.selected ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                class="size-4 shrink-0 text-muted"
+              />
+            </button>
+
+            <div
+              v-if="row.selected"
+              class="border-t border-default/70 px-4 pb-5 pt-4 sm:px-5"
+            >
               <div
-                v-if="row.selected"
-                class="grid gap-4 border-t border-default pt-4 md:grid-cols-2"
+                class="mb-3 flex items-center gap-2 text-sm font-semibold text-highlighted"
               >
-                <UFormField label="Opens">
+                <div
+                  class="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary"
+                >
+                  <span class="text-xs font-black">2</span>
+                </div>
+
+                Set access window
+              </div>
+
+              <div class="grid gap-4 md:grid-cols-2">
+                <UFormField
+                  label="Opens"
+                  description="Students can start from this time."
+                >
                   <UInput
                     v-model="row.startsAtLocal"
                     type="datetime-local"
@@ -741,39 +954,35 @@ onMounted(
                   />
                 </UFormField>
 
-                <UFormField label="Closes">
+                <UFormField
+                  label="Closes"
+                  description="This is the final deadline."
+                >
                   <UInput
                     v-model="row.endsAtLocal"
                     type="datetime-local"
                     class="w-full"
                   />
                 </UFormField>
-
               </div>
 
               <div
-                v-if="
-                  row.existing
-                  && row.selected
-                "
-                class="flex justify-end"
+                v-if="row.existing"
+                class="mt-4 flex items-center justify-between gap-3 rounded-xl bg-elevated/50 px-3 py-2.5"
               >
+                <p class="text-xs text-muted">
+                  This class already has an active schedule.
+                </p>
+
                 <UButton
                   color="error"
-                  variant="soft"
+                  variant="ghost"
                   size="sm"
                   icon="i-lucide-lock"
-                  :loading="
-                    closingId
-                    === row.existing.id
-                  "
-                  @click="
-                    requestClose(
-                      row.existing,
-                    )
-                  "
+                  :loading="closingId === row.existing.id"
+                  @click="requestClose(row.existing)"
                 >
-                  Close Access Early
+                  Close early
                 </UButton>
               </div>
             </div>
@@ -781,43 +990,212 @@ onMounted(
         </div>
       </UCard>
 
-      <div class="flex justify-end">
-        <UButton
-          icon="i-lucide-calendar-check"
-          :disabled="!canEdit"
-          @click="requestSave"
+      <div
+        class="sticky bottom-4 z-20 rounded-2xl border border-default bg-default/95 p-3 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-default/85"
+      >
+        <div
+          class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
         >
-          Review and Save
-        </UButton>
+          <div class="min-w-0">
+            <p class="font-bold text-highlighted">
+              {{
+                selectedRows.length === 0
+                  ? 'Choose a class to continue'
+                  : `${selectedRows.length} ${selectedRows.length === 1 ? 'class' : 'classes'} selected`
+              }}
+            </p>
+
+            <p class="mt-0.5 text-xs text-muted">
+              Review the schedule before saving.
+            </p>
+          </div>
+
+          <UButton
+            icon="i-lucide-arrow-right"
+            trailing
+            :disabled="!canEdit || selectedRows.length === 0"
+            @click="requestSave"
+          >
+            Review & Save
+          </UButton>
+        </div>
       </div>
     </template>
 
-    <ConfirmationModal
-      v-model:open="
-        saveConfirmationOpen
-      "
-      title="Save classroom assessment schedules?"
-      description="Students can start when access opens. The closing time is the final assessment deadline, and each question keeps its configured answer time."
-      confirm-label="Save Schedules"
-      icon="i-lucide-calendar-check"
-      :loading="isSaving"
-      @confirm="save"
-    />
+    <UModal
+      v-model:open="saveConfirmationOpen"
+      :ui="{
+        content: 'sm:max-w-2xl',
+      }"
+    >
+      <template #content>
+        <div class="p-5 sm:p-6">
+          <div class="flex items-start gap-3">
+            <div
+              class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary"
+            >
+              <UIcon
+                name="i-lucide-calendar-check"
+                class="size-5"
+              />
+            </div>
+
+            <div class="min-w-0">
+              <p class="text-xs font-bold uppercase tracking-[0.14em] text-primary">
+                Step 3
+              </p>
+
+              <h2 class="mt-1 text-xl font-black text-highlighted">
+                Review assignment
+              </h2>
+
+              <p class="mt-1 text-sm text-muted">
+                Confirm the classes and access times before saving.
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-2">
+            <div
+              v-for="row in selectedRows"
+              :key="row.classroom.id"
+              class="rounded-xl border border-default bg-elevated/35 p-4"
+            >
+              <div
+                class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+              >
+                <div class="min-w-0">
+                  <p class="font-black text-highlighted">
+                    {{ row.classroom.subjectCode }}
+                    ·
+                    {{ row.classroom.section }}
+                  </p>
+
+                  <p class="mt-1 truncate text-sm text-muted">
+                    {{ row.classroom.name }}
+                  </p>
+                </div>
+
+                <div class="shrink-0 text-sm sm:text-right">
+                  <p class="font-semibold text-highlighted">
+                    {{ formatLocalDate(row.startsAtLocal) }}
+                  </p>
+
+                  <p class="mt-1 text-muted">
+                    to {{ formatLocalDate(row.endsAtLocal) }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <UAlert
+            v-if="removedExistingRows.length > 0"
+            class="mt-4"
+            color="warning"
+            variant="soft"
+            icon="i-lucide-triangle-alert"
+            title="Existing assignments will be removed"
+            :description="`${removedExistingRows.length} previously assigned ${removedExistingRows.length === 1 ? 'class is' : 'classes are'} no longer selected.`"
+          />
+
+          <div
+            class="mt-6 flex flex-col-reverse gap-2 border-t border-default pt-4 sm:flex-row sm:justify-end"
+          >
+            <UButton
+              color="neutral"
+              variant="ghost"
+              :disabled="isSaving"
+              @click="saveConfirmationOpen = false"
+            >
+              Go Back
+            </UButton>
+
+            <UButton
+              icon="i-lucide-calendar-check"
+              :loading="isSaving"
+              @click="save"
+            >
+              Assign Assessment
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="saveSuccessOpen"
+      :ui="{
+        content: 'sm:max-w-md',
+      }"
+    >
+      <template #content>
+        <div class="p-6 text-center sm:p-7">
+          <div
+            class="mx-auto flex size-16 items-center justify-center rounded-full bg-success/12 text-success ring-8 ring-success/5"
+          >
+            <UIcon
+              name="i-lucide-check"
+              class="size-8 stroke-[3]"
+            />
+          </div>
+
+          <h2 class="mt-5 text-2xl font-black text-highlighted">
+            Assessment assigned
+          </h2>
+
+          <p class="mt-2 text-sm leading-6 text-muted">
+            {{
+              lastSavedSchedules.length === 1
+                ? 'The class schedule is ready.'
+                : `${lastSavedSchedules.length} class schedules are ready.`
+            }}
+            What would you like to do next?
+          </p>
+
+          <div class="mt-6 grid gap-2">
+            <UButton
+              size="lg"
+              icon="i-lucide-radio-tower"
+              block
+              @click="openLiveSessions"
+            >
+              {{ liveSessionActionLabel }}
+            </UButton>
+
+            <UButton
+              size="lg"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-clipboard-list"
+              block
+              @click="backToAssessments"
+            >
+              Back to Assessments
+            </UButton>
+          </div>
+
+          <UButton
+            class="mt-3"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            @click="saveSuccessOpen = false"
+          >
+            Stay on this page
+          </UButton>
+        </div>
+      </template>
+    </UModal>
 
     <ConfirmationModal
-      v-model:open="
-        closeConfirmationOpen
-      "
+      v-model:open="closeConfirmationOpen"
       title="Close assessment access now?"
-      description="Students will no longer be able to start. In-progress attempts will be submitted and graded safely."
+      description="Students will no longer be able to start. In-progress attempts will be submitted automatically."
       confirm-label="Close Access"
       confirm-color="error"
       icon="i-lucide-lock"
-      :loading="
-        Boolean(
-          closingId,
-        )
-      "
+      :loading="Boolean(closingId)"
       @confirm="confirmClose"
     />
   </div>
