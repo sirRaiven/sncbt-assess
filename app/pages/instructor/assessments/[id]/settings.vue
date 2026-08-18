@@ -92,9 +92,6 @@ const schema = z.object({
     "score_and_answers",
   ]),
 
-  leaderboardEnabled:
-    z.boolean(),
-
   allowBacktracking:
     z.boolean(),
 });
@@ -112,7 +109,6 @@ const state = reactive<SettingsSchema>({
   randomizeQuestions: false,
   randomizeOptions: false,
   resultVisibility: "score_and_answers",
-  leaderboardEnabled: false,
   allowBacktracking: true,
 });
 
@@ -152,8 +148,6 @@ function fillState(
     value.randomize_options;
   state.resultVisibility =
     value.result_visibility;
-  state.leaderboardEnabled =
-    value.leaderboard_enabled;
   state.allowBacktracking =
     value.allow_backtracking;
 }
@@ -222,8 +216,6 @@ async function save(
           event.data.randomizeOptions,
         resultVisibility:
           event.data.resultVisibility,
-        leaderboardEnabled:
-          event.data.leaderboardEnabled,
         allowBacktracking:
           event.data.allowBacktracking,
       },
@@ -745,21 +737,6 @@ onMounted(
                   />
                 </div>
 
-                <div class="flex items-start justify-between gap-5">
-                  <div>
-                    <p class="font-semibold text-highlighted">
-                      Leaderboard available
-                    </p>
-                    <p class="mt-1 text-sm text-muted">
-                      Enables ranking in Instructor monitoring. Students do not currently see a leaderboard.
-                    </p>
-                  </div>
-
-                  <USwitch
-                    v-model="state.leaderboardEnabled"
-                    aria-label="Leaderboard available"
-                  />
-                </div>
               </div>
             </fieldset>
           </UCard>

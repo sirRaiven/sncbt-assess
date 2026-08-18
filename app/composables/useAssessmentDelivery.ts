@@ -5,6 +5,7 @@ import type {
   InstructorDeliveryMonitor,
   SaveDeliveryAnswerResult,
   StudentAssessmentDelivery,
+  StudentLiveLeaderboard,
   SubmitDeliveryAttemptResult,
 } from "~/types/assessment-delivery";
 
@@ -348,6 +349,22 @@ export function useAssessmentDelivery() {
     );
   }
 
+  async function getStudentLeaderboard(
+    assignmentId: string,
+  ) {
+    return await invoke<{
+      serverNow: string;
+      leaderboard:
+        StudentLiveLeaderboard;
+    }>(
+      "get-student-leaderboard",
+      {
+        assignmentId,
+      },
+      10000,
+    );
+  }
+
   async function listInstructorDeliveries() {
     return await invoke<{
       serverNow: string;
@@ -375,6 +392,7 @@ export function useAssessmentDelivery() {
     saveAnswer,
     submitAttempt,
     getResult,
+    getStudentLeaderboard,
     listInstructorDeliveries,
     getInstructorMonitor,
   };

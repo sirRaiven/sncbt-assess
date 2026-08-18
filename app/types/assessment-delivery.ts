@@ -40,7 +40,6 @@ export interface AssessmentScheduleInput {
   endsAt: string;
   /** @deprecated Always null; the class closing time is the whole-assessment deadline. */
   timeLimitSeconds: number | null;
-  showLeaderboard: boolean;
   maxAttempts: number;
 }
 
@@ -220,6 +219,25 @@ export interface SubmitDeliveryAttemptResult {
   alreadyCompleted: boolean;
 }
 
+
+export interface StudentLiveLeaderboardEntry {
+  rank: number;
+  studentName: string;
+  score: number;
+  maximumScore: number;
+  isCurrentStudent: boolean;
+}
+
+export interface StudentLiveLeaderboard {
+  assignmentId: string;
+  assessmentId: string;
+  title: string;
+  scoringMode:
+    | "standard"
+    | "speed_bonus";
+  updatedAt: string;
+  entries: StudentLiveLeaderboardEntry[];
+}
 
 export interface InstructorDeliveryListItem {
   assignmentId: string;

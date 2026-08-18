@@ -103,9 +103,6 @@ const schema = z.object({
     "score_and_answers",
   ]),
 
-  leaderboardEnabled:
-    z.boolean(),
-
   allowBacktracking:
     z.boolean(),
 });
@@ -124,7 +121,6 @@ const state = reactive<CreateAssessmentSchema>({
   randomizeQuestions: false,
   randomizeOptions: false,
   resultVisibility: "score_and_answers",
-  leaderboardEnabled: false,
   allowBacktracking: true,
 });
 
@@ -272,8 +268,6 @@ async function submit(
         event.data.randomizeOptions,
       resultVisibility:
         event.data.resultVisibility,
-      leaderboardEnabled:
-        event.data.leaderboardEnabled,
       allowBacktracking:
         event.data.allowBacktracking,
     });
@@ -716,21 +710,6 @@ async function submit(
                 />
               </div>
 
-              <div class="flex items-start justify-between gap-5">
-                <div>
-                  <p class="font-semibold text-highlighted">
-                    Leaderboard available
-                  </p>
-                  <p class="mt-1 text-sm text-muted">
-                    Enables ranking in Instructor monitoring. Students do not currently see a leaderboard.
-                  </p>
-                </div>
-
-                <USwitch
-                  v-model="state.leaderboardEnabled"
-                  aria-label="Leaderboard available"
-                />
-              </div>
             </div>
           </div>
         </UCard>

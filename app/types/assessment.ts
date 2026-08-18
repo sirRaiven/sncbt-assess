@@ -81,7 +81,6 @@ export interface AssessmentDetailsInput {
   randomizeQuestions: boolean;
   randomizeOptions: boolean;
   resultVisibility: AssessmentResultVisibility;
-  leaderboardEnabled: boolean;
   allowBacktracking: boolean;
 }
 

@@ -25,7 +25,6 @@ interface ClassScheduleRow {
   selected: boolean;
   startsAtLocal: string;
   endsAtLocal: string;
-  showLeaderboard: boolean;
   maxAttempts: number;
   existing:
     AssessmentScheduleItem
@@ -260,13 +259,6 @@ function buildRows(
               )
             : defaults
               .endsAtLocal,
-        showLeaderboard:
-          existing
-            ?.showLeaderboard
-          ?? overview.value
-            ?.assessment
-            .defaultLeaderboardEnabled
-          ?? true,
         maxAttempts:
           existing?.maxAttempts
           ?? 1,
@@ -436,8 +428,6 @@ async function save():
         // The class closing time is the only assessment deadline.
         timeLimitSeconds:
           null,
-        showLeaderboard:
-          row.showLeaderboard,
         maxAttempts:
           row.maxAttempts,
       }),
@@ -741,7 +731,7 @@ onMounted(
 
               <div
                 v-if="row.selected"
-                class="grid gap-4 border-t border-default pt-4 md:grid-cols-3"
+                class="grid gap-4 border-t border-default pt-4 md:grid-cols-2"
               >
                 <UFormField label="Opens">
                   <UInput
@@ -759,13 +749,6 @@ onMounted(
                   />
                 </UFormField>
 
-                <div class="flex items-end">
-                  <USwitch
-                    v-model="row.showLeaderboard"
-                    label="Show leaderboard"
-                    aria-label="Show leaderboard for this class"
-                  />
-                </div>
               </div>
 
               <div

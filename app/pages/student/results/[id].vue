@@ -471,6 +471,13 @@ onMounted(
         />
       </section>
 
+      <StudentLeaderboardCard
+        v-if="canShowScore"
+        :assignment-id="
+          delivery.assignmentId
+        "
+      />
+
       <UCard>
         <template #header>
           <div class="flex flex-wrap items-center justify-between gap-3">
@@ -490,7 +497,7 @@ onMounted(
           </div>
         </template>
 
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div class="rounded-xl border border-default p-4">
             <p class="text-xs font-bold uppercase tracking-[0.14em] text-muted">
               Started
@@ -522,22 +529,6 @@ onMounted(
 
             <p class="mt-1 text-sm text-muted">
               {{ delivery.classroom.section }}
-            </p>
-          </div>
-
-          <div class="rounded-xl border border-default p-4">
-            <p class="text-xs font-bold uppercase tracking-[0.14em] text-muted">
-              Result access
-            </p>
-
-            <p class="mt-2 font-bold text-highlighted">
-              {{
-                delivery.resultVisibility === "hidden"
-                  ? "Not released"
-                  : delivery.resultVisibility === "score_only"
-                    ? "Score only"
-                    : "Score + instant feedback"
-              }}
             </p>
           </div>
         </div>
@@ -582,47 +573,6 @@ onMounted(
               attempt.submittedReason,
             )
           "
-        />
-      </UCard>
-
-      <UCard>
-        <template #header>
-          <div>
-            <h2 class="font-black text-highlighted">
-              Answer feedback
-            </h2>
-
-            <p class="mt-1 text-sm text-muted">
-              Correct answers are never published on this result page.
-            </p>
-          </div>
-        </template>
-
-        <UAlert
-          v-if="delivery.resultVisibility === 'hidden'"
-          color="info"
-          variant="soft"
-          icon="i-lucide-eye-off"
-          title="Result not released"
-          description="Your submission is recorded. Your instructor has chosen not to release the score or answer feedback."
-        />
-
-        <UAlert
-          v-else-if="delivery.resultVisibility === 'score_only'"
-          color="neutral"
-          variant="soft"
-          icon="i-lucide-trophy"
-          title="Score-only result"
-          description="Your score is available. Question-by-question correct answers are not shown."
-        />
-
-        <UAlert
-          v-else
-          color="success"
-          variant="soft"
-          icon="i-lucide-circle-check-big"
-          title="Instant feedback was enabled"
-          description="During the assessment, SNCBT Assess showed Correct or Incorrect after each committed answer. The correct answer itself remains private and is not displayed after submission."
         />
       </UCard>
 

@@ -475,6 +475,16 @@ onMounted(
           </div>
         </div>
       </UCard>
+
+      <StudentLeaderboardCard
+        v-if="
+          delivery.resultVisibility
+          !== 'hidden'
+        "
+        :assignment-id="
+          delivery.assignmentId
+        "
+      />
     </template>
   </div>
 </template>
