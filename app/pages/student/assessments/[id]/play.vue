@@ -170,6 +170,14 @@ const pendingFeedbackAction =
 const pendingFeedbackSubmitReason =
   ref("student_submitted");
 
+const FEEDBACK_AUTO_ADVANCE_MS =
+  2200;
+
+let feedbackAdvanceTimer:
+  ReturnType<typeof setTimeout>
+  | null =
+    null;
+
 const isOnline =
   ref(true);
 
@@ -2661,8 +2669,70 @@ async function submit(
   );
 }
 
+function clearFeedbackAdvanceTimer():
+  void {
+  if (!feedbackAdvanceTimer) {
+    return;
+  }
+
+  clearTimeout(
+    feedbackAdvanceTimer,
+  );
+
+  feedbackAdvanceTimer =
+    null;
+}
+
+function scheduleFeedbackAdvance():
+  void {
+  clearFeedbackAdvanceTimer();
+
+  if (
+    !feedbackModalOpen.value
+    || !pendingFeedbackAction.value
+  ) {
+    return;
+  }
+
+  feedbackAdvanceTimer =
+    setTimeout(
+      () => {
+        feedbackAdvanceTimer =
+          null;
+
+        void continueAfterFeedback();
+      },
+      FEEDBACK_AUTO_ADVANCE_MS,
+    );
+}
+
+watch(
+  [
+    feedbackModalOpen,
+    pendingFeedbackAction,
+  ],
+  (
+    [
+      open,
+      action,
+    ],
+  ) => {
+    if (
+      open
+      && action
+    ) {
+      scheduleFeedbackAdvance();
+
+      return;
+    }
+
+    clearFeedbackAdvanceTimer();
+  },
+);
+
 async function continueAfterFeedback():
   Promise<void> {
+  clearFeedbackAdvanceTimer();
   const action =
     pendingFeedbackAction.value;
 
@@ -2973,6 +3043,8 @@ onMounted(
 
 onBeforeUnmount(
   () => {
+    clearFeedbackAdvanceTimer();
+
     if (timer) {
       clearInterval(timer);
     }
@@ -3645,69 +3717,99 @@ onBeforeRouteLeave(
     <UModal
       v-model:open="feedbackModalOpen"
       :dismissible="false"
-      :ui="{ content: 'sm:max-w-md' }"
+      :ui="{
+        content:
+          'sm:max-w-sm overflow-hidden',
+      }"
     >
       <template #content>
         <div
           v-if="answerFeedback"
-          class="p-6 text-center sm:p-7"
+          class="relative overflow-hidden px-6 py-8 text-center sm:px-8 sm:py-9"
         >
           <div
-            class="mx-auto flex size-16 items-center justify-center rounded-full"
+            class="pointer-events-none absolute inset-0"
             :class="
               answerFeedback.isCorrect
-                ? 'bg-success/12 text-success'
-                : 'bg-error/12 text-error'
+                ? 'bg-gradient-to-br from-success/14 via-transparent to-success/5'
+                : 'bg-gradient-to-br from-error/14 via-transparent to-error/5'
             "
-          >
-            <UIcon
-              :name="
+            aria-hidden="true"
+          />
+
+          <div class="relative">
+            <div
+              class="mx-auto flex size-20 items-center justify-center rounded-full ring-8 animate-pulse"
+              :class="
                 answerFeedback.isCorrect
-                  ? 'i-lucide-circle-check-big'
-                  : 'i-lucide-circle-x'
+                  ? 'bg-success/15 text-success ring-success/5'
+                  : 'bg-error/15 text-error ring-error/5'
               "
-              class="size-9"
-            />
+            >
+              <UIcon
+                :name="
+                  answerFeedback.isCorrect
+                    ? 'i-lucide-check'
+                    : 'i-lucide-x'
+                "
+                class="size-11 stroke-[3]"
+              />
+            </div>
+
+            <h2
+              class="mt-5 text-3xl font-black tracking-tight"
+              :class="
+                answerFeedback.isCorrect
+                  ? 'text-success'
+                  : 'text-error'
+              "
+            >
+              {{
+                answerFeedback.isCorrect
+                  ? "Correct!"
+                  : "Incorrect"
+              }}
+            </h2>
+
+            <UBadge
+              v-if="answerFeedback.speedBonus > 0"
+              class="mt-4"
+              color="primary"
+              variant="soft"
+              size="lg"
+              icon="i-lucide-zap"
+            >
+              +{{ answerFeedback.speedBonus }} speed bonus
+            </UBadge>
+
+            <div
+              class="mx-auto mt-6 h-1.5 max-w-36 overflow-hidden rounded-full bg-elevated"
+              aria-hidden="true"
+            >
+              <div
+                class="h-full w-full origin-left rounded-full animate-[feedback-shrink_2.2s_linear_forwards]"
+                :class="
+                  answerFeedback.isCorrect
+                    ? 'bg-success'
+                    : 'bg-error'
+                "
+              />
+            </div>
           </div>
-
-          <h2
-            class="mt-5 text-2xl font-black text-highlighted"
-          >
-            {{
-              answerFeedback.isCorrect
-                ? "Correct!"
-                : "Incorrect"
-            }}
-          </h2>
-
-          <p class="mt-2 text-sm leading-6 text-muted">
-            Your answer is now locked. SNCBT Assess does not reveal the correct answer during the assessment.
-          </p>
-
-          <UBadge
-            v-if="answerFeedback.speedBonus > 0"
-            class="mt-4"
-            color="primary"
-            variant="soft"
-            size="lg"
-          >
-            +{{ answerFeedback.speedBonus }} speed bonus
-          </UBadge>
-
-          <UButton
-            class="mt-6 w-full justify-center"
-            size="lg"
-            :color="
-              answerFeedback.isCorrect
-                ? 'success'
-                : 'error'
-            "
-            @click="continueAfterFeedback"
-          >
-            Continue
-          </UButton>
         </div>
       </template>
     </UModal>
   </div>
 </template>
+
+<style>
+@keyframes feedback-shrink {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}
+</style>

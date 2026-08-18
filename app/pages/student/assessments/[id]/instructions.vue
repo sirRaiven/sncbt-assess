@@ -128,10 +128,9 @@ const integrityStartNotice =
     () =>
       integrityPolicy.value
         ?.enabled
-        ? integrityPolicy.value
-            .focusModeEnabled
-          ? " Focus monitoring is active. If your browser supports fullscreen, you will enter Focus Mode before the first question timer starts."
-          : " Assessment activity monitoring is active during this attempt."
+        && integrityPolicy.value
+          .focusModeEnabled
+        ? " Focus Mode will open before the first question."
         : "",
   );
 
@@ -153,14 +152,14 @@ const startConfirmationDescription =
           attemptPolicy.value.nextAttemptNumber
           || attemptPolicy.value.attemptsUsed + 1;
 
-        return `This will start attempt ${nextNumber} of ${attemptPolicy.value.maxAttempts}. The first question timer starts when the question is delivered. The class closes at ${closesAt}.${integrityStartNotice.value}`;
+        return `Start attempt ${nextNumber} of ${attemptPolicy.value.maxAttempts}. Each question has its own timer. Finish before ${closesAt}.${integrityStartNotice.value}`;
       }
 
       if (canStartAnotherAttempt.value) {
-        return `This will start another assessment attempt. Each question has its own answer timer, and the class closes at ${closesAt}.${integrityStartNotice.value}`;
+        return `Start another attempt. Each question has its own timer. Finish before ${closesAt}.${integrityStartNotice.value}`;
       }
 
-      return `The first question timer starts when the question is delivered. Each question has its own answer time, and the class closes at ${closesAt}.${integrityStartNotice.value}`;
+      return `Each question has its own timer. Finish before ${closesAt}.${integrityStartNotice.value}`;
     },
   );
 
@@ -418,241 +417,270 @@ onMounted(
     <template
       v-else-if="delivery"
     >
-      <UCard>
-        <template #header>
-          <h2 class="font-black text-highlighted">
-            Before you begin
-          </h2>
-        </template>
-
+      <UCard
+        class="overflow-hidden"
+        :ui="{
+          body: 'p-0 sm:p-0',
+        }"
+      >
         <div
-          class="grid gap-4 sm:grid-cols-2"
-          :class="
-            attemptPolicy
-              ? 'xl:grid-cols-6'
-              : 'xl:grid-cols-5'
-          "
+          class="border-b border-default bg-gradient-to-br from-primary/12 via-primary/5 to-transparent p-5 sm:p-6"
         >
-          <div class="rounded-xl bg-elevated p-4 text-center">
-            <p class="text-xs text-muted">
-              Questions
-            </p>
+          <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+          >
+            <div class="min-w-0">
+              <div class="flex items-center gap-3">
+                <div
+                  class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary"
+                >
+                  <UIcon
+                    name="i-lucide-clipboard-check"
+                    class="size-5"
+                  />
+                </div>
 
-            <p class="mt-2 text-2xl font-black text-highlighted">
-              {{ delivery.questionCount }}
-            </p>
-          </div>
+                <div>
+                  <h2 class="text-lg font-black text-highlighted">
+                    Ready to start?
+                  </h2>
 
-          <div class="rounded-xl bg-elevated p-4 text-center">
-            <p class="text-xs text-muted">
-              Total points
-            </p>
+                  <p class="mt-0.5 text-sm text-muted">
+                    Check the important details below before you begin.
+                  </p>
+                </div>
+              </div>
+            </div>
 
-            <p class="mt-2 text-2xl font-black text-highlighted">
-              {{ delivery.totalPoints }}
-            </p>
-          </div>
+            <div
+              class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-default bg-default/70 px-3 py-2 text-sm"
+            >
+              <UIcon
+                name="i-lucide-calendar-clock"
+                class="size-4 text-primary"
+              />
 
-          <div class="rounded-xl bg-elevated p-4 text-center">
-            <p class="text-xs text-muted">
-              Scoring
-            </p>
+              <span class="text-muted">
+                Closes
+              </span>
 
-            <p class="mt-2 text-sm font-black text-highlighted">
-              {{
-                delivery.scoringMode === "speed_bonus"
-                  ? "Speed bonus"
-                  : "Standard"
-              }}
-            </p>
-          </div>
-
-          <div class="rounded-xl bg-elevated p-4 text-center">
-            <p class="text-xs text-muted">
-              Question timing
-            </p>
-
-            <p class="mt-2 text-sm font-black text-highlighted">
-              Timed individually
-            </p>
-          </div>
-
-          <div class="rounded-xl bg-elevated p-4 text-center">
-            <p class="text-xs text-muted">
-              Backtracking
-            </p>
-
-            <p class="mt-2 text-sm font-black text-highlighted">
-              {{
-                delivery.allowBacktracking
-                  ? "Allowed"
-                  : "Disabled"
-              }}
-            </p>
+              <span class="font-bold text-highlighted">
+                {{ formatDate(delivery.endsAt) }}
+              </span>
+            </div>
           </div>
 
           <div
-            v-if="attemptPolicy"
-            class="rounded-xl bg-elevated p-4 text-center"
+            class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4"
           >
-            <p class="text-xs text-muted">
-              Attempts
-            </p>
-
-            <p class="mt-2 text-sm font-black text-highlighted">
-              {{ attemptPolicy.attemptsUsed }}
-              of
-              {{ attemptPolicy.maxAttempts }}
-              used
-            </p>
-
-            <p class="mt-1 text-xs text-muted">
-              {{ attemptPolicy.attemptsRemaining }} remaining
-            </p>
-          </div>
-        </div>
-
-        <UAlert
-          class="mt-6"
-          color="warning"
-          variant="soft"
-          icon="i-lucide-hourglass"
-          title="Question timeout rule"
-          description="If a question's answer time reaches zero, that question closes and the assessment moves to the next one. An unsaved answer is recorded as timed out. Each new question receives its own configured time until the class deadline is reached."
-        />
-
-        <UAlert
-          v-if="delivery.scoringMode === 'speed_bonus'"
-          class="mt-4"
-          color="primary"
-          variant="soft"
-          icon="i-lucide-gauge"
-          title="Speed bonus is active"
-          description="Correct answers receive their full points plus up to 20% extra based on how quickly the answer is committed. The bonus decreases as the question timer is used. Incorrect answers receive no speed bonus."
-        />
-
-        <UAlert
-          v-if="delivery.resultVisibility === 'score_and_answers'"
-          class="mt-4"
-          color="success"
-          variant="soft"
-          icon="i-lucide-circle-check-big"
-          title="Instant answer feedback is active"
-          description="After you commit an answer, you will see only Correct or Incorrect. The correct answer will not be shown. Once feedback appears, that question is locked and cannot be changed."
-        />
-
-        <UAlert
-          v-if="integrityPolicy?.enabled"
-          class="mt-4"
-          color="info"
-          variant="soft"
-          icon="i-lucide-shield-check"
-          title="Assessment activity monitoring is active"
-          :description="
-            integrityPolicy.focusModeEnabled
-              ? 'SNCBT Assess records focus-related signals while this attempt is active, including leaving the assessment tab, exiting fullscreen Focus Mode, or attempting to copy, paste, cut, or open the context menu in the question area. These signals are visible to your instructor but do not automatically determine misconduct or change your score.'
-              : 'SNCBT Assess records focus-related browser signals while this attempt is active. These signals are visible to your instructor but do not automatically determine misconduct or change your score.'
-          "
-        />
-
-        <div class="mt-6 grid gap-4 md:grid-cols-2">
-          <div class="rounded-xl border border-default p-4">
-            <p class="text-xs font-bold uppercase tracking-[0.14em] text-muted">
-              Opens
-            </p>
-
-            <p class="mt-2 font-bold text-highlighted">
-              {{
-                formatDate(
-                  delivery.startsAt,
-                )
-              }}
-            </p>
-          </div>
-
-          <div class="rounded-xl border border-default p-4">
-            <p class="text-xs font-bold uppercase tracking-[0.14em] text-muted">
-              Closes
-            </p>
-
-            <p class="mt-2 font-bold text-highlighted">
-              {{
-                formatDate(
-                  delivery.endsAt,
-                )
-              }}
-            </p>
-          </div>
-        </div>
-
-        <div class="mt-6 border-t border-default pt-6">
-          <h3 class="font-black text-highlighted">
-            Instructor instructions
-          </h3>
-
-          <p class="mt-3 whitespace-pre-line text-sm leading-7 text-muted">
-            {{
-              delivery.instructions
-              || "Read each question carefully. Save your answer before continuing and submit only when you are ready."
-            }}
-          </p>
-        </div>
-
-        <div class="mt-6 space-y-3 border-t border-default pt-6">
-          <div class="flex items-start gap-3">
-            <UIcon
-              name="i-lucide-circle-check"
-              class="mt-0.5 size-5 text-success"
-            />
-
-            <p class="text-sm text-muted">
-              SNCBT Assess keeps track of each question timer, the class deadline, and your saved progress. Answers cannot be changed after submission.
-            </p>
-          </div>
-
-          <div class="flex items-start gap-3">
-            <UIcon
-              name="i-lucide-circle-check"
-              class="mt-0.5 size-5 text-success"
-            />
-
-            <p class="text-sm text-muted">
-              {{
-                delivery.resultVisibility === "score_and_answers"
-                  ? "When instant feedback is enabled, only the Correct or Incorrect outcome is shown. The correct answer itself remains private."
-                  : "Correct answers are not sent to your browser while the assessment is active."
-              }}
-            </p>
-          </div>
-
-          <div class="flex items-start gap-3">
-            <UIcon
-              name="i-lucide-circle-check"
-              class="mt-0.5 size-5 text-success"
-            />
-
-            <p class="text-sm text-muted">
-              Closing or refreshing the browser does not create another attempt. Use Continue Assessment to resume.
-            </p>
-          </div>
-        </div>
-
-        <div
-          v-if="attemptPolicy"
-          class="mt-6 rounded-xl border border-default p-4"
-        >
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p class="text-xs font-bold uppercase tracking-[0.14em] text-muted">
-                Attempt policy
+            <div class="rounded-xl bg-default/70 px-4 py-3">
+              <p class="text-xs font-medium text-muted">
+                Questions
               </p>
 
-              <p class="mt-2 font-bold text-highlighted">
-                {{ attemptPolicy.attemptsUsed }} of {{ attemptPolicy.maxAttempts }} attempts used
+              <p class="mt-1 text-xl font-black text-highlighted">
+                {{ delivery.questionCount }}
+              </p>
+            </div>
+
+            <div class="rounded-xl bg-default/70 px-4 py-3">
+              <p class="text-xs font-medium text-muted">
+                Points
+              </p>
+
+              <p class="mt-1 text-xl font-black text-highlighted">
+                {{ delivery.totalPoints }}
+              </p>
+            </div>
+
+            <div class="rounded-xl bg-default/70 px-4 py-3">
+              <p class="text-xs font-medium text-muted">
+                Backtracking
+              </p>
+
+              <p class="mt-1 text-sm font-black text-highlighted">
+                {{
+                  delivery.allowBacktracking
+                    ? "Allowed"
+                    : "Not allowed"
+                }}
+              </p>
+            </div>
+
+            <div class="rounded-xl bg-default/70 px-4 py-3">
+              <p class="text-xs font-medium text-muted">
+                Timing
+              </p>
+
+              <p class="mt-1 text-sm font-black text-highlighted">
+                Per question
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-5 sm:p-6">
+          <section>
+            <div class="flex items-center gap-2">
+              <UIcon
+                name="i-lucide-list-checks"
+                class="size-5 text-primary"
+              />
+
+              <h3 class="font-black text-highlighted">
+                What you need to know
+              </h3>
+            </div>
+
+            <div class="mt-4 grid gap-3 md:grid-cols-2">
+              <div
+                class="flex items-start gap-3 rounded-xl border border-default/70 bg-elevated/35 p-4"
+              >
+                <div
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning"
+                >
+                  <UIcon
+                    name="i-lucide-timer"
+                    class="size-4"
+                  />
+                </div>
+
+                <div>
+                  <p class="text-sm font-bold text-highlighted">
+                    Watch the timer
+                  </p>
+
+                  <p class="mt-1 text-sm leading-5 text-muted">
+                    When a question reaches 0, it closes and you move to the next one.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                class="flex items-start gap-3 rounded-xl border border-default/70 bg-elevated/35 p-4"
+              >
+                <div
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+                >
+                  <UIcon
+                    :name="
+                      delivery.allowBacktracking
+                        ? 'i-lucide-undo-2'
+                        : 'i-lucide-lock'
+                    "
+                    class="size-4"
+                  />
+                </div>
+
+                <div>
+                  <p class="text-sm font-bold text-highlighted">
+                    {{
+                      delivery.allowBacktracking
+                        ? "You can go back"
+                        : "Answers move forward"
+                    }}
+                  </p>
+
+                  <p class="mt-1 text-sm leading-5 text-muted">
+                    {{
+                      delivery.allowBacktracking
+                        ? "Previous questions can be revisited while the assessment allows it."
+                        : "Once you move on from a question, you cannot return to change it."
+                    }}
+                  </p>
+                </div>
+              </div>
+
+              <div
+                v-if="delivery.scoringMode === 'speed_bonus'"
+                class="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"
+              >
+                <div
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary"
+                >
+                  <UIcon
+                    name="i-lucide-zap"
+                    class="size-4"
+                  />
+                </div>
+
+                <div>
+                  <p class="text-sm font-bold text-highlighted">
+                    Speed bonus
+                  </p>
+
+                  <p class="mt-1 text-sm leading-5 text-muted">
+                    Correct answers can earn extra points when answered quickly.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                v-if="integrityPolicy?.enabled"
+                class="flex items-start gap-3 rounded-xl border border-info/20 bg-info/5 p-4"
+              >
+                <div
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-info/12 text-info"
+                >
+                  <UIcon
+                    name="i-lucide-shield-check"
+                    class="size-4"
+                  />
+                </div>
+
+                <div>
+                  <p class="text-sm font-bold text-highlighted">
+                    Stay focused
+                  </p>
+
+                  <p class="mt-1 text-sm leading-5 text-muted">
+                    {{
+                      integrityPolicy.focusModeEnabled
+                        ? "Focus Mode will open before the first question. Stay on the assessment while answering."
+                        : "Stay on the assessment page while answering."
+                    }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section
+            v-if="delivery.instructions"
+            class="mt-6 rounded-xl border border-default p-4 sm:p-5"
+          >
+            <div class="flex items-center gap-2">
+              <UIcon
+                name="i-lucide-message-square-text"
+                class="size-4 text-primary"
+              />
+
+              <h3 class="font-black text-highlighted">
+                Instructor note
+              </h3>
+            </div>
+
+            <p class="mt-3 whitespace-pre-line text-sm leading-6 text-muted">
+              {{ delivery.instructions }}
+            </p>
+          </section>
+
+          <div
+            v-if="
+              attemptPolicy
+              && attemptPolicy.maxAttempts > 1
+            "
+            class="mt-5 flex flex-col gap-3 rounded-xl border border-default bg-elevated/30 p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <p class="text-sm font-bold text-highlighted">
+                Attempts
               </p>
 
               <p class="mt-1 text-sm text-muted">
-                {{ attemptPolicy.attemptsRemaining }} attempt{{ attemptPolicy.attemptsRemaining === 1 ? '' : 's' }} remaining · {{ scorePolicyLabel(attemptPolicy.scorePolicy) }}
+                {{ attemptPolicy.attemptsUsed }} of {{ attemptPolicy.maxAttempts }} used
+                · {{ attemptPolicy.attemptsRemaining }} remaining
+                · {{ scorePolicyLabel(attemptPolicy.scorePolicy) }}
               </p>
             </div>
 
@@ -666,69 +694,71 @@ onMounted(
             >
               {{
                 attemptPolicy.attemptsRemaining > 0
-                  ? 'Attempts available'
-                  : 'Attempt limit reached'
+                  ? "Available"
+                  : "Limit reached"
               }}
             </UBadge>
           </div>
-        </div>
 
-        <UAlert
-          v-if="
-            delivery.status
-            === 'upcoming'
-          "
-          class="mt-6"
-          color="info"
-          variant="soft"
-          title="This assessment is upcoming"
-          :description="`You can begin on ${formatDate(delivery.startsAt)}.`"
-        />
-
-        <UAlert
-          v-else-if="
-            delivery.status
-            === 'closed'
-            && !delivery.canViewResult
-          "
-          class="mt-6"
-          color="warning"
-          variant="soft"
-          title="This assessment is closed"
-          description="The class availability period has ended."
-        />
-
-        <div class="mt-6 space-y-3">
-          <UButton
+          <UAlert
             v-if="
-              canStartAnotherAttempt
-              && delivery.canViewResult
+              delivery.status
+              === 'upcoming'
             "
-            :to="`/student/results/${assignmentId}`"
-            block
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-chart-column"
-          >
-            View Latest Result
-          </UButton>
+            class="mt-5"
+            color="info"
+            variant="soft"
+            icon="i-lucide-calendar-clock"
+            title="Not open yet"
+            :description="`You can begin on ${formatDate(delivery.startsAt)}.`"
+          />
 
-          <UButton
-            block
-            size="xl"
-            :disabled="!canProceed"
-            :icon="
-              delivery.canStart
-              || delivery.canResume
-                ? 'i-lucide-play'
-                : delivery.canViewResult
-                  ? 'i-lucide-chart-column'
-                  : 'i-lucide-eye'
+          <UAlert
+            v-else-if="
+              delivery.status
+              === 'closed'
+              && !delivery.canViewResult
             "
-            @click="requestProceed"
-          >
-            {{ actionLabel }}
-          </UButton>
+            class="mt-5"
+            color="warning"
+            variant="soft"
+            icon="i-lucide-lock"
+            title="Assessment closed"
+            description="The assessment period has ended."
+          />
+
+          <div class="mt-6 space-y-3 border-t border-default pt-5">
+            <UButton
+              v-if="
+                canStartAnotherAttempt
+                && delivery.canViewResult
+              "
+              :to="`/student/results/${assignmentId}`"
+              block
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-chart-column"
+            >
+              View Latest Result
+            </UButton>
+
+            <UButton
+              block
+              size="xl"
+              :disabled="!canProceed"
+              :icon="
+                delivery.canStart
+                || delivery.canResume
+                  ? 'i-lucide-play'
+                  : delivery.canViewResult
+                    ? 'i-lucide-chart-column'
+                    : 'i-lucide-eye'
+              "
+              @click="requestProceed"
+            >
+              {{ actionLabel }}
+            </UButton>
+          </div>
         </div>
       </UCard>
     </template>

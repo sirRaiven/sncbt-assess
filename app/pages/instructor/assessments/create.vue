@@ -123,7 +123,7 @@ const state = reactive<CreateAssessmentSchema>({
   scoringMode: "standard",
   randomizeQuestions: false,
   randomizeOptions: false,
-  resultVisibility: "score_only",
+  resultVisibility: "score_and_answers",
   leaderboardEnabled: false,
   allowBacktracking: true,
 });
@@ -722,7 +722,7 @@ async function submit(
                     Leaderboard available
                   </p>
                   <p class="mt-1 text-sm text-muted">
-                    Allow class ranking when it is enabled for a scheduled assessment.
+                    Enables ranking in Instructor monitoring. Students do not currently see a leaderboard.
                   </p>
                 </div>
 

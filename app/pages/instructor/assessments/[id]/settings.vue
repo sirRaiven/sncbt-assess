@@ -111,7 +111,7 @@ const state = reactive<SettingsSchema>({
   scoringMode: "standard",
   randomizeQuestions: false,
   randomizeOptions: false,
-  resultVisibility: "score_only",
+  resultVisibility: "score_and_answers",
   leaderboardEnabled: false,
   allowBacktracking: true,
 });
@@ -745,10 +745,15 @@ onMounted(
                   />
                 </div>
 
-                <div class="flex items-center justify-between gap-5">
-                  <span class="font-semibold text-highlighted">
-                    Leaderboard available
-                  </span>
+                <div class="flex items-start justify-between gap-5">
+                  <div>
+                    <p class="font-semibold text-highlighted">
+                      Leaderboard available
+                    </p>
+                    <p class="mt-1 text-sm text-muted">
+                      Enables ranking in Instructor monitoring. Students do not currently see a leaderboard.
+                    </p>
+                  </div>
 
                   <USwitch
                     v-model="state.leaderboardEnabled"

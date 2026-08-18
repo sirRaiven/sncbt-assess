@@ -37,6 +37,12 @@ const delivery =
     null,
   );
 
+const isLoading =
+  ref(true);
+
+const errorMessage =
+  ref("");
+
 const attempt =
   computed(
     () =>
@@ -253,52 +259,57 @@ async function loadResult():
   errorMessage.value =
     "";
 
-  const result =
-    await getResult(
-      assignmentId.value,
-    );
+  try {
+    const result =
+      await getResult(
+        assignmentId.value,
+      );
 
-  if (
-    result.error
-    || !result.data
-  ) {
-    // Backward-compatible fallback for an older Edge Function that
-    // still returned RESULT_HIDDEN as a 403. The updated function
-    // returns the safe delivery state instead of a technical error.
     if (
-      result.code
-      === "RESULT_HIDDEN"
+      result.error
+      || !result.data
     ) {
-      const fallback =
-        await getStudentDelivery(
-          assignmentId.value,
-        );
+      // Backward-compatible fallback for an older Edge Function that
+      // still returned RESULT_HIDDEN as a 403. The updated function
+      // returns the safe delivery state instead of a technical error.
+      if (
+        result.code
+        === "RESULT_HIDDEN"
+      ) {
+        const fallback =
+          await getStudentDelivery(
+            assignmentId.value,
+          );
 
-      if (fallback.data) {
-        delivery.value =
-          fallback.data.delivery;
+        if (fallback.data) {
+          delivery.value =
+            fallback.data.delivery;
 
-        isLoading.value =
-          false;
-
-        return;
+          return;
+        }
       }
+
+      delivery.value =
+        null;
+
+      errorMessage.value =
+        "This assessment result is not available right now. Please try again later.";
+
+      return;
     }
 
-    errorMessage.value =
-      "This assessment result is not available right now. Please try again later.";
+    delivery.value =
+      result.data.delivery;
+  } catch {
+    delivery.value =
+      null;
 
+    errorMessage.value =
+      "This assessment result could not be loaded. Please try again.";
+  } finally {
     isLoading.value =
       false;
-
-    return;
   }
-
-  delivery.value =
-    result.data.delivery;
-
-  isLoading.value =
-    false;
 }
 
 onMounted(
