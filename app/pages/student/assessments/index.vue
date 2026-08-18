@@ -217,6 +217,55 @@ function formatDate(
     );
 }
 
+function timelineLabel(
+  delivery:
+    StudentAssessmentDelivery,
+): string {
+  if (
+    hasCompletedAttempt(delivery)
+    && delivery.attempt?.submittedAt
+  ) {
+    return "Submitted";
+  }
+
+  if (
+    delivery.status
+    === "upcoming"
+  ) {
+    return "Opens";
+  }
+
+  if (
+    delivery.status
+    === "open"
+  ) {
+    return "Closes";
+  }
+
+  return "Closed";
+}
+
+function timelineValue(
+  delivery:
+    StudentAssessmentDelivery,
+): string {
+  if (
+    hasCompletedAttempt(delivery)
+    && delivery.attempt?.submittedAt
+  ) {
+    return delivery.attempt.submittedAt;
+  }
+
+  if (
+    delivery.status
+    === "upcoming"
+  ) {
+    return delivery.startsAt;
+  }
+
+  return delivery.endsAt;
+}
+
 function displayStatus(
   delivery:
     StudentAssessmentDelivery,
@@ -474,7 +523,7 @@ onMounted(
       <USkeleton
         v-for="number in 4"
         :key="number"
-        class="h-[31rem] rounded-xl"
+        class="h-[22rem] rounded-xl"
       />
     </div>
 
@@ -492,24 +541,29 @@ onMounted(
       <UCard
         v-for="delivery in filteredDeliveries"
         :key="delivery.assignmentId"
-        class="overflow-hidden"
+        class="overflow-hidden transition-shadow hover:shadow-md"
         :ui="{
           body: 'p-0 sm:p-0',
         }"
       >
-        <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-5">
+        <div
+          class="relative border-b border-default bg-gradient-to-br from-primary/18 via-primary/8 to-transparent p-5"
+        >
           <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-2">
-              <div class="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15">
+              <div
+                class="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15"
+              >
                 <UIcon
                   name="i-lucide-clipboard-check"
-                  class="size-5"
+                  class="size-4.5"
                 />
               </div>
 
               <UBadge
                 color="neutral"
                 variant="soft"
+                size="sm"
               >
                 {{ assessmentTypeLabel(delivery.assessmentType) }}
               </UBadge>
@@ -522,14 +576,16 @@ onMounted(
 
           <NuxtLink
             :to="actionRoute(delivery)"
-            class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+            class="group mt-4 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
             :aria-label="`${actionLabel(delivery)}: ${delivery.title}`"
           >
-            <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
+            <h2
+              class="line-clamp-2 text-lg font-black leading-snug text-highlighted transition group-hover:text-primary"
+            >
               {{ delivery.title }}
             </h2>
 
-            <p class="mt-2 text-sm font-medium text-muted">
+            <p class="mt-1.5 text-sm font-medium text-muted">
               {{ delivery.subjectCode }}
               ·
               {{ delivery.classroom.section }}
@@ -538,120 +594,95 @@ onMounted(
         </div>
 
         <div class="p-5">
-          <div class="flex min-h-7 flex-wrap gap-2">
-            <UBadge
-              color="primary"
-              variant="soft"
-              icon="i-lucide-school"
-            >
+          <div
+            class="flex min-w-0 items-center gap-2 text-sm font-semibold text-primary"
+          >
+            <UIcon
+              name="i-lucide-school"
+              class="size-4 shrink-0"
+            />
+
+            <span class="truncate">
               {{ delivery.classroom.name }}
-            </UBadge>
-
-            <UBadge
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-timer"
-            >
-              Per-question timing
-            </UBadge>
-          </div>
-
-          <div class="mt-5 grid grid-cols-3 gap-3">
-            <div class="rounded-xl bg-elevated p-3">
-              <div class="flex items-center gap-2 text-muted">
-                <UIcon
-                  name="i-lucide-list-checks"
-                  class="size-4"
-                />
-                <span class="text-xs">Questions</span>
-              </div>
-
-              <p class="mt-2 text-lg font-black text-highlighted">
-                {{ delivery.questionCount }}
-              </p>
-            </div>
-
-            <div class="rounded-xl bg-elevated p-3">
-              <div class="flex items-center gap-2 text-muted">
-                <UIcon
-                  name="i-lucide-circle-dot"
-                  class="size-4"
-                />
-                <span class="text-xs">Points</span>
-              </div>
-
-              <p class="mt-2 text-lg font-black text-highlighted">
-                {{ delivery.totalPoints }}
-              </p>
-            </div>
-
-            <div class="rounded-xl bg-elevated p-3">
-              <div class="flex items-center gap-2 text-muted">
-                <UIcon
-                  name="i-lucide-calendar-clock"
-                  class="size-4"
-                />
-                <span class="text-xs">Status</span>
-              </div>
-
-              <p class="mt-2 truncate text-sm font-black capitalize text-highlighted">
-                {{ displayStatus(delivery).replaceAll('_', ' ') }}
-              </p>
-            </div>
-          </div>
-
-          <div class="mt-4 rounded-xl border border-default bg-default/30 p-3 text-sm">
-            <div class="flex justify-between gap-4">
-              <span class="text-muted">Opens</span>
-
-              <span class="text-right font-semibold text-highlighted">
-                {{ formatDate(delivery.startsAt) }}
-              </span>
-            </div>
-
-            <div class="mt-2 flex justify-between gap-4">
-              <span class="text-muted">Closes</span>
-
-              <span class="text-right font-semibold text-highlighted">
-                {{ formatDate(delivery.endsAt) }}
-              </span>
-            </div>
+            </span>
           </div>
 
           <div
-            v-if="delivery.attemptPolicy"
-            class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-elevated p-3"
+            class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted"
           >
-            <div>
-              <p class="text-xs text-muted">
-                Attempts
-              </p>
+            <span class="inline-flex items-center gap-1.5">
+              <UIcon
+                name="i-lucide-list-checks"
+                class="size-4"
+              />
+              <strong class="font-semibold text-highlighted">
+                {{ delivery.questionCount }}
+              </strong>
+              questions
+            </span>
 
-              <p class="mt-1 text-sm font-bold text-highlighted">
-                {{ delivery.attemptPolicy.attemptsUsed }} of {{ delivery.attemptPolicy.maxAttempts }} used
-              </p>
-            </div>
+            <span class="inline-flex items-center gap-1.5">
+              <UIcon
+                name="i-lucide-circle-dot"
+                class="size-4"
+              />
+              <strong class="font-semibold text-highlighted">
+                {{ delivery.totalPoints }}
+              </strong>
+              points
+            </span>
+          </div>
+
+          <div
+            class="mt-4 flex items-center gap-2 rounded-xl border border-default/70 bg-elevated/35 px-3 py-2.5 text-sm"
+          >
+            <UIcon
+              name="i-lucide-calendar-clock"
+              class="size-4 shrink-0 text-muted"
+            />
+
+            <span class="shrink-0 text-muted">
+              {{ timelineLabel(delivery) }}
+            </span>
+
+            <span class="min-w-0 truncate font-semibold text-highlighted">
+              {{ formatDate(timelineValue(delivery)) }}
+            </span>
+          </div>
+
+          <div
+            v-if="delivery.attemptPolicy && delivery.attemptPolicy.maxAttempts > 1"
+            class="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-elevated px-3 py-2.5"
+          >
+            <span class="text-xs text-muted">
+              Attempt {{ delivery.attemptPolicy.attemptsUsed }} of {{ delivery.attemptPolicy.maxAttempts }}
+            </span>
 
             <UBadge
               :color="delivery.attemptPolicy.attemptsRemaining > 0 ? 'success' : 'neutral'"
               variant="soft"
+              size="sm"
             >
               {{ delivery.attemptPolicy.attemptsRemaining }} remaining
             </UBadge>
           </div>
 
-          <UAlert
+          <div
             v-if="hasCompletedAttempt(delivery) && delivery.canStart"
-            class="mt-4"
-            color="success"
-            variant="soft"
-            title="Another attempt is available"
-            description="You have already submitted an attempt, and another attempt is currently available."
-          />
+            class="mt-4 flex items-center gap-2 rounded-xl bg-success/8 px-3 py-2.5 text-sm text-success"
+          >
+            <UIcon
+              name="i-lucide-rotate-ccw"
+              class="size-4 shrink-0"
+            />
+            <span class="font-medium">
+              Another attempt is available
+            </span>
+          </div>
 
           <div
             v-if="delivery.attempt && delivery.attempt.status === 'in_progress'"
-            class="mt-4 rounded-xl bg-elevated p-3"
+            class="mt-4"
           >
             <div class="flex justify-between text-xs text-muted">
               <span>Progress</span>
@@ -676,7 +707,7 @@ onMounted(
             :variant="delivery.canStart || delivery.canResume ? 'solid' : 'soft'"
             :icon="actionIcon(delivery)"
             block
-            class="mt-5"
+            class="mt-4"
           >
             {{ actionLabel(delivery) }}
           </UButton>
