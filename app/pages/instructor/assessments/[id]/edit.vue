@@ -11,8 +11,10 @@ import type {
 } from "~/types/question";
 
 import {
-  toUserFacingError,
-} from "~/utils/user-facing-error";
+  assessmentQuestionTypeLabel,
+  isChoiceQuestionType,
+  isTrueFalseQuestionType,
+} from "~/types/question";
 
 definePageMeta({
   layout: "instructor",
@@ -121,9 +123,6 @@ function friendlyError(
       "foreign key constraint",
     )
     || normalized.includes(
-      "already been used in a student assessment",
-    )
-    || normalized.includes(
       "already been included in a student attempt",
     )
     || normalized.includes(
@@ -166,10 +165,7 @@ function friendlyError(
     return "The selected question or assessment is no longer available. Refresh the page and try again.";
   }
 
-  return toUserFacingError(
-    message,
-    fallback,
-  );
+  return fallback;
 }
 
 const editor = reactive<{
@@ -180,6 +176,8 @@ const editor = reactive<{
   points: number;
   timeLimitSeconds: number;
   options: QuestionOptionInput[];
+  acceptedAnswersText: string;
+  correctBoolean: boolean | null;
 }>({
   questionType:
     "multiple_choice",
@@ -203,6 +201,10 @@ const editor = reactive<{
       isCorrect: false,
     },
   ],
+  acceptedAnswersText:
+    "",
+  correctBoolean:
+    null,
 });
 
 const selectedQuestion = computed(
@@ -219,6 +221,20 @@ const isDraft = computed(
   () =>
     assessment.value?.status
     === "draft",
+);
+
+const isChoiceQuestion = computed(
+  () =>
+    isChoiceQuestionType(
+      editor.questionType,
+    ),
+);
+
+const isTrueFalseQuestion = computed(
+  () =>
+    isTrueFalseQuestionType(
+      editor.questionType,
+    ),
 );
 
 const totalPoints = computed(
@@ -253,6 +269,10 @@ const estimatedMinutes = computed(
 );
 
 const duplicateOptionWarning = computed(() => {
+  if (!isChoiceQuestion.value) {
+    return false;
+  }
+
   const normalized =
     editor.options
       .map(
@@ -284,6 +304,30 @@ function emptyOptions(): QuestionOptionInput[] {
   ];
 }
 
+function acceptedAnswersFromEditor(): string[] {
+  const normalized =
+    editor.acceptedAnswersText
+      .split(/\r?\n|\|/g)
+      .map(
+        (answer) =>
+          answer
+            .trim()
+            .replace(/\s+/g, " "),
+      )
+      .filter(Boolean);
+
+  return [
+    ...new Map(
+      normalized.map(
+        (answer) => [
+          answer.toLowerCase(),
+          answer,
+        ],
+      ),
+    ).values(),
+  ];
+}
+
 function startNewQuestion(): void {
   selectedQuestionId.value =
     null;
@@ -311,6 +355,12 @@ function startNewQuestion(): void {
 
   editor.options =
     emptyOptions();
+
+  editor.acceptedAnswersText =
+    "";
+
+  editor.correctBoolean =
+    null;
 
   formError.value =
     "";
@@ -348,15 +398,27 @@ function selectQuestion(
     question.time_limit_seconds;
 
   editor.options =
-    question.options.map(
-      (option) => ({
-        text:
-          option.option_text,
+    question.options.length > 0
+      ? question.options.map(
+          (option) => ({
+            text:
+              option.option_text,
 
-        isCorrect:
-          option.is_correct,
-      }),
-    );
+            isCorrect:
+              option.is_correct,
+          }),
+        )
+      : emptyOptions();
+
+  editor.acceptedAnswersText =
+    (
+      question.accepted_answers
+      ?? []
+    ).join("\n");
+
+  editor.correctBoolean =
+    question.correct_boolean
+    ?? null;
 
   formError.value =
     "";
@@ -369,28 +431,69 @@ function changeQuestionType(
     value;
 
   if (
-    value === "multiple_choice"
+    isChoiceQuestionType(
+      value,
+    )
   ) {
-    const firstCorrect =
-      editor.options.findIndex(
-        (option) =>
-          option.isCorrect,
-      );
+    if (editor.options.length < 2) {
+      editor.options =
+        emptyOptions();
+    }
 
-    editor.options.forEach(
-      (
-        option,
-        index,
-      ) => {
-        option.isCorrect =
-          index
-          === (
-            firstCorrect >= 0
-              ? firstCorrect
-              : 0
-          );
-      },
-    );
+    editor.acceptedAnswersText =
+      "";
+    editor.correctBoolean =
+      null;
+
+    if (value === "multiple_choice") {
+      const firstCorrect =
+        editor.options.findIndex(
+          (option) =>
+            option.isCorrect,
+        );
+
+      editor.options.forEach(
+        (
+          option,
+          index,
+        ) => {
+          option.isCorrect =
+            index
+            === (
+              firstCorrect >= 0
+                ? firstCorrect
+                : 0
+            );
+        },
+      );
+    }
+
+    return;
+  }
+
+  if (value === "fill_blank") {
+    editor.correctBoolean =
+      null;
+    return;
+  }
+
+  if (
+    isTrueFalseQuestionType(
+      value,
+    )
+  ) {
+    editor.correctBoolean =
+      editor.correctBoolean
+      ?? true;
+
+    if (
+      value === "true_false"
+      || editor.correctBoolean
+        === true
+    ) {
+      editor.acceptedAnswersText =
+        "";
+    }
   }
 }
 
@@ -455,42 +558,92 @@ function validateEditor(): string | null {
     return "Question text is required.";
   }
 
+  if (isChoiceQuestion.value) {
+    if (
+      editor.options.length < 2
+      || editor.options.length > 5
+    ) {
+      return "Add two to five choices.";
+    }
+
+    if (
+      editor.options.some(
+        (option) =>
+          !option.text.trim(),
+      )
+    ) {
+      return "Every choice requires text.";
+    }
+
+    if (duplicateOptionWarning.value) {
+      return "Each answer choice must use different text.";
+    }
+
+    const correctCount =
+      editor.options.filter(
+        (option) =>
+          option.isCorrect,
+      ).length;
+
+    if (
+      editor.questionType
+        === "multiple_choice"
+      && correctCount !== 1
+    ) {
+      return "Multiple Choice requires exactly one correct choice.";
+    }
+
+    if (
+      editor.questionType
+        === "checkbox"
+      && correctCount < 1
+    ) {
+      return "Checkbox requires at least one correct choice.";
+    }
+  }
+
+  const acceptedAnswers =
+    acceptedAnswersFromEditor();
+
   if (
-    editor.options.length < 2
-    || editor.options.length > 5
+    editor.questionType
+      === "fill_blank"
+    && acceptedAnswers.length < 1
   ) {
-    return "Add two to five choices.";
+    return "Fill in the Blanks requires at least one accepted answer.";
   }
 
   if (
-    editor.options.some(
-      (option) =>
-        !option.text.trim(),
+    acceptedAnswers.length > 10
+  ) {
+    return "Use no more than 10 accepted text answers.";
+  }
+
+  if (
+    acceptedAnswers.some(
+      (answer) =>
+        answer.length > 500,
     )
   ) {
-    return "Every choice requires text.";
+    return "Each accepted text answer must not exceed 500 characters.";
   }
 
-  const correctCount =
-    editor.options.filter(
-      (option) =>
-        option.isCorrect,
-    ).length;
-
   if (
-    editor.questionType
-      === "multiple_choice"
-    && correctCount !== 1
+    isTrueFalseQuestion.value
+    && editor.correctBoolean
+      === null
   ) {
-    return "Multiple Choice requires exactly one correct choice.";
+    return "Select whether the statement is True or False.";
   }
 
   if (
     editor.questionType
-      === "checkbox"
-    && correctCount < 1
+      === "true_false_correction"
+    && editor.correctBoolean
+      === false
+    && acceptedAnswers.length < 1
   ) {
-    return "Checkbox requires at least one correct choice.";
+    return "When False is the correct answer, add at least one accepted correction or correct answer.";
   }
 
   if (
@@ -528,6 +681,9 @@ function validateEditor(): string | null {
 }
 
 function getEditorPayload(): QuestionEditorInput {
+  const acceptedAnswers =
+    acceptedAnswersFromEditor();
+
   return {
     questionType:
       editor.questionType,
@@ -554,15 +710,34 @@ function getEditorPayload(): QuestionEditorInput {
       ),
 
     options:
-      editor.options.map(
-        (option) => ({
-          text:
-            option.text.trim(),
+      isChoiceQuestion.value
+        ? editor.options.map(
+            (option) => ({
+              text:
+                option.text.trim(),
 
-          isCorrect:
-            option.isCorrect,
-        }),
-      ),
+              isCorrect:
+                option.isCorrect,
+            }),
+          )
+        : [],
+
+    acceptedAnswers:
+      editor.questionType
+        === "fill_blank"
+        || (
+          editor.questionType
+            === "true_false_correction"
+          && editor.correctBoolean
+            === false
+        )
+        ? acceptedAnswers
+        : [],
+
+    correctBoolean:
+      isTrueFalseQuestion.value
+        ? editor.correctBoolean
+        : null,
   };
 }
 
@@ -1032,7 +1207,7 @@ async function publish(): Promise<void> {
       "Assessment is not ready",
       friendlyError(
         validation.error,
-        "Review every question and make sure each one has complete answer choices, a correct answer, points, and a time limit.",
+        "Review every question and make sure each one has a complete answer configuration, points, and a time limit.",
       ),
       "warning",
       "i-lucide-list-checks",
@@ -1101,18 +1276,12 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
-      :breadcrumbs="[
-        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
-        { label: 'Assessments', to: '/instructor/assessments' },
-        { label: assessment?.title || 'Assessment', to: `/instructor/assessments/${assessmentId}/edit` },
-        { label: 'Questions' },
-      ]"
-      eyebrow="Question builder"
+      eyebrow="Question Builder"
       :title="
         assessment?.title
         || 'Assessment questions'
       "
-      description="Create and organize questions, answer choices, points, and time limits before publishing."
+      description="Create and organize multiple-choice, checkbox, fill-in-the-blank, and true-or-false questions before publishing."
     >
       <template #actions>
         <UButton
@@ -1123,6 +1292,24 @@ onMounted(
           icon="i-lucide-file-spreadsheet"
         >
           Import Excel
+        </UButton>
+
+        <UButton
+          :to="`/instructor/assessments/${assessmentId}/settings`"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-settings-2"
+        >
+          Settings
+        </UButton>
+
+        <UButton
+          :to="`/instructor/assessments/${assessmentId}/preview`"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-eye"
+        >
+          Preview as Student
         </UButton>
 
         <UButton
@@ -1139,11 +1326,6 @@ onMounted(
         </UButton>
       </template>
     </PageHeader>
-
-    <AssessmentWorkspaceNavigation
-      :assessment-id="assessmentId"
-      active="questions"
-    />
 
     <div
       v-if="
@@ -1299,10 +1481,9 @@ onMounted(
 
                 <p class="mt-1 text-xs text-muted">
                   {{
-                    question.question_type
-                      === 'multiple_choice'
-                      ? 'Multiple Choice'
-                      : 'Checkbox'
+                    assessmentQuestionTypeLabel(
+                      question.question_type,
+                    )
                   }}
                   ·
                   {{ question.points }}
@@ -1428,6 +1609,18 @@ onMounted(
                   label: 'Checkbox',
                   value: 'checkbox',
                 },
+                {
+                  label: 'Fill in the Blanks',
+                  value: 'fill_blank',
+                },
+                {
+                  label: 'True or False',
+                  value: 'true_false',
+                },
+                {
+                  label: 'True or False + Correction',
+                  value: 'true_false_correction',
+                },
               ]"
               value-key="value"
               label-key="label"
@@ -1452,7 +1645,9 @@ onMounted(
             />
           </UFormField>
 
-          <div>
+          <div
+            v-if="isChoiceQuestion"
+          >
             <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p class="font-semibold text-highlighted">
@@ -1474,9 +1669,7 @@ onMounted(
                 variant="outline"
                 size="sm"
                 icon="i-lucide-plus"
-                :disabled="
-                  editor.options.length >= 5
-                "
+                :disabled="editor.options.length >= 5"
                 @click="addOption"
               >
                 Add Choice
@@ -1499,27 +1692,17 @@ onMounted(
 
             <div class="space-y-3">
               <div
-                v-for="(
-                  option,
-                  index
-                ) in editor.options"
+                v-for="(option, index) in editor.options"
                 :key="index"
                 class="flex items-center gap-3 rounded-xl border border-default p-3 focus-within:border-primary focus-within:ring-3 focus-within:ring-primary/10"
               >
                 <input
-                  v-if="
-                    editor.questionType
-                    === 'multiple_choice'
-                  "
+                  v-if="editor.questionType === 'multiple_choice'"
                   type="radio"
                   :name="`correct-${assessmentId}`"
                   :checked="option.isCorrect"
                   class="size-4 accent-brand-600"
-                  @change="
-                    setMultipleChoiceCorrect(
-                      index,
-                    )
-                  "
+                  @change="setMultipleChoiceCorrect(index)"
                 >
 
                 <input
@@ -1541,17 +1724,109 @@ onMounted(
                   variant="ghost"
                   icon="i-lucide-x"
                   size="sm"
-                  :disabled="
-                    editor.options.length <= 2
-                  "
+                  :disabled="editor.options.length <= 2"
                   :aria-label="`Remove choice ${index + 1}`"
-                  @click="
-                    removeOption(
-                      index,
-                    )
-                  "
+                  @click="removeOption(index)"
                 />
               </div>
+            </div>
+          </div>
+
+          <div
+            v-else-if="editor.questionType === 'fill_blank'"
+            class="rounded-xl border border-default bg-elevated/40 p-4"
+          >
+            <UFormField
+              label="Accepted answer(s)"
+              help="Enter one accepted answer per line. Matching ignores capitalization, extra spaces, and leading or trailing spaces."
+              required
+            >
+              <UTextarea
+                v-model="editor.acceptedAnswersText"
+                :rows="5"
+                class="w-full"
+                placeholder="Example answer\nAnother acceptable spelling"
+              />
+            </UFormField>
+          </div>
+
+          <div
+            v-else-if="isTrueFalseQuestion"
+            class="space-y-4 rounded-xl border border-default bg-elevated/40 p-4"
+          >
+            <div>
+              <p class="font-semibold text-highlighted">
+                Correct answer
+              </p>
+              <p class="mt-1 text-xs text-muted">
+                Select the correct truth value for this statement.
+              </p>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                class="rounded-xl border p-4 text-left transition"
+                :class="editor.correctBoolean === true ? 'border-success bg-success/10' : 'border-default hover:border-success/40'"
+                @click="editor.correctBoolean = true; editor.acceptedAnswersText = ''"
+              >
+                <div class="flex items-center gap-3">
+                  <UIcon
+                    name="i-lucide-circle-check"
+                    class="size-5 text-success"
+                  />
+                  <span class="font-bold text-highlighted">True</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                class="rounded-xl border p-4 text-left transition"
+                :class="editor.correctBoolean === false ? 'border-error bg-error/10' : 'border-default hover:border-error/40'"
+                @click="editor.correctBoolean = false"
+              >
+                <div class="flex items-center gap-3">
+                  <UIcon
+                    name="i-lucide-circle-x"
+                    class="size-5 text-error"
+                  />
+                  <span class="font-bold text-highlighted">False</span>
+                </div>
+              </button>
+            </div>
+
+            <div
+              v-if="editor.questionType === 'true_false_correction'"
+              class="rounded-xl border border-primary/20 bg-primary/5 p-4"
+            >
+              <p class="text-sm font-semibold text-highlighted">
+                False-answer correction
+              </p>
+              <p class="mt-1 text-xs leading-5 text-muted">
+                Students who choose False will also be asked to state why the statement is false or provide the correct answer.
+              </p>
+
+              <UFormField
+                v-if="editor.correctBoolean === false"
+                class="mt-4"
+                label="Accepted correction(s)"
+                help="One accepted correction per line. The student must answer False and match one of these corrections to receive the point."
+                required
+              >
+                <UTextarea
+                  v-model="editor.acceptedAnswersText"
+                  :rows="4"
+                  class="w-full"
+                  placeholder="Write the correct statement or answer"
+                />
+              </UFormField>
+
+              <p
+                v-else
+                class="mt-3 text-xs text-muted"
+              >
+                Because True is the correct answer, a student choosing False remains incorrect even if they enter a correction.
+              </p>
             </div>
           </div>
 
@@ -1634,8 +1909,8 @@ onMounted(
             </UFormField>
 
             <UFormField
-              label="Answer time (seconds)"
-              help="This timer applies only to this question. When time runs out, the question closes and the student moves to the next question."
+              label="Time allowed"
+              help="Enter the number of seconds for this question."
             >
               <UInput
                 v-model.number="editor.timeLimitSeconds"
@@ -1678,7 +1953,7 @@ onMounted(
 
             <div class="flex justify-between gap-4">
               <dt class="text-muted">
-                Total configured question time
+                Estimated time
               </dt>
 
               <dd class="font-bold text-highlighted">

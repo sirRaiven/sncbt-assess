@@ -443,7 +443,7 @@ onMounted(
         color="info"
         variant="soft"
         title="Add valid questions before publishing"
-        description="Open the Question Builder and save at least one complete Multiple Choice or Checkbox question."
+        description="Open the Question Builder and save at least one complete supported question."
       />
 
       <UAlert
@@ -655,7 +655,7 @@ onMounted(
                       value: 'score_only',
                     },
                     {
-                      label: 'Show score and answer review',
+                      label: 'Show score + instant feedback',
                       value: 'score_and_answers',
                     },
                   ]"
@@ -664,6 +664,42 @@ onMounted(
                   class="w-full"
                 />
               </UFormField>
+
+              <UAlert
+                v-if="state.scoringMode === 'speed_bonus'"
+                color="primary"
+                variant="soft"
+                icon="i-lucide-gauge"
+                title="How speed bonus works"
+                description="Correct answers earn their full question points plus up to 20% extra. The bonus decreases smoothly as more of the question timer is used. Incorrect or unanswered questions receive no speed bonus."
+              />
+
+              <UAlert
+                v-if="state.resultVisibility === 'hidden'"
+                color="neutral"
+                variant="soft"
+                icon="i-lucide-eye-off"
+                title="Results stay private"
+                description="Students can submit normally, but they will not see their score or Correct/Incorrect feedback."
+              />
+
+              <UAlert
+                v-else-if="state.resultVisibility === 'score_only'"
+                color="info"
+                variant="soft"
+                icon="i-lucide-trophy"
+                title="Score after submission"
+                description="Students see their released score after submitting. Individual answers are not checked on screen while the assessment is active."
+              />
+
+              <UAlert
+                v-else
+                color="success"
+                variant="soft"
+                icon="i-lucide-circle-check-big"
+                title="Instant answer feedback"
+                description="After a student commits an answer, SNCBT Assess shows only Correct or Incorrect. The correct answer is never revealed. Once feedback is shown, that question is locked and cannot be changed."
+              />
 
               <UAlert
                 color="info"

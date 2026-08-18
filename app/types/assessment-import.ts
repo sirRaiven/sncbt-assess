@@ -14,6 +14,8 @@ export interface ExcelQuestionImportQuestion {
   points: number;
   timeLimitSeconds: number;
   options: QuestionOptionInput[];
+  acceptedAnswers: string[];
+  correctBoolean: boolean | null;
 }
 
 export interface ExcelQuestionImportPreviewRow {
@@ -23,6 +25,7 @@ export interface ExcelQuestionImportPreviewRow {
   question: ExcelQuestionImportQuestion | null;
   rawQuestionType: string;
   correctAnswerText: string;
+  acceptedAnswerText: string;
   errors: string[];
 }
 
@@ -43,7 +46,6 @@ export interface ExcelQuestionImportResult {
   questionIds: string[];
 }
 
-// Server-staged import types used by the current Validate and Preview flow.
 export type AssessmentImportStatus =
   | "ready"
   | "committed"
@@ -81,6 +83,9 @@ export interface AssessmentImportNormalizedQuestion {
   timeLimitSeconds: number;
   options: AssessmentImportNormalizedOption[];
   correctAnswerText: string;
+  acceptedAnswers: string[];
+  acceptedAnswerText: string;
+  correctBoolean: boolean | null;
 }
 
 export interface AssessmentImportRow {

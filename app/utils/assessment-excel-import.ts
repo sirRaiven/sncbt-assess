@@ -62,6 +62,12 @@ const headerAliases = {
     "correct answer",
     "correct answers",
   ],
+  acceptedAnswers: [
+    "accepted text answer(s)",
+    "accepted text answers",
+    "accepted answers",
+    "accepted answer",
+  ],
   timeInSeconds: [
     "time in seconds",
     "time",
@@ -158,6 +164,42 @@ function parseQuestionType(
     return "checkbox";
   }
 
+  if (
+    [
+      "fill in the blanks",
+      "fill in the blank",
+      "fill blank",
+      "fill blanks",
+      "short answer",
+    ].includes(normalized)
+  ) {
+    return "fill_blank";
+  }
+
+  if (
+    [
+      "true or false",
+      "true false",
+      "tf",
+      "t f",
+    ].includes(normalized)
+  ) {
+    return "true_false";
+  }
+
+  if (
+    [
+      "true or false + correction",
+      "true false + correction",
+      "true or false correction",
+      "true false correction",
+      "true or false with correction",
+      "true false with correction",
+    ].includes(normalized)
+  ) {
+    return "true_false_correction";
+  }
+
   return null;
 }
 
@@ -195,6 +237,50 @@ function parseCorrectIndexes(
   return [
     ...new Set(indexes),
   ];
+}
+
+function parseBooleanAnswer(
+  value: string,
+): boolean | null {
+  const normalized =
+    value.trim().toLowerCase();
+
+  if (["true", "t", "1", "yes"].includes(normalized)) {
+    return true;
+  }
+
+  if (["false", "f", "0", "no"].includes(normalized)) {
+    return false;
+  }
+
+  return null;
+}
+
+function parseAcceptedAnswers(
+  value: string,
+): string[] {
+  const values = value
+    .split(/[|\n]+/)
+    .map((answer) =>
+      answer
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter(Boolean);
+
+  const seen = new Set<string>();
+
+  return values.filter((answer) => {
+    const normalized =
+      answer.toLowerCase();
+
+    if (seen.has(normalized)) {
+      return false;
+    }
+
+    seen.add(normalized);
+    return true;
+  });
 }
 
 function parseTimeLimit(
@@ -293,6 +379,13 @@ function buildQuestionRow(
       row[indexes.correctAnswer],
     );
 
+  const acceptedAnswerText =
+    indexes.acceptedAnswers >= 0
+      ? normalizeText(
+          row[indexes.acceptedAnswers],
+        )
+      : "";
+
   if (!questionText) {
     errors.push(
       "Question Text is required.",
@@ -307,7 +400,7 @@ function buildQuestionRow(
 
   if (!questionType) {
     errors.push(
-      "Question Type must be Multiple Choice or Checkbox.",
+      "Question Type must be Multiple Choice, Checkbox, Fill in the Blanks, True or False, or True or False + Correction.",
     );
   }
 
@@ -341,90 +434,180 @@ function buildQuestionRow(
     }
   }
 
-  if (hasOptionGap) {
-    errors.push(
-      "Answer options must be continuous. Do not leave an empty option before another filled option.",
-    );
-  }
-
   const filledOptions =
     optionTexts.filter(Boolean);
 
-  if (filledOptions.length < 2) {
-    errors.push(
-      "Add at least two answer options.",
-    );
-  }
+  const isChoiceQuestion =
+    questionType === "multiple_choice"
+    || questionType === "checkbox";
 
-  for (const optionText of filledOptions) {
-    if (optionText.length > 500) {
+  let correctIndexes: number[] = [];
+  let correctBoolean: boolean | null = null;
+  let acceptedAnswers =
+    parseAcceptedAnswers(
+      acceptedAnswerText,
+    );
+
+  if (isChoiceQuestion) {
+    if (hasOptionGap) {
       errors.push(
-        "Each answer option must not exceed 500 characters.",
+        "Answer options must be continuous. Do not leave an empty option before another filled option.",
       );
-      break;
+    }
+
+    if (filledOptions.length < 2) {
+      errors.push(
+        "Add at least two answer options.",
+      );
+    }
+
+    for (const optionText of filledOptions) {
+      if (optionText.length > 500) {
+        errors.push(
+          "Each answer option must not exceed 500 characters.",
+        );
+        break;
+      }
+    }
+
+    const normalizedOptions =
+      filledOptions.map(
+        (option) =>
+          option.toLowerCase(),
+      );
+
+    if (
+      new Set(normalizedOptions).size
+      !== normalizedOptions.length
+    ) {
+      errors.push(
+        "Answer options must not contain duplicate text.",
+      );
+    }
+
+    correctIndexes =
+      parseCorrectIndexes(
+        correctAnswerText,
+      );
+
+    if (!correctAnswerText) {
+      errors.push(
+        "Correct Answer is required.",
+      );
+    } else if (
+      correctIndexes.some(
+        (index) =>
+          !Number.isInteger(index),
+      )
+    ) {
+      errors.push(
+        "Correct Answer must use option numbers 1–5 or letters A–E.",
+      );
+    } else if (
+      correctIndexes.some(
+        (index) =>
+          index < 1
+          || index > filledOptions.length,
+      )
+    ) {
+      errors.push(
+        "Correct Answer refers to an option that is empty or does not exist.",
+      );
+    }
+
+    if (
+      questionType === "multiple_choice"
+      && correctIndexes.length !== 1
+    ) {
+      errors.push(
+        "Multiple Choice requires exactly one correct answer.",
+      );
+    }
+
+    if (
+      questionType === "checkbox"
+      && correctIndexes.length < 1
+    ) {
+      errors.push(
+        "Checkbox requires at least one correct answer.",
+      );
+    }
+
+    acceptedAnswers = [];
+  } else {
+    if (filledOptions.length > 0) {
+      errors.push(
+        "Leave Option 1 through Option 5 empty for this question type.",
+      );
+    }
+
+    if (questionType === "fill_blank") {
+      if (
+        acceptedAnswers.length === 0
+        && correctAnswerText
+      ) {
+        acceptedAnswers = [
+          correctAnswerText,
+        ];
+      }
+
+      if (acceptedAnswers.length < 1) {
+        errors.push(
+          "Fill in the Blanks requires at least one Accepted Text Answer. Separate alternatives with |.",
+        );
+      }
+    }
+
+    if (
+      questionType === "true_false"
+      || questionType === "true_false_correction"
+    ) {
+      correctBoolean =
+        parseBooleanAnswer(
+          correctAnswerText,
+        );
+
+      if (correctBoolean === null) {
+        errors.push(
+          "Correct Answer must be True or False for this question type.",
+        );
+      }
+    }
+
+    if (
+      questionType === "true_false_correction"
+      && correctBoolean === false
+      && acceptedAnswers.length < 1
+    ) {
+      errors.push(
+        "When the correct answer is False, add the expected correction in Accepted Text Answer(s). Separate alternatives with |.",
+      );
+    }
+
+    if (
+      questionType === "true_false"
+      || (
+        questionType === "true_false_correction"
+        && correctBoolean === true
+      )
+    ) {
+      acceptedAnswers = [];
     }
   }
 
-  const normalizedOptions =
-    filledOptions.map(
-      (option) =>
-        option.toLowerCase(),
-    );
-
-  if (
-    new Set(normalizedOptions).size
-    !== normalizedOptions.length
-  ) {
+  if (acceptedAnswers.length > 10) {
     errors.push(
-      "Answer options must not contain duplicate text.",
+      "A question can contain at most ten accepted text answers.",
     );
   }
 
-  const correctIndexes =
-    parseCorrectIndexes(
-      correctAnswerText,
-    );
-
-  if (!correctAnswerText) {
-    errors.push(
-      "Correct Answer is required.",
-    );
-  } else if (
-    correctIndexes.some(
-      (index) =>
-        !Number.isInteger(index),
+  if (
+    acceptedAnswers.some(
+      (answer) => answer.length > 500,
     )
   ) {
     errors.push(
-      "Correct Answer must use option numbers 1–5 or letters A–E.",
-    );
-  } else if (
-    correctIndexes.some(
-      (index) =>
-        index < 1
-        || index > filledOptions.length,
-    )
-  ) {
-    errors.push(
-      "Correct Answer refers to an option that is empty or does not exist.",
-    );
-  }
-
-  if (
-    questionType === "multiple_choice"
-    && correctIndexes.length !== 1
-  ) {
-    errors.push(
-      "Multiple Choice requires exactly one correct answer.",
-    );
-  }
-
-  if (
-    questionType === "checkbox"
-    && correctIndexes.length < 1
-  ) {
-    errors.push(
-      "Checkbox requires at least one correct answer.",
+      "Each accepted text answer must not exceed 500 characters.",
     );
   }
 
@@ -458,15 +641,17 @@ function buildQuestionRow(
   }
 
   const options: QuestionOptionInput[] =
-    filledOptions.map(
-      (text, index) => ({
-        text,
-        isCorrect:
-          correctIndexes.includes(
-            index + 1,
-          ),
-      }),
-    );
+    isChoiceQuestion
+      ? filledOptions.map(
+          (text, index) => ({
+            text,
+            isCorrect:
+              correctIndexes.includes(
+                index + 1,
+              ),
+          }),
+        )
+      : [];
 
   const question:
     ExcelQuestionImportQuestion | null =
@@ -479,10 +664,11 @@ function buildQuestionRow(
             imageUrl,
             explanation:
               explanation || null,
-            points:
-              1,
+            points: 1,
             timeLimitSeconds,
             options,
+            acceptedAnswers,
+            correctBoolean,
           }
         : null;
 
@@ -495,6 +681,7 @@ function buildQuestionRow(
     question,
     rawQuestionType,
     correctAnswerText,
+    acceptedAnswerText,
     errors,
   };
 }
@@ -603,6 +790,11 @@ export async function parseAssessmentQuestionWorkbook(
         normalizedHeaders,
         "correctAnswer",
       ),
+    acceptedAnswers:
+      findHeaderIndex(
+        normalizedHeaders,
+        "acceptedAnswers",
+      ),
     timeInSeconds:
       findHeaderIndex(
         normalizedHeaders,
@@ -643,6 +835,10 @@ export async function parseAssessmentQuestionWorkbook(
     {
       key: "correctAnswer",
       label: "Correct Answer",
+    },
+    {
+      key: "acceptedAnswers",
+      label: "Accepted Text Answer(s)",
     },
   ];
 

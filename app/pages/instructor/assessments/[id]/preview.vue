@@ -7,6 +7,12 @@ import type {
   AssessmentQuestion,
 } from "~/types/question";
 
+import {
+  assessmentQuestionTypeLabel,
+  isChoiceQuestionType,
+  isTrueFalseQuestionType,
+} from "~/types/question";
+
 definePageMeta({
   layout: "instructor",
 });
@@ -46,6 +52,12 @@ const currentIndex =
 const selectedOptionIds =
   ref<string[]>([]);
 
+const textResponse =
+  ref("");
+
+const booleanResponse =
+  ref<boolean | null>(null);
+
 const isLoading =
   ref(true);
 
@@ -59,6 +71,43 @@ const currentQuestion = computed(
     ]
     || null,
 );
+
+const isChoiceQuestion = computed(
+  () =>
+    currentQuestion.value
+      ? isChoiceQuestionType(
+          currentQuestion.value.question_type,
+        )
+      : false,
+);
+
+const isTrueFalseQuestion = computed(
+  () =>
+    currentQuestion.value
+      ? isTrueFalseQuestionType(
+          currentQuestion.value.question_type,
+        )
+      : false,
+);
+
+const answerInstruction = computed(() => {
+  switch (
+    currentQuestion.value?.question_type
+  ) {
+    case "multiple_choice":
+      return "Select one answer.";
+    case "checkbox":
+      return "Select all answers that apply.";
+    case "fill_blank":
+      return "Type your answer in the blank.";
+    case "true_false":
+      return "Choose True or False.";
+    case "true_false_correction":
+      return "Choose True or False. If you choose False, explain why or provide the correct answer.";
+    default:
+      return "Answer the question.";
+  }
+});
 
 const progress = computed(
   () =>
@@ -150,6 +199,12 @@ function move(
 
   selectedOptionIds.value =
     [];
+
+  textResponse.value =
+    "";
+
+  booleanResponse.value =
+    null;
 }
 
 async function loadData(): Promise<void> {
@@ -209,6 +264,12 @@ async function loadData(): Promise<void> {
   selectedOptionIds.value =
     [];
 
+  textResponse.value =
+    "";
+
+  booleanResponse.value =
+    null;
+
   isLoading.value =
     false;
 }
@@ -221,13 +282,7 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
-      :breadcrumbs="[
-        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
-        { label: 'Assessments', to: '/instructor/assessments' },
-        { label: assessment?.title || 'Assessment', to: `/instructor/assessments/${assessmentId}/edit` },
-        { label: 'Preview' },
-      ]"
-      eyebrow="Student preview"
+      eyebrow="Student-view preview"
       :title="
         assessment?.title
         || 'Assessment'
@@ -246,13 +301,25 @@ onMounted(
           Start Live
         </UButton>
 
+        <UButton
+          :to="`/instructor/assessments/${assessmentId}/edit`"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-pencil"
+        >
+          Question Builder
+        </UButton>
+
+        <UButton
+          :to="`/instructor/assessments/${assessmentId}/settings`"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-settings-2"
+        >
+          Settings
+        </UButton>
       </template>
     </PageHeader>
-
-    <AssessmentWorkspaceNavigation
-      :assessment-id="assessmentId"
-      active="preview"
-    />
 
     <UAlert
       v-if="errorMessage"
@@ -317,10 +384,9 @@ onMounted(
             variant="soft"
           >
             {{
-              currentQuestion.question_type
-                === 'multiple_choice'
-                ? 'Multiple Choice'
-                : 'Checkbox'
+              assessmentQuestionTypeLabel(
+                currentQuestion.question_type,
+              )
             }}
           </UBadge>
 
@@ -361,52 +427,35 @@ onMounted(
         </h1>
 
         <p class="mt-3 text-sm text-muted">
-          {{
-            currentQuestion.question_type
-              === 'multiple_choice'
-              ? 'Select one answer.'
-              : 'Select all answers that apply.'
-          }}
+          {{ answerInstruction }}
         </p>
 
-        <div class="mt-8 grid gap-3 sm:grid-cols-2">
+        <div
+          v-if="isChoiceQuestion"
+          class="mt-8 grid gap-3 sm:grid-cols-2"
+        >
           <button
-            v-for="(
-              option,
-              index
-            ) in currentQuestion.options"
+            v-for="(option, index) in currentQuestion.options"
             :key="option.id"
             type="button"
             class="rounded-xl border p-5 text-left transition"
             :class="
-              isSelected(
-                option.id,
-              )
+              isSelected(option.id)
                 ? 'border-primary bg-primary/5 ring-3 ring-primary/10'
                 : 'border-default hover:border-primary/40 hover:bg-primary/5'
             "
-            @click="
-              selectOption(
-                option.id,
-              )
-            "
+            @click="selectOption(option.id)"
           >
             <div class="flex items-center gap-3">
               <span
                 class="flex size-8 shrink-0 items-center justify-center rounded-lg text-sm font-black"
                 :class="
-                  isSelected(
-                    option.id,
-                  )
+                  isSelected(option.id)
                     ? 'bg-primary text-white'
                     : 'bg-elevated text-muted'
                 "
               >
-                {{
-                  String.fromCharCode(
-                    65 + index,
-                  )
-                }}
+                {{ String.fromCharCode(65 + index) }}
               </span>
 
               <span class="font-semibold text-highlighted">
@@ -414,6 +463,64 @@ onMounted(
               </span>
             </div>
           </button>
+        </div>
+
+        <div
+          v-else-if="currentQuestion.question_type === 'fill_blank'"
+          class="mt-8 max-w-2xl"
+        >
+          <UFormField label="Your answer">
+            <UInput
+              v-model="textResponse"
+              size="xl"
+              class="w-full"
+              placeholder="Type your answer"
+            />
+          </UFormField>
+        </div>
+
+        <div
+          v-else-if="isTrueFalseQuestion"
+          class="mt-8 space-y-5"
+        >
+          <div class="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              class="rounded-xl border p-5 text-left transition"
+              :class="booleanResponse === true ? 'border-primary bg-primary/5 ring-3 ring-primary/10' : 'border-default hover:border-primary/40'"
+              @click="booleanResponse = true; textResponse = ''"
+            >
+              <div class="flex items-center gap-3">
+                <UIcon name="i-lucide-circle-check" class="size-5 text-success" />
+                <span class="font-bold text-highlighted">True</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              class="rounded-xl border p-5 text-left transition"
+              :class="booleanResponse === false ? 'border-primary bg-primary/5 ring-3 ring-primary/10' : 'border-default hover:border-primary/40'"
+              @click="booleanResponse = false"
+            >
+              <div class="flex items-center gap-3">
+                <UIcon name="i-lucide-circle-x" class="size-5 text-error" />
+                <span class="font-bold text-highlighted">False</span>
+              </div>
+            </button>
+          </div>
+
+          <UFormField
+            v-if="currentQuestion.question_type === 'true_false_correction' && booleanResponse === false"
+            label="Why is it false?"
+            help="State the correction or correct answer."
+          >
+            <UTextarea
+              v-model="textResponse"
+              :rows="4"
+              class="w-full"
+              placeholder="Explain why the statement is false or write the correct answer"
+            />
+          </UFormField>
         </div>
 
         <div class="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
@@ -451,7 +558,7 @@ onMounted(
         color="info"
         variant="soft"
         title="Preview only"
-        description="Selections are local and are not submitted or graded. Secure student attempts begin in a later phase."
+        description="Answers in this preview are local only and are not submitted or graded."
       />
     </div>
   </div>

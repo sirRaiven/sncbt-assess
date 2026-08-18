@@ -44,12 +44,532 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          first_name: string | null
+          last_name: string | null
+          middle_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          first_name?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          first_name?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_assignments: {
+        Row: {
+          assessment_id: string
+          cancelled_at: string | null
+          classroom_id: string
+          closed_at: string | null
+          created_at: string
+          ends_at: string
+          focus_mode_enabled: boolean
+          id: string
+          instructor_id: string
+          integrity_monitoring_enabled: boolean
+          max_attempts: number
+          show_leaderboard: boolean
+          starts_at: string
+          time_limit_seconds: number | null
+          updated_at: string
+        }
+        Insert: {
+          assessment_id: string
+          cancelled_at?: string | null
+          classroom_id: string
+          closed_at?: string | null
+          created_at?: string
+          ends_at: string
+          focus_mode_enabled?: boolean
+          id?: string
+          instructor_id: string
+          integrity_monitoring_enabled?: boolean
+          max_attempts?: number
+          show_leaderboard?: boolean
+          starts_at: string
+          time_limit_seconds?: number | null
+          updated_at?: string
+        }
+        Update: {
+          assessment_id?: string
+          cancelled_at?: string | null
+          classroom_id?: string
+          closed_at?: string | null
+          created_at?: string
+          ends_at?: string
+          focus_mode_enabled?: boolean
+          id?: string
+          instructor_id?: string
+          integrity_monitoring_enabled?: boolean
+          max_attempts?: number
+          show_leaderboard?: boolean
+          starts_at?: string
+          time_limit_seconds?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_assignments_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_assignments_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_assignments_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_attempts: {
+        Row: {
+          answered_count: number
+          assessment_id: string
+          assessment_version: number
+          assignment_id: string | null
+          attempt_number: number
+          classroom_id: string | null
+          correct_count: number
+          created_at: string
+          current_question_index: number
+          expires_at: string | null
+          id: string
+          last_activity_at: string | null
+          locked_at: string | null
+          maximum_score: number
+          option_order: Json | null
+          question_order: string[] | null
+          session_id: string | null
+          speed_bonus_total: number
+          started_at: string | null
+          status: Database["public"]["Enums"]["assessment_attempt_status"]
+          student_id: string
+          submitted_at: string | null
+          submitted_reason: string | null
+          total_response_time_ms: number
+          total_score: number
+          unanswered_count: number
+          updated_at: string
+          wrong_count: number
+        }
+        Insert: {
+          answered_count?: number
+          assessment_id: string
+          assessment_version: number
+          assignment_id?: string | null
+          attempt_number?: number
+          classroom_id?: string | null
+          correct_count?: number
+          created_at?: string
+          current_question_index?: number
+          expires_at?: string | null
+          id?: string
+          last_activity_at?: string | null
+          locked_at?: string | null
+          maximum_score?: number
+          option_order?: Json | null
+          question_order?: string[] | null
+          session_id?: string | null
+          speed_bonus_total?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["assessment_attempt_status"]
+          student_id: string
+          submitted_at?: string | null
+          submitted_reason?: string | null
+          total_response_time_ms?: number
+          total_score?: number
+          unanswered_count?: number
+          updated_at?: string
+          wrong_count?: number
+        }
+        Update: {
+          answered_count?: number
+          assessment_id?: string
+          assessment_version?: number
+          assignment_id?: string | null
+          attempt_number?: number
+          classroom_id?: string | null
+          correct_count?: number
+          created_at?: string
+          current_question_index?: number
+          expires_at?: string | null
+          id?: string
+          last_activity_at?: string | null
+          locked_at?: string | null
+          maximum_score?: number
+          option_order?: Json | null
+          question_order?: string[] | null
+          session_id?: string | null
+          speed_bonus_total?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["assessment_attempt_status"]
+          student_id?: string
+          submitted_at?: string | null
+          submitted_reason?: string | null
+          total_response_time_ms?: number
+          total_score?: number
+          unanswered_count?: number
+          updated_at?: string
+          wrong_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_attempts_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_attempts_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_attempts_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_attempts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_attempts_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_import_rows: {
+        Row: {
+          created_at: string
+          id: string
+          import_id: string
+          is_excluded: boolean
+          is_valid: boolean
+          normalized_data: Json
+          source_row_number: number
+          updated_at: string
+          validation_errors: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          import_id: string
+          is_excluded?: boolean
+          is_valid?: boolean
+          normalized_data?: Json
+          source_row_number: number
+          updated_at?: string
+          validation_errors?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          import_id?: string
+          is_excluded?: boolean
+          is_valid?: boolean
+          normalized_data?: Json
+          source_row_number?: number
+          updated_at?: string
+          validation_errors?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_import_rows_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_imports: {
+        Row: {
+          assessment_id: string
+          completed_at: string | null
+          created_at: string
+          expires_at: string
+          file_size_bytes: number
+          id: string
+          imported_rows: number
+          instructor_id: string
+          invalid_rows: number
+          original_filename: string
+          status: Database["public"]["Enums"]["assessment_import_status"]
+          total_rows: number
+          updated_at: string
+          valid_rows: number
+        }
+        Insert: {
+          assessment_id: string
+          completed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          file_size_bytes: number
+          id?: string
+          imported_rows?: number
+          instructor_id: string
+          invalid_rows?: number
+          original_filename: string
+          status?: Database["public"]["Enums"]["assessment_import_status"]
+          total_rows?: number
+          updated_at?: string
+          valid_rows?: number
+        }
+        Update: {
+          assessment_id?: string
+          completed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          file_size_bytes?: number
+          id?: string
+          imported_rows?: number
+          instructor_id?: string
+          invalid_rows?: number
+          original_filename?: string
+          status?: Database["public"]["Enums"]["assessment_import_status"]
+          total_rows?: number
+          updated_at?: string
+          valid_rows?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_imports_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_imports_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_integrity_events: {
+        Row: {
+          assessment_id: string
+          assignment_id: string
+          attempt_id: string
+          classroom_id: string
+          client_occurred_at: string | null
+          event_type: string
+          id: string
+          metadata: Json
+          question_id: string | null
+          question_index: number | null
+          received_at: string
+          severity: string
+          student_id: string
+        }
+        Insert: {
+          assessment_id: string
+          assignment_id: string
+          attempt_id: string
+          classroom_id: string
+          client_occurred_at?: string | null
+          event_type: string
+          id: string
+          metadata?: Json
+          question_id?: string | null
+          question_index?: number | null
+          received_at?: string
+          severity: string
+          student_id: string
+        }
+        Update: {
+          assessment_id?: string
+          assignment_id?: string
+          attempt_id?: string
+          classroom_id?: string
+          client_occurred_at?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json
+          question_id?: string | null
+          question_index?: number | null
+          received_at?: string
+          severity?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_integrity_events_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_integrity_events_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_integrity_events_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_integrity_events_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_integrity_events_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_integrity_events_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_sessions: {
+        Row: {
+          allow_late_join: boolean
+          assessment_id: string
+          assessment_version: number
+          cancelled_at: string | null
+          classroom_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          instructor_id: string
+          session_code: string
+          session_mode: Database["public"]["Enums"]["live_session_mode"]
+          show_leaderboard: boolean
+          started_at: string | null
+          status: Database["public"]["Enums"]["assessment_session_status"]
+          updated_at: string
+        }
+        Insert: {
+          allow_late_join?: boolean
+          assessment_id: string
+          assessment_version: number
+          cancelled_at?: string | null
+          classroom_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          instructor_id: string
+          session_code: string
+          session_mode?: Database["public"]["Enums"]["live_session_mode"]
+          show_leaderboard?: boolean
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["assessment_session_status"]
+          updated_at?: string
+        }
+        Update: {
+          allow_late_join?: boolean
+          assessment_id?: string
+          assessment_version?: number
+          cancelled_at?: string | null
+          classroom_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          instructor_id?: string
+          session_code?: string
+          session_mode?: Database["public"]["Enums"]["live_session_mode"]
+          show_leaderboard?: boolean
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["assessment_session_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_sessions_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_sessions_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_sessions_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessments: {
         Row: {
           allow_backtracking: boolean
           archived_at: string | null
           assessment_type: Database["public"]["Enums"]["assessment_type"]
-          classroom_id: string
+          classroom_id: string | null
           created_at: string
           id: string
           instructions: string | null
@@ -75,7 +595,7 @@ export type Database = {
           allow_backtracking?: boolean
           archived_at?: string | null
           assessment_type?: Database["public"]["Enums"]["assessment_type"]
-          classroom_id: string
+          classroom_id?: string | null
           created_at?: string
           id?: string
           instructions?: string | null
@@ -101,7 +621,7 @@ export type Database = {
           allow_backtracking?: boolean
           archived_at?: string | null
           assessment_type?: Database["public"]["Enums"]["assessment_type"]
-          classroom_id?: string
+          classroom_id?: string | null
           created_at?: string
           id?: string
           instructions?: string | null
@@ -143,6 +663,159 @@ export type Database = {
             columns: ["source_assessment_id"]
             isOneToOne: false
             referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attempt_answer_options: {
+        Row: {
+          answer_id: string
+          created_at: string
+          option_id: string
+        }
+        Insert: {
+          answer_id: string
+          created_at?: string
+          option_id: string
+        }
+        Update: {
+          answer_id?: string
+          created_at?: string
+          option_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attempt_answer_options_answer_id_fkey"
+            columns: ["answer_id"]
+            isOneToOne: false
+            referencedRelation: "attempt_answers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attempt_answer_options_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "question_options"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attempt_answers: {
+        Row: {
+          answered_at: string | null
+          attempt_id: string
+          awarded_points: number | null
+          boolean_response: boolean | null
+          created_at: string
+          finalized_at: string | null
+          id: string
+          is_correct: boolean | null
+          is_final: boolean
+          question_id: string
+          response_time_ms: number
+          speed_bonus: number | null
+          text_response: string | null
+          updated_at: string
+        }
+        Insert: {
+          answered_at?: string | null
+          attempt_id: string
+          awarded_points?: number | null
+          boolean_response?: boolean | null
+          created_at?: string
+          finalized_at?: string | null
+          id?: string
+          is_correct?: boolean | null
+          is_final?: boolean
+          question_id: string
+          response_time_ms?: number
+          speed_bonus?: number | null
+          text_response?: string | null
+          updated_at?: string
+        }
+        Update: {
+          answered_at?: string | null
+          attempt_id?: string
+          awarded_points?: number | null
+          boolean_response?: boolean | null
+          created_at?: string
+          finalized_at?: string | null
+          id?: string
+          is_correct?: boolean | null
+          is_final?: boolean
+          question_id?: string
+          response_time_ms?: number
+          speed_bonus?: number | null
+          text_response?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attempt_answers_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attempt_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attempt_question_states: {
+        Row: {
+          attempt_id: string
+          created_at: string
+          deadline_at: string | null
+          finalized_at: string | null
+          first_delivered_at: string
+          id: string
+          order_number: number
+          question_id: string
+          timed_out_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempt_id: string
+          created_at?: string
+          deadline_at?: string | null
+          finalized_at?: string | null
+          first_delivered_at: string
+          id?: string
+          order_number: number
+          question_id: string
+          timed_out_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempt_id?: string
+          created_at?: string
+          deadline_at?: string | null
+          finalized_at?: string | null
+          first_delivered_at?: string
+          id?: string
+          order_number?: number
+          question_id?: string
+          timed_out_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attempt_question_states_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attempt_question_states_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
             referencedColumns: ["id"]
           },
         ]
@@ -309,47 +982,6 @@ export type Database = {
           },
         ]
       }
-      student_profiles: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          first_name: string | null
-          last_name: string | null
-          middle_name: string | null
-          student_number: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          first_name?: string | null
-          last_name?: string | null
-          middle_name?: string | null
-          student_number: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          first_name?: string | null
-          last_name?: string | null
-          middle_name?: string | null
-          student_number?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "student_profiles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       instructor_profiles: {
         Row: {
           avatar_url: string | null
@@ -384,44 +1016,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "instructor_profiles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      admin_profiles: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          first_name: string | null
-          last_name: string | null
-          middle_name: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          first_name?: string | null
-          last_name?: string | null
-          middle_name?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          first_name?: string | null
-          last_name?: string | null
-          middle_name?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "admin_profiles_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "accounts"
@@ -469,7 +1063,9 @@ export type Database = {
       }
       questions: {
         Row: {
+          accepted_answers: string[]
           assessment_id: string
+          correct_boolean: boolean | null
           created_at: string
           explanation: string | null
           id: string
@@ -482,7 +1078,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accepted_answers?: string[]
           assessment_id: string
+          correct_boolean?: boolean | null
           created_at?: string
           explanation?: string | null
           id?: string
@@ -495,7 +1093,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accepted_answers?: string[]
           assessment_id?: string
+          correct_boolean?: boolean | null
           created_at?: string
           explanation?: string | null
           id?: string
@@ -517,31 +1117,211 @@ export type Database = {
           },
         ]
       }
-    }
-    Views: {
-      profiles: {
+      session_participants: {
         Row: {
-          account_status: Database["public"]["Enums"]["account_status"]
-          avatar_url: string | null
+          activated_at: string | null
+          answered_count: number
+          completed_at: string | null
           created_at: string
-          email: string | null
-          employee_number: string | null
-          first_name: string | null
+          current_question_number: number
+          finished_at: string | null
           id: string
-          last_name: string | null
-          middle_name: string | null
-          requested_role: Database["public"]["Enums"]["user_role"]
-          role: Database["public"]["Enums"]["user_role"]
-          student_number: string | null
+          joined_at: string
+          last_activity_at: string | null
+          left_at: string | null
+          removed_at: string | null
+          session_id: string
+          status: Database["public"]["Enums"]["session_participant_status"]
+          student_id: string
           updated_at: string
         }
-        Relationships: []
+        Insert: {
+          activated_at?: string | null
+          answered_count?: number
+          completed_at?: string | null
+          created_at?: string
+          current_question_number?: number
+          finished_at?: string | null
+          id?: string
+          joined_at?: string
+          last_activity_at?: string | null
+          left_at?: string | null
+          removed_at?: string | null
+          session_id: string
+          status?: Database["public"]["Enums"]["session_participant_status"]
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          answered_count?: number
+          completed_at?: string | null
+          created_at?: string
+          current_question_number?: number
+          finished_at?: string | null
+          id?: string
+          joined_at?: string
+          last_activity_at?: string | null
+          left_at?: string | null
+          removed_at?: string | null
+          session_id?: string
+          status?: Database["public"]["Enums"]["session_participant_status"]
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_participants_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          first_name: string | null
+          last_name: string | null
+          middle_name: string | null
+          student_number: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          first_name?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          student_number: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          first_name?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          student_number?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
+    Views: {
+      [_ in never]: never
+    }
     Functions: {
+      archive_assessment_safely: {
+        Args: { p_assessment_id: string; p_instructor_id: string }
+        Returns: Json
+      }
       assert_assessment_publishable: {
         Args: { p_assessment_id: string; p_instructor_id: string }
         Returns: undefined
+      }
+      begin_scheduled_assessment_attempt: {
+        Args: { p_assignment_id: string; p_student_id: string }
+        Returns: string
+      }
+      begin_student_attempt: {
+        Args: { p_session_id: string; p_student_id: string }
+        Returns: string
+      }
+      close_assessment_session: {
+        Args: {
+          p_instructor_id: string
+          p_session_id: string
+          p_target_status: Database["public"]["Enums"]["assessment_session_status"]
+        }
+        Returns: undefined
+      }
+      close_live_assessment_session: {
+        Args: {
+          p_instructor_id: string
+          p_session_id: string
+          p_target_status: Database["public"]["Enums"]["assessment_session_status"]
+        }
+        Returns: undefined
+      }
+      close_scheduled_assessment_assignment: {
+        Args: { p_assignment_id: string; p_instructor_id: string }
+        Returns: undefined
+      }
+      commit_assessment_import: {
+        Args: {
+          p_excluded_row_ids: string[]
+          p_import_id: string
+          p_instructor_id: string
+        }
+        Returns: number
+      }
+      complete_student_attempt: {
+        Args: {
+          p_attempt_id: string
+          p_auto: boolean
+          p_reason: string
+          p_student_id: string
+        }
+        Returns: Json
+      }
+      create_assessment_session: {
+        Args: {
+          p_allow_late_join: boolean
+          p_assessment_id: string
+          p_instructor_id: string
+        }
+        Returns: string
+      }
+      create_assessment_with_assignments: {
+        Args: {
+          p_allow_backtracking: boolean
+          p_assessment_type: Database["public"]["Enums"]["assessment_type"]
+          p_classroom_ids: string[]
+          p_instructions: string
+          p_instructor_id: string
+          p_leaderboard_enabled: boolean
+          p_overall_time_limit_seconds: number
+          p_randomize_options: boolean
+          p_randomize_questions: boolean
+          p_result_visibility: Database["public"]["Enums"]["assessment_result_visibility"]
+          p_scoring_mode: Database["public"]["Enums"]["assessment_scoring_mode"]
+          p_subject_code: string
+          p_subject_name: string
+          p_title: string
+        }
+        Returns: string
+      }
+      create_live_assessment_session: {
+        Args: {
+          p_allow_late_join: boolean
+          p_assessment_id: string
+          p_classroom_id: string
+          p_instructor_id: string
+          p_session_mode: Database["public"]["Enums"]["live_session_mode"]
+          p_show_leaderboard: boolean
+        }
+        Returns: string
       }
       current_account_status: {
         Args: never
@@ -551,13 +1331,17 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
-      get_classroom_enrollment_settings: {
-        Args: { p_classroom_id: string }
-        Returns: Json
-      }
       delete_assessment_question: {
         Args: { p_instructor_id: string; p_question_id: string }
         Returns: string
+      }
+      delete_instructor_archived_assessment: {
+        Args: { p_assessment_id: string; p_instructor_id: string }
+        Returns: Json
+      }
+      delete_instructor_closed_session: {
+        Args: { p_instructor_id: string; p_session_id: string }
+        Returns: Json
       }
       duplicate_assessment_question: {
         Args: { p_instructor_id: string; p_question_id: string }
@@ -567,6 +1351,96 @@ export type Database = {
         Args: { p_assessment_id: string; p_instructor_id: string }
         Returns: string
       }
+      finalize_due_assessment_attempts: { Args: never; Returns: number }
+      force_submit_scheduled_attempt: {
+        Args: { p_attempt_id: string; p_instructor_id: string }
+        Returns: Json
+      }
+      get_assessment_integrity_monitor: {
+        Args: { p_assignment_id: string; p_attempt_ids: string[] }
+        Returns: {
+          attempt_id: string
+          high_priority_count: number
+          latest_event_type: string
+          latest_signal_at: string
+          low_priority_count: number
+          medium_priority_count: number
+          recent_events: Json
+          signal_count: number
+        }[]
+      }
+      get_classroom_enrollment_settings: {
+        Args: { p_classroom_id: string }
+        Returns: Json
+      }
+      grant_scheduled_attempt_extra_time: {
+        Args: {
+          p_attempt_id: string
+          p_extra_seconds: number
+          p_instructor_id: string
+        }
+        Returns: string
+      }
+      import_assessment_questions: {
+        Args: {
+          p_assessment_id: string
+          p_instructor_id: string
+          p_questions: Json
+        }
+        Returns: Json
+      }
+      join_assessment_session: {
+        Args: { p_session_code: string; p_student_id: string }
+        Returns: string
+      }
+      join_live_assessment_session: {
+        Args: { p_session_code: string; p_student_id: string }
+        Returns: string
+      }
+      leave_live_session_lobby: {
+        Args: { p_session_id: string; p_student_id: string }
+        Returns: undefined
+      }
+      leave_session_lobby: {
+        Args: { p_session_id: string; p_student_id: string }
+        Returns: undefined
+      }
+      prepare_attempt_question: {
+        Args: {
+          p_attempt_id: string
+          p_requested_index: number
+          p_student_id: string
+        }
+        Returns: Json
+      }
+      prepare_scheduled_attempt_question: {
+        Args: {
+          p_attempt_id: string
+          p_requested_index: number
+          p_student_id: string
+        }
+        Returns: Json
+      }
+      purge_assessment_integrity_events: {
+        Args: { p_before: string }
+        Returns: number
+      }
+      remove_live_session_participant: {
+        Args: {
+          p_instructor_id: string
+          p_participant_id: string
+          p_session_id: string
+        }
+        Returns: undefined
+      }
+      remove_session_participant: {
+        Args: {
+          p_instructor_id: string
+          p_participant_id: string
+          p_session_id: string
+        }
+        Returns: undefined
+      }
       reorder_assessment_questions: {
         Args: {
           p_assessment_id: string
@@ -575,34 +1449,158 @@ export type Database = {
         }
         Returns: undefined
       }
+      resolve_auth_identifier: {
+        Args: { p_identifier: string }
+        Returns: {
+          account_status: Database["public"]["Enums"]["account_status"]
+          email: string
+          role: Database["public"]["Enums"]["user_role"]
+          user_id: string
+        }[]
+      }
+      return_assessment_to_draft_safely: {
+        Args: { p_assessment_id: string; p_instructor_id: string }
+        Returns: Json
+      }
+      save_assessment_question:
+        | {
+            Args: {
+              p_assessment_id: string
+              p_explanation: string
+              p_image_url: string
+              p_instructor_id: string
+              p_options: Json
+              p_points: number
+              p_question_id: string
+              p_question_text: string
+              p_question_type: Database["public"]["Enums"]["assessment_question_type"]
+              p_time_limit_seconds: number
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_accepted_answers: string[]
+              p_assessment_id: string
+              p_correct_boolean: boolean
+              p_explanation: string
+              p_image_url: string
+              p_instructor_id: string
+              p_options: Json
+              p_points: number
+              p_question_id: string
+              p_question_text: string
+              p_question_type: Database["public"]["Enums"]["assessment_question_type"]
+              p_time_limit_seconds: number
+            }
+            Returns: string
+          }
+      save_attempt_response:
+        | {
+            Args: {
+              p_attempt_id: string
+              p_finalize: boolean
+              p_question_id: string
+              p_selected_option_ids: string[]
+              p_student_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_attempt_id: string
+              p_boolean_response: boolean
+              p_finalize: boolean
+              p_question_id: string
+              p_selected_option_ids: string[]
+              p_student_id: string
+              p_text_response: string
+            }
+            Returns: Json
+          }
+      save_scheduled_attempt_response:
+        | {
+            Args: {
+              p_attempt_id: string
+              p_finalize: boolean
+              p_question_id: string
+              p_selected_option_ids: string[]
+              p_student_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_attempt_id: string
+              p_boolean_response: boolean
+              p_finalize: boolean
+              p_question_id: string
+              p_selected_option_ids: string[]
+              p_student_id: string
+              p_text_response: string
+            }
+            Returns: Json
+          }
+      set_assessment_assignments: {
+        Args: {
+          p_assessment_id: string
+          p_classroom_ids: string[]
+          p_instructor_id: string
+        }
+        Returns: undefined
+      }
       set_classroom_enrollment_approval: {
         Args: { p_classroom_id: string; p_required: boolean }
         Returns: Json
       }
-      save_assessment_question: {
+      set_scheduled_assessment_assignments: {
         Args: {
           p_assessment_id: string
-          p_explanation: string
-          p_image_url: string
           p_instructor_id: string
-          p_options: Json
-          p_points: number
-          p_question_id: string
-          p_question_text: string
-          p_question_type: Database["public"]["Enums"]["assessment_question_type"]
-          p_time_limit_seconds: number
+          p_schedules: Json
         }
-        Returns: string
+        Returns: undefined
+      }
+      start_assessment_session: {
+        Args: { p_instructor_id: string; p_session_id: string }
+        Returns: undefined
+      }
+      start_live_assessment_session: {
+        Args: { p_instructor_id: string; p_session_id: string }
+        Returns: undefined
+      }
+      submit_scheduled_assessment_attempt: {
+        Args: {
+          p_attempt_id: string
+          p_auto: boolean
+          p_reason: string
+          p_student_id: string
+        }
+        Returns: Json
       }
     }
     Enums: {
       account_status: "pending" | "active" | "suspended" | "rejected"
-      assessment_question_type: "multiple_choice" | "checkbox"
+      assessment_attempt_status:
+        | "not_started"
+        | "in_progress"
+        | "submitted"
+        | "auto_submitted"
+        | "locked"
+        | "cancelled"
+      assessment_import_status: "ready" | "committed" | "cancelled" | "failed"
+      assessment_question_type:
+        | "multiple_choice"
+        | "checkbox"
+        | "fill_blank"
+        | "true_false"
+        | "true_false_correction"
       assessment_result_visibility:
         | "hidden"
         | "score_only"
         | "score_and_answers"
       assessment_scoring_mode: "standard" | "speed_bonus"
+      assessment_session_status: "lobby" | "active" | "ended" | "cancelled"
       assessment_status: "draft" | "published" | "archived"
       assessment_type: "quiz" | "examination" | "activity" | "practice"
       classroom_membership_status:
@@ -612,6 +1610,14 @@ export type Database = {
         | "removed"
         | "left"
       classroom_status: "active" | "archived"
+      live_session_mode: "student_paced" | "teacher_led"
+      session_participant_status:
+        | "waiting"
+        | "active"
+        | "completed"
+        | "left"
+        | "removed"
+        | "finished"
       user_role: "admin" | "instructor" | "student"
     }
     CompositeTypes: {
@@ -741,13 +1747,29 @@ export const Constants = {
   public: {
     Enums: {
       account_status: ["pending", "active", "suspended", "rejected"],
-      assessment_question_type: ["multiple_choice", "checkbox"],
+      assessment_attempt_status: [
+        "not_started",
+        "in_progress",
+        "submitted",
+        "auto_submitted",
+        "locked",
+        "cancelled",
+      ],
+      assessment_import_status: ["ready", "committed", "cancelled", "failed"],
+      assessment_question_type: [
+        "multiple_choice",
+        "checkbox",
+        "fill_blank",
+        "true_false",
+        "true_false_correction",
+      ],
       assessment_result_visibility: [
         "hidden",
         "score_only",
         "score_and_answers",
       ],
       assessment_scoring_mode: ["standard", "speed_bonus"],
+      assessment_session_status: ["lobby", "active", "ended", "cancelled"],
       assessment_status: ["draft", "published", "archived"],
       assessment_type: ["quiz", "examination", "activity", "practice"],
       classroom_membership_status: [
@@ -758,6 +1780,15 @@ export const Constants = {
         "left",
       ],
       classroom_status: ["active", "archived"],
+      live_session_mode: ["student_paced", "teacher_led"],
+      session_participant_status: [
+        "waiting",
+        "active",
+        "completed",
+        "left",
+        "removed",
+        "finished",
+      ],
       user_role: ["admin", "instructor", "student"],
     },
   },

@@ -52,6 +52,25 @@ function formatDate(
     );
 }
 
+
+function baseScore(
+  delivery:
+    StudentAssessmentDelivery,
+): number {
+  const attempt =
+    delivery.attempt;
+
+  if (!attempt) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    attempt.totalScore
+    - (attempt.speedBonus || 0),
+  );
+}
+
 function percentage(
   delivery:
     StudentAssessmentDelivery,
@@ -68,7 +87,7 @@ function percentage(
 
   return Math.round(
     (
-      attempt.totalScore
+      baseScore(delivery)
       / attempt.maximumScore
     ) * 100,
   );
@@ -186,7 +205,7 @@ onMounted(
       "
       icon="i-lucide-trophy"
       title="No submitted results"
-      description="Submitted assessments will appear here. Scores and answer review remain controlled by your instructor."
+      description="Submitted assessments will appear here. Score visibility and instant feedback remain controlled by your instructor."
     />
 
     <div
@@ -237,13 +256,30 @@ onMounted(
             >
               <div class="rounded-lg bg-elevated p-3 text-center">
                 <p class="text-xs text-muted">
-                  Score
+                  {{
+                    delivery.scoringMode === "speed_bonus"
+                      ? "Points"
+                      : "Score"
+                  }}
                 </p>
 
                 <p class="mt-1 font-black text-highlighted">
-                  {{ delivery.attempt.totalScore }}
-                  /
-                  {{ delivery.attempt.maximumScore }}
+                  <template v-if="delivery.scoringMode === 'speed_bonus'">
+                    {{ delivery.attempt.totalScore }}
+                  </template>
+
+                  <template v-else>
+                    {{ delivery.attempt.totalScore }}
+                    /
+                    {{ delivery.attempt.maximumScore }}
+                  </template>
+                </p>
+
+                <p
+                  v-if="delivery.scoringMode === 'speed_bonus'"
+                  class="mt-1 text-[11px] text-muted"
+                >
+                  Base {{ baseScore(delivery) }} / {{ delivery.attempt.maximumScore }} · +{{ delivery.attempt.speedBonus }} bonus
                 </p>
               </div>
 

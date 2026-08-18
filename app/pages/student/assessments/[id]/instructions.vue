@@ -429,8 +429,8 @@ onMounted(
           class="grid gap-4 sm:grid-cols-2"
           :class="
             attemptPolicy
-              ? 'xl:grid-cols-5'
-              : 'xl:grid-cols-4'
+              ? 'xl:grid-cols-6'
+              : 'xl:grid-cols-5'
           "
         >
           <div class="rounded-xl bg-elevated p-4 text-center">
@@ -450,6 +450,20 @@ onMounted(
 
             <p class="mt-2 text-2xl font-black text-highlighted">
               {{ delivery.totalPoints }}
+            </p>
+          </div>
+
+          <div class="rounded-xl bg-elevated p-4 text-center">
+            <p class="text-xs text-muted">
+              Scoring
+            </p>
+
+            <p class="mt-2 text-sm font-black text-highlighted">
+              {{
+                delivery.scoringMode === "speed_bonus"
+                  ? "Speed bonus"
+                  : "Standard"
+              }}
             </p>
           </div>
 
@@ -505,6 +519,26 @@ onMounted(
           icon="i-lucide-hourglass"
           title="Question timeout rule"
           description="If a question's answer time reaches zero, that question closes and the assessment moves to the next one. An unsaved answer is recorded as timed out. Each new question receives its own configured time until the class deadline is reached."
+        />
+
+        <UAlert
+          v-if="delivery.scoringMode === 'speed_bonus'"
+          class="mt-4"
+          color="primary"
+          variant="soft"
+          icon="i-lucide-gauge"
+          title="Speed bonus is active"
+          description="Correct answers receive their full points plus up to 20% extra based on how quickly the answer is committed. The bonus decreases as the question timer is used. Incorrect answers receive no speed bonus."
+        />
+
+        <UAlert
+          v-if="delivery.resultVisibility === 'score_and_answers'"
+          class="mt-4"
+          color="success"
+          variant="soft"
+          icon="i-lucide-circle-check-big"
+          title="Instant answer feedback is active"
+          description="After you commit an answer, you will see only Correct or Incorrect. The correct answer will not be shown. Once feedback appears, that question is locked and cannot be changed."
         />
 
         <UAlert
@@ -583,7 +617,11 @@ onMounted(
             />
 
             <p class="text-sm text-muted">
-              Correct answers are not sent to your browser while the assessment is active.
+              {{
+                delivery.resultVisibility === "score_and_answers"
+                  ? "When instant feedback is enabled, only the Correct or Incorrect outcome is shown. The correct answer itself remains private."
+                  : "Correct answers are not sent to your browser while the assessment is active."
+              }}
             </p>
           </div>
 

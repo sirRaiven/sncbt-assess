@@ -28,6 +28,7 @@ const assignmentId =
 
 const {
   getResult,
+  getStudentDelivery,
 } = useAssessmentDelivery();
 
 const delivery =
@@ -122,6 +123,25 @@ const canTakeAnotherAttempt =
       ),
   );
 
+const speedBonus =
+  computed(
+    () =>
+      delivery.value?.attempt
+        ?.speedBonus
+      || 0,
+  );
+
+const baseScore =
+  computed(
+    () =>
+      Math.max(
+        0,
+        (delivery.value?.attempt
+          ?.totalScore || 0)
+        - speedBonus.value,
+      ),
+  );
+
 const scorePercent =
   computed(
     () => {
@@ -138,7 +158,7 @@ const scorePercent =
 
       return Math.round(
         (
-          attempt.totalScore
+          baseScore.value
           / attempt.maximumScore
         ) * 100,
       );
@@ -162,9 +182,25 @@ async function loadResult():
     result.error
     || !result.data
   ) {
+    if (result.code === "RESULT_HIDDEN") {
+      const fallback =
+        await getStudentDelivery(
+          assignmentId.value,
+        );
+
+      if (fallback.data) {
+        delivery.value =
+          fallback.data.delivery;
+
+        isLoading.value =
+          false;
+
+        return;
+      }
+    }
+
     errorMessage.value =
-      result.error
-      || "Unable to load the assessment result.";
+      "Your submission was recorded, but the result is not available right now.";
 
     isLoading.value =
       false;
@@ -260,13 +296,30 @@ onMounted(
         >
           <div class="rounded-xl bg-elevated p-4 text-center">
             <p class="text-xs text-muted">
-              Score
+              {{
+                delivery.scoringMode === "speed_bonus"
+                  ? "Final points"
+                  : "Score"
+              }}
             </p>
 
             <p class="mt-2 text-2xl font-black text-highlighted">
-              {{ delivery.attempt.totalScore }}
-              /
-              {{ delivery.attempt.maximumScore }}
+              <template v-if="delivery.scoringMode === 'speed_bonus'">
+                {{ delivery.attempt.totalScore }}
+              </template>
+
+              <template v-else>
+                {{ delivery.attempt.totalScore }}
+                /
+                {{ delivery.attempt.maximumScore }}
+              </template>
+            </p>
+
+            <p
+              v-if="delivery.scoringMode === 'speed_bonus'"
+              class="mt-1 text-xs text-muted"
+            >
+              Base {{ baseScore }} / {{ delivery.attempt.maximumScore }} · +{{ speedBonus }} bonus
             </p>
           </div>
 

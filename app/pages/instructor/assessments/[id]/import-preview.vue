@@ -120,17 +120,20 @@ function formatFileSize(
 function questionTypeLabel(
   value: string | null,
 ): string {
-  if (
-    value === "multiple_choice"
-  ) {
-    return "Multiple Choice";
+  switch (value) {
+    case "multiple_choice":
+      return "Multiple Choice";
+    case "checkbox":
+      return "Checkbox";
+    case "fill_blank":
+      return "Fill in the Blanks";
+    case "true_false":
+      return "True or False";
+    case "true_false_correction":
+      return "True or False + Correction";
+    default:
+      return "Unknown";
   }
-
-  if (value === "checkbox") {
-    return "Checkbox";
-  }
-
-  return "Unknown";
 }
 
 function toggleExcluded(
@@ -480,10 +483,27 @@ onMounted(
                 </UBadge>
 
                 <UBadge
+                  v-if="row.normalized_data.options.length"
                   color="neutral"
                   variant="soft"
                 >
                   {{ row.normalized_data.options.length }} choices
+                </UBadge>
+
+                <UBadge
+                  v-if="row.normalized_data.acceptedAnswers.length"
+                  color="neutral"
+                  variant="soft"
+                >
+                  {{ row.normalized_data.acceptedAnswers.length }} accepted text answer{{ row.normalized_data.acceptedAnswers.length === 1 ? '' : 's' }}
+                </UBadge>
+
+                <UBadge
+                  v-if="row.normalized_data.correctBoolean !== null"
+                  color="success"
+                  variant="soft"
+                >
+                  Correct: {{ row.normalized_data.correctBoolean ? 'True' : 'False' }}
                 </UBadge>
               </div>
 
@@ -512,6 +532,25 @@ onMounted(
                     class="ml-2"
                   >
                     Correct
+                  </UBadge>
+                </div>
+              </div>
+
+              <div
+                v-if="row.normalized_data.acceptedAnswers.length"
+                class="mt-4 rounded-xl border border-default bg-elevated/40 p-3"
+              >
+                <p class="text-xs font-bold uppercase tracking-[0.12em] text-muted">
+                  Accepted text answer{{ row.normalized_data.acceptedAnswers.length === 1 ? '' : 's' }}
+                </p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <UBadge
+                    v-for="answer in row.normalized_data.acceptedAnswers"
+                    :key="answer"
+                    color="success"
+                    variant="soft"
+                  >
+                    {{ answer }}
                   </UBadge>
                 </div>
               </div>

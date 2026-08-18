@@ -611,7 +611,7 @@ async function submit(
                     value: 'score_only',
                   },
                   {
-                    label: 'Show score and answer review',
+                    label: 'Show score + instant feedback',
                     value: 'score_and_answers',
                   },
                 ]"
@@ -620,6 +620,42 @@ async function submit(
                 class="w-full"
               />
             </UFormField>
+
+            <UAlert
+              v-if="state.scoringMode === 'speed_bonus'"
+              color="primary"
+              variant="soft"
+              icon="i-lucide-gauge"
+              title="How speed bonus works"
+              description="Correct answers receive their full points plus up to 20% extra based on how much of the question timer remains. The bonus gradually decreases to zero at the question deadline. Wrong or unanswered questions receive no speed bonus."
+            />
+
+            <UAlert
+              v-if="state.resultVisibility === 'hidden'"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-eye-off"
+              title="Results stay private"
+              description="Students can submit normally, but their score and Correct or Incorrect feedback are not released."
+            />
+
+            <UAlert
+              v-else-if="state.resultVisibility === 'score_only'"
+              color="info"
+              variant="soft"
+              icon="i-lucide-trophy"
+              title="Score after submission"
+              description="Students can view their released score after submission. No Correct or Incorrect feedback is shown while answering."
+            />
+
+            <UAlert
+              v-else
+              color="success"
+              variant="soft"
+              icon="i-lucide-circle-check-big"
+              title="Instant answer feedback"
+              description="After a Student commits an answer, SNCBT Assess shows only Correct or Incorrect and locks that question. The correct answer itself is never revealed."
+            />
 
             <UAlert
               color="info"

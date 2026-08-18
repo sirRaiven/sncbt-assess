@@ -7,6 +7,10 @@ import type {
   InstructorIntegritySummary,
 } from "~/types/assessment-integrity";
 
+import type {
+  AssessmentQuestionType,
+} from "~/types/question";
+
 export type DeliveryAvailabilityStatus =
   | "upcoming"
   | "open"
@@ -85,6 +89,7 @@ export interface DeliveryAttemptSummary {
   answeredCount: number;
   questionCount: number;
   totalScore: number;
+  speedBonus?: number;
   maximumScore: number;
   correctCount: number | null;
   wrongCount: number | null;
@@ -116,6 +121,9 @@ export interface StudentAssessmentDelivery {
   subjectName: string;
   subjectCode: string;
   assessmentType: AssessmentType;
+  scoringMode?:
+    | "standard"
+    | "speed_bonus";
   instructions: string | null;
   questionCount: number;
   totalPoints: number;
@@ -143,9 +151,7 @@ export interface SafeDeliveryOption {
 
 export interface SafeDeliveryQuestion {
   id: string;
-  questionType:
-    | "multiple_choice"
-    | "checkbox";
+  questionType: AssessmentQuestionType;
   questionText: string;
   imageUrl: string | null;
   points: number;
@@ -162,6 +168,8 @@ export interface DeliveryQuestionPayload {
   deadlineAt: string | null;
   firstDeliveredAt: string;
   selectedOptionIds: string[];
+  textResponse: string | null;
+  booleanResponse: boolean | null;
   finalized: boolean;
   canGoPrevious: boolean;
   canGoNext: boolean;
@@ -180,6 +188,12 @@ export interface AttemptSelectionPolicyResponse {
   questions: AttemptQuestionSelectionPolicy[];
 }
 
+export interface DeliveryAnswerFeedback {
+  available: boolean;
+  isCorrect: boolean;
+  speedBonus: number;
+}
+
 export interface SaveDeliveryAnswerResult {
   message: string;
   saved: boolean;
@@ -189,6 +203,7 @@ export interface SaveDeliveryAnswerResult {
   answeredCount: number;
   attemptClosed?: boolean;
   alreadyFinalized?: boolean;
+  feedback?: DeliveryAnswerFeedback | null;
 }
 
 export interface SubmitDeliveryAttemptResult {
@@ -205,41 +220,6 @@ export interface SubmitDeliveryAttemptResult {
   alreadyCompleted: boolean;
 }
 
-
-export type StudentResultReviewOutcome =
-  | "correct"
-  | "incorrect"
-  | "unanswered"
-  | "not_graded";
-
-export interface StudentResultReviewOption {
-  id: string;
-  text: string;
-  orderNumber: number;
-  selected: boolean;
-  correct: boolean;
-}
-
-export interface StudentResultReviewQuestion {
-  id: string;
-  orderNumber: number;
-  questionType:
-    | "multiple_choice"
-    | "checkbox";
-  questionText: string;
-  imageUrl: string | null;
-  points: number;
-  earnedPoints: number | null;
-  outcome: StudentResultReviewOutcome;
-  options: StudentResultReviewOption[];
-  explanation: string | null;
-}
-
-export interface StudentResultReview {
-  assignmentId: string;
-  attemptId: string;
-  questions: StudentResultReviewQuestion[];
-}
 
 export interface InstructorDeliveryListItem {
   assignmentId: string;

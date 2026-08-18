@@ -381,17 +381,29 @@ onMounted(
             Download the SNCBT Assess template and begin entering questions on row 3. Do not rename the `Create a Quiz` worksheet or row-1 headers.
           </p>
 
-          <UButton
-            to="/templates/sncbt-assess-question-import-template.xlsx"
-            external
-            block
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-download"
-            class="mt-5"
-          >
-            Download Excel Template
-          </UButton>
+          <div class="mt-5 grid gap-2">
+            <UButton
+              to="/templates/sncbt-assess-question-import-template.xlsx"
+              external
+              block
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-download"
+            >
+              Download Excel Template
+            </UButton>
+
+            <UButton
+              to="/templates/sncbt-assess-question-import-sample.xlsx"
+              external
+              block
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-file-spreadsheet"
+            >
+              View Filled Sample
+            </UButton>
+          </div>
         </UCard>
 
         <UCard>
@@ -407,7 +419,7 @@ onMounted(
                 name="i-lucide-check"
                 class="mt-1 size-4 shrink-0 text-success"
               />
-              Two to five choices per question
+              Supports Multiple Choice, Checkbox, Fill in the Blanks, and both True or False formats
             </li>
 
             <li class="flex gap-3">
@@ -415,7 +427,7 @@ onMounted(
                 name="i-lucide-check"
                 class="mt-1 size-4 shrink-0 text-success"
               />
-              Correct answers use option numbers such as `2` or `1,3`
+              Choice questions use option numbers such as `2` or `1,3` for the correct answer
             </li>
 
             <li class="flex gap-3">
@@ -423,7 +435,7 @@ onMounted(
                 name="i-lucide-check"
                 class="mt-1 size-4 shrink-0 text-success"
               />
-              Empty time cells use 30 seconds
+              Text answers and False corrections use the Accepted Text Answer(s) column; separate alternatives with `|`
             </li>
 
             <li class="flex gap-3">
@@ -431,7 +443,7 @@ onMounted(
                 name="i-lucide-check"
                 class="mt-1 size-4 shrink-0 text-success"
               />
-              Imported questions use 1 point by default
+              Empty time cells use 30 seconds, and imported questions use 1 point by default
             </li>
           </ul>
         </UCard>

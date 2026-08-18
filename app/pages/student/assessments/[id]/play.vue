@@ -4,6 +4,7 @@ import {
 } from "vue-router";
 
 import type {
+  DeliveryAnswerFeedback,
   DeliveryQuestionPayload,
   StudentAssessmentDelivery,
 } from "~/types/assessment-delivery";
@@ -126,6 +127,14 @@ const selectedOptionIds =
     [],
   );
 
+const textResponse =
+  ref("");
+
+const booleanResponse =
+  ref<boolean | null>(
+    null,
+  );
+
 const isLoading =
   ref(true);
 
@@ -141,6 +150,26 @@ const errorMessage =
 const submitModalOpen =
   ref(false);
 
+const answerFeedback =
+  ref<DeliveryAnswerFeedback | null>(
+    null,
+  );
+
+const feedbackModalOpen =
+  ref(false);
+
+const pendingFeedbackAction =
+  ref<
+    | "next"
+    | "previous"
+    | "open-submit"
+    | "submit"
+    | null
+  >(null);
+
+const pendingFeedbackSubmitReason =
+  ref("student_submitted");
+
 const isOnline =
   ref(true);
 
@@ -155,6 +184,14 @@ const lastSyncedAt =
 const loadedSelectedOptionIds =
   ref<string[]>(
     [],
+  );
+
+const loadedTextResponse =
+  ref("");
+
+const loadedBooleanResponse =
+  ref<boolean | null>(
+    null,
   );
 
 const allowRouteLeave =
@@ -309,6 +346,38 @@ const isLastQuestion =
         : false,
   );
 
+const isChoiceQuestion =
+  computed(
+    () => {
+      const type =
+        questionPayload.value
+          ?.question.questionType;
+
+      return type === "multiple_choice"
+        || type === "checkbox";
+    },
+  );
+
+const isTrueFalseQuestion =
+  computed(
+    () => {
+      const type =
+        questionPayload.value
+          ?.question.questionType;
+
+      return type === "true_false"
+        || type === "true_false_correction";
+    },
+  );
+
+const instantFeedbackActive =
+  computed(
+    () =>
+      delivery.value
+        ?.resultVisibility
+      === "score_and_answers",
+  );
+
 const requiredSelections =
   computed<number | null>(
     () => {
@@ -320,18 +389,22 @@ const requiredSelections =
       }
 
       if (
-        payload.question
-          .questionType
+        payload.question.questionType
         === "multiple_choice"
       ) {
         return 1;
       }
 
+      if (
+        payload.question.questionType
+        !== "checkbox"
+      ) {
+        return 0;
+      }
+
       return (
         selectionLimitByQuestionId
-          .value[
-            payload.question.id
-          ]
+          .value[payload.question.id]
         ?? null
       );
     },
@@ -344,28 +417,56 @@ const selectedAnswerCount =
         .length,
   );
 
-const selectionRequirementMet =
-  computed(
-    () => {
-      if (
-        questionPayload.value
-          ?.finalized
-      ) {
-        return true;
-      }
+function hasCurrentAnswer(): boolean {
+  const payload =
+    questionPayload.value;
 
+  if (!payload) {
+    return false;
+  }
+
+  switch (
+    payload.question.questionType
+  ) {
+    case "multiple_choice":
+    case "checkbox": {
       const required =
         requiredSelections.value;
 
-      if (required === null) {
-        return false;
-      }
+      return required !== null
+        && selectedAnswerCount.value
+          === required;
+    }
 
-      return (
-        selectedAnswerCount.value
-        === required
-      );
-    },
+    case "fill_blank":
+      return textResponse.value
+        .trim().length > 0;
+
+    case "true_false":
+      return booleanResponse.value
+        !== null;
+
+    case "true_false_correction":
+      return booleanResponse.value
+        !== null
+        && (
+          booleanResponse.value === true
+          || textResponse.value
+            .trim().length > 0
+        );
+
+    default:
+      return false;
+  }
+}
+
+const selectionRequirementMet =
+  computed(
+    () =>
+      questionPayload.value
+        ?.finalized
+        ? true
+        : hasCurrentAnswer(),
   );
 
 const selectionInstruction =
@@ -378,22 +479,37 @@ const selectionInstruction =
         return "";
       }
 
-      if (
-        payload.question
-          .questionType
-        === "multiple_choice"
+      switch (
+        payload.question.questionType
       ) {
-        return "Select one answer.";
+        case "multiple_choice":
+          return "Select one answer.";
+
+        case "checkbox": {
+          const required =
+            requiredSelections.value;
+
+          if (required === null) {
+            return "Loading answer-selection rules...";
+          }
+
+          return `Select exactly ${required} ${required === 1 ? "answer" : "answers"}. ${selectedAnswerCount.value} of ${required} selected.`;
+        }
+
+        case "fill_blank":
+          return "Type your answer in the blank.";
+
+        case "true_false":
+          return "Choose True or False.";
+
+        case "true_false_correction":
+          return booleanResponse.value === false
+            ? "You selected False. State why it is false or provide the correct answer."
+            : "Choose True or False. If you choose False, you must also provide the correction.";
+
+        default:
+          return "Complete the answer.";
       }
-
-      const required =
-        requiredSelections.value;
-
-      if (required === null) {
-        return "Loading answer-selection rules...";
-      }
-
-      return `Select exactly ${required} ${required === 1 ? "answer" : "answers"}. ${selectedAnswerCount.value} of ${required} selected.`;
     },
   );
 
@@ -407,6 +523,10 @@ const nextActionLabel =
         return isLastQuestion.value
           ? "Submit Assessment"
           : "Next Question";
+      }
+
+      if (instantFeedbackActive.value) {
+        return "Check Answer";
       }
 
       return isLastQuestion.value
@@ -469,11 +589,14 @@ const estimatedAnsweredCount =
 
       const serverHadAnswer =
         loadedSelectedOptionIds.value
-          .length > 0;
+          .length > 0
+        || loadedTextResponse.value
+          .trim().length > 0
+        || loadedBooleanResponse.value
+          !== null;
 
       const currentHasAnswer =
-        selectedOptionIds.value
-          .length > 0;
+        hasCurrentAnswer();
 
       if (
         currentHasAnswer
@@ -1451,6 +1574,10 @@ function saveRecovery():
     JSON.stringify({
       selectedOptionIds:
         selectedOptionIds.value,
+      textResponse:
+        textResponse.value,
+      booleanResponse:
+        booleanResponse.value,
       savedAt:
         new Date()
           .toISOString(),
@@ -1481,7 +1608,14 @@ function restoreRecovery():
       JSON.parse(raw) as {
         selectedOptionIds?:
           string[];
+        textResponse?:
+          string;
+        booleanResponse?:
+          boolean | null;
       };
+
+    let recovered =
+      false;
 
     if (
       Array.isArray(
@@ -1491,7 +1625,31 @@ function restoreRecovery():
       selectedOptionIds.value = [
         ...parsed.selectedOptionIds,
       ];
+      recovered = true;
+    }
 
+    if (
+      typeof parsed.textResponse
+        === "string"
+    ) {
+      textResponse.value =
+        parsed.textResponse;
+      recovered = true;
+    }
+
+    if (
+      typeof parsed.booleanResponse
+        === "boolean"
+      || parsed.booleanResponse
+        === null
+    ) {
+      booleanResponse.value =
+        parsed.booleanResponse
+        ?? null;
+      recovered = true;
+    }
+
+    if (recovered) {
       pendingSync.value =
         true;
     }
@@ -1544,6 +1702,47 @@ function isOptionChoiceDisabled(
   );
 }
 
+function markAnswerChanged(): void {
+  if (
+    !questionPayload.value
+    || questionPayload.value
+      .finalized
+    || questionTimeoutTriggered.value
+    || questionSeconds.value === 0
+  ) {
+    return;
+  }
+
+  pendingSync.value =
+    true;
+
+  saveRecovery();
+}
+
+function selectBoolean(
+  value: boolean,
+): void {
+  if (
+    !questionPayload.value
+    || questionPayload.value
+      .finalized
+    || questionTimeoutTriggered.value
+    || questionSeconds.value === 0
+  ) {
+    return;
+  }
+
+  booleanResponse.value =
+    value;
+
+  if (value) {
+    textResponse.value =
+      "";
+  }
+
+  markAnswerChanged();
+}
+
 function selectOption(
   optionId: string,
 ): void {
@@ -1593,15 +1792,16 @@ function selectOption(
     ];
   }
 
-  pendingSync.value =
-    true;
-
-  saveRecovery();
+  markAnswerChanged();
 }
 
 function normalizeSelectedOptionIds():
   string[] {
   if (!questionPayload.value) {
+    return [];
+  }
+
+  if (!isChoiceQuestion.value) {
     return [];
   }
 
@@ -1662,6 +1862,22 @@ function applyQuestionPayload(
   loadedSelectedOptionIds.value = [
     ...payload.selectedOptionIds,
   ];
+
+  textResponse.value =
+    payload.textResponse
+    ?? "";
+
+  loadedTextResponse.value =
+    payload.textResponse
+    ?? "";
+
+  booleanResponse.value =
+    payload.booleanResponse
+    ?? null;
+
+  loadedBooleanResponse.value =
+    payload.booleanResponse
+    ?? null;
 
   pendingSync.value =
     false;
@@ -1955,6 +2171,7 @@ async function synchronizeAnswer(
   options?: {
     silentError?: boolean;
     recoverFinalized?: boolean;
+    commitForFeedback?: boolean;
   },
 ): Promise<boolean> {
   if (
@@ -2000,8 +2217,21 @@ async function synchronizeAnswer(
         delivery.value.attempt.id,
         questionPayload.value
           .question.id,
-        normalizedOptionIds,
+        {
+          selectedOptionIds:
+            normalizedOptionIds,
+          textResponse:
+            textResponse.value
+              .trim()
+            || null,
+          booleanResponse:
+            booleanResponse.value,
+        },
         finalize,
+        Boolean(
+          options
+            ?.commitForFeedback,
+        ),
       );
 
     if (
@@ -2081,6 +2311,17 @@ async function synchronizeAnswer(
       return false;
     }
 
+    answerFeedback.value =
+      result.data.feedback
+        ?.available
+        ? result.data.feedback
+        : null;
+
+    feedbackModalOpen.value =
+      Boolean(
+        answerFeedback.value,
+      );
+
     if (
       delivery.value.attempt
     ) {
@@ -2103,13 +2344,17 @@ async function synchronizeAnswer(
         selectedOptionIds.value = [
           ...loadedSelectedOptionIds.value,
         ];
+        textResponse.value =
+          loadedTextResponse.value;
+        booleanResponse.value =
+          loadedBooleanResponse.value;
       }
 
       toast.add({
         title:
           "Question time expired",
         description:
-          selectedOptionIds.value.length > 0
+          hasCurrentAnswer()
             ? "Your answer that was saved before the deadline has been finalized."
             : "No answer was saved before the question deadline. This question is recorded as unanswered due to timeout.",
         color:
@@ -2119,6 +2364,10 @@ async function synchronizeAnswer(
       loadedSelectedOptionIds.value = [
         ...normalizedOptionIds,
       ];
+      loadedTextResponse.value =
+        textResponse.value.trim();
+      loadedBooleanResponse.value =
+        booleanResponse.value;
 
       if (
         result.data.finalized
@@ -2168,7 +2417,7 @@ async function goNext():
 
   if (!selectionRequirementMet.value) {
     toast.add({
-      title: "Complete the required selections",
+      title: "Complete the answer",
       description: selectionInstruction.value,
       color: "warning",
     });
@@ -2180,6 +2429,10 @@ async function goNext():
     await synchronizeAnswer(
       !questionPayload.value
         .allowBacktracking,
+      {
+        commitForFeedback:
+          true,
+      },
     );
 
   if (!saved) {
@@ -2187,6 +2440,15 @@ async function goNext():
       questionTimeoutTriggered.value =
         false;
     }
+
+    return;
+  }
+
+  if (feedbackModalOpen.value) {
+    pendingFeedbackAction.value =
+      isLastQuestion.value
+        ? "open-submit"
+        : "next";
 
     return;
   }
@@ -2237,7 +2499,7 @@ async function goPrevious():
 
   if (!selectionRequirementMet.value) {
     toast.add({
-      title: "Complete the required selections",
+      title: "Complete the answer",
       description: selectionInstruction.value,
       color: "warning",
     });
@@ -2248,9 +2510,20 @@ async function goPrevious():
   const saved =
     await synchronizeAnswer(
       false,
+      {
+        commitForFeedback:
+          true,
+      },
     );
 
   if (!saved) {
+    return;
+  }
+
+  if (feedbackModalOpen.value) {
+    pendingFeedbackAction.value =
+      "previous";
+
     return;
   }
 
@@ -2283,9 +2556,26 @@ async function submit(
       await synchronizeAnswer(
         !questionPayload.value
           .allowBacktracking,
+        {
+          commitForFeedback:
+            true,
+        },
       );
 
     if (!saved) {
+      isSubmitting.value =
+        false;
+
+      return;
+    }
+
+    if (feedbackModalOpen.value) {
+      pendingFeedbackAction.value =
+        "submit";
+
+      pendingFeedbackSubmitReason.value =
+        reason;
+
       isSubmitting.value =
         false;
 
@@ -2369,6 +2659,54 @@ async function submit(
   await leaveAssessment(
     `/student/assessments/${assignmentId.value}/completed`,
   );
+}
+
+async function continueAfterFeedback():
+  Promise<void> {
+  const action =
+    pendingFeedbackAction.value;
+
+  const submitReason =
+    pendingFeedbackSubmitReason.value;
+
+  feedbackModalOpen.value =
+    false;
+
+  answerFeedback.value =
+    null;
+
+  pendingFeedbackAction.value =
+    null;
+
+  if (action === "next") {
+    await loadQuestion(
+      currentIndex.value + 1,
+    );
+
+    return;
+  }
+
+  if (action === "previous") {
+    await loadQuestion(
+      currentIndex.value - 1,
+    );
+
+    return;
+  }
+
+  if (action === "open-submit") {
+    submitModalOpen.value =
+      true;
+
+    return;
+  }
+
+  if (action === "submit") {
+    await submit(
+      false,
+      submitReason,
+    );
+  }
 }
 
 async function handleQuestionTimeout():
@@ -3102,54 +3440,110 @@ onBeforeRouteLeave(
             class="mt-6 max-h-80 w-full rounded-xl border border-default object-contain"
           >
 
-          <div class="mt-8 grid gap-4 md:grid-cols-2">
+          <div
+            v-if="isChoiceQuestion"
+            class="mt-8 grid gap-4 md:grid-cols-2"
+          >
             <button
-              v-for="(
-                option,
-                index
-              ) in questionPayload.question.options"
+              v-for="(option, index) in questionPayload.question.options"
               :key="option.id"
               type="button"
               class="flex min-h-20 items-center gap-4 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
               :class="
-                isSelected(
-                  option.id,
-                )
+                isSelected(option.id)
                   ? 'border-primary bg-primary/10 ring-3 ring-primary/10'
                   : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'
               "
-              :disabled="
-                isOptionChoiceDisabled(
-                  option.id,
-                )
-              "
-              @click="
-                selectOption(
-                  option.id,
-                )
-              "
+              :disabled="isOptionChoiceDisabled(option.id)"
+              @click="selectOption(option.id)"
             >
               <span
                 class="flex size-9 shrink-0 items-center justify-center rounded-lg font-black"
                 :class="
-                  isSelected(
-                    option.id,
-                  )
+                  isSelected(option.id)
                     ? 'bg-primary text-white'
                     : 'bg-elevated text-muted'
                 "
               >
-                {{
-                  String.fromCharCode(
-                    65 + index,
-                  )
-                }}
+                {{ String.fromCharCode(65 + index) }}
               </span>
 
               <span class="font-bold text-highlighted">
                 {{ option.text }}
               </span>
             </button>
+          </div>
+
+          <div
+            v-else-if="questionPayload.question.questionType === 'fill_blank'"
+            class="mt-8 max-w-3xl"
+          >
+            <UFormField
+              label="Your answer"
+              help="Enter the word, phrase, or short answer that completes the question."
+            >
+              <UInput
+                v-model="textResponse"
+                size="xl"
+                class="w-full"
+                placeholder="Type your answer"
+                :maxlength="1000"
+                :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                @update:model-value="markAnswerChanged"
+              />
+            </UFormField>
+          </div>
+
+          <div
+            v-else-if="isTrueFalseQuestion"
+            class="mt-8 space-y-5"
+          >
+            <div class="grid gap-4 md:grid-cols-2">
+              <button
+                type="button"
+                class="flex min-h-20 items-center gap-4 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
+                :class="booleanResponse === true ? 'border-primary bg-primary/10 ring-3 ring-primary/10' : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'"
+                :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                @click="selectBoolean(true)"
+              >
+                <UIcon
+                  name="i-lucide-circle-check"
+                  class="size-6 shrink-0 text-success"
+                />
+                <span class="font-bold text-highlighted">True</span>
+              </button>
+
+              <button
+                type="button"
+                class="flex min-h-20 items-center gap-4 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
+                :class="booleanResponse === false ? 'border-primary bg-primary/10 ring-3 ring-primary/10' : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'"
+                :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                @click="selectBoolean(false)"
+              >
+                <UIcon
+                  name="i-lucide-circle-x"
+                  class="size-6 shrink-0 text-error"
+                />
+                <span class="font-bold text-highlighted">False</span>
+              </button>
+            </div>
+
+            <UFormField
+              v-if="questionPayload.question.questionType === 'true_false_correction' && booleanResponse === false"
+              label="Why is it false?"
+              help="State the correction or provide the correct answer. This field is required when you choose False."
+              required
+            >
+              <UTextarea
+                v-model="textResponse"
+                :rows="4"
+                class="w-full"
+                placeholder="Explain why the statement is false or write the correct answer"
+                :maxlength="1000"
+                :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                @update:model-value="markAnswerChanged"
+              />
+            </UFormField>
           </div>
 
           <div class="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
@@ -3247,5 +3641,73 @@ onBeforeRouteLeave(
         description="Reconnect and allow the current answer to synchronize before submitting."
       />
     </ConfirmationModal>
+
+    <UModal
+      v-model:open="feedbackModalOpen"
+      :dismissible="false"
+      :ui="{ content: 'sm:max-w-md' }"
+    >
+      <template #content>
+        <div
+          v-if="answerFeedback"
+          class="p-6 text-center sm:p-7"
+        >
+          <div
+            class="mx-auto flex size-16 items-center justify-center rounded-full"
+            :class="
+              answerFeedback.isCorrect
+                ? 'bg-success/12 text-success'
+                : 'bg-error/12 text-error'
+            "
+          >
+            <UIcon
+              :name="
+                answerFeedback.isCorrect
+                  ? 'i-lucide-circle-check-big'
+                  : 'i-lucide-circle-x'
+              "
+              class="size-9"
+            />
+          </div>
+
+          <h2
+            class="mt-5 text-2xl font-black text-highlighted"
+          >
+            {{
+              answerFeedback.isCorrect
+                ? "Correct!"
+                : "Incorrect"
+            }}
+          </h2>
+
+          <p class="mt-2 text-sm leading-6 text-muted">
+            Your answer is now locked. SNCBT Assess does not reveal the correct answer during the assessment.
+          </p>
+
+          <UBadge
+            v-if="answerFeedback.speedBonus > 0"
+            class="mt-4"
+            color="primary"
+            variant="soft"
+            size="lg"
+          >
+            +{{ answerFeedback.speedBonus }} speed bonus
+          </UBadge>
+
+          <UButton
+            class="mt-6 w-full justify-center"
+            size="lg"
+            :color="
+              answerFeedback.isCorrect
+                ? 'success'
+                : 'error'
+            "
+            @click="continueAfterFeedback"
+          >
+            Continue
+          </UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
