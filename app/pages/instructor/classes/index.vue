@@ -156,7 +156,7 @@ async function confirmArchiveClass(): Promise<void> {
     title:
       "Class archived",
     description:
-      `${classroom.name} is now available in Archive.`,
+      `${classroom.name} and its assigned assessment access are now archived.`,
     color:
       "success",
   });
@@ -474,8 +474,8 @@ onMounted(
       title="Archive class?"
       :description="
         pendingArchiveClass
-          ? `Archive ${pendingArchiveClass.name}? New enrollment-code access and membership requests will be disabled. The class can be reactivated later from Archive.`
-          : 'Archive this class?'
+          ? `Archive ${pendingArchiveClass.name}? New joins will stop, assigned assessment access will close, and any Student currently taking an assessment in this class will be submitted automatically. Assessment records and Student results are kept.`
+          : 'Archive this class and close its assigned assessment access?'
       "
       confirm-label="Archive Class"
       confirm-color="warning"

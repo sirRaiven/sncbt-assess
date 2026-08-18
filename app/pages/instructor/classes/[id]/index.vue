@@ -52,6 +52,9 @@ const assessmentError = ref("");
 const approvalConfirmationOpen = ref(false);
 const requestedApprovalValue = ref(false);
 
+const archiveConfirmationOpen =
+  ref(false);
+
 const assignedAssessments = computed(
   () => assessments.value
     .filter(
@@ -142,6 +145,23 @@ async function loadEnrollmentSettings(): Promise<void> {
   enrollmentSettings.value =
     result.data;
   isLoadingEnrollment.value = false;
+}
+
+function requestClassStatusAction():
+  void {
+  if (
+    classroom.value?.status
+    === "active"
+  ) {
+    archiveConfirmationOpen.value =
+      true;
+
+    return;
+  }
+
+  void runClassAction(
+    "reactivate",
+  );
 }
 
 async function runClassAction(
@@ -773,7 +793,7 @@ onMounted(() => {
               color="warning"
               variant="soft"
               title="Archived class"
-              description="New enrollment and normal student access are disabled until the class is reactivated."
+              description="New enrollment is disabled. Assessment deliveries assigned to this class remain closed unless you reactivate the class and schedule them again."
             />
 
             <UButton
@@ -783,7 +803,7 @@ onMounted(() => {
               variant="soft"
               :icon="classroom.status === 'active' ? 'i-lucide-archive' : 'i-lucide-archive-restore'"
               :loading="isUpdating"
-              @click="runClassAction(classroom.status === 'active' ? 'archive' : 'reactivate')"
+              @click="requestClassStatusAction"
             >
               {{
                 classroom.status === "active"
@@ -794,6 +814,17 @@ onMounted(() => {
           </UCard>
         </div>
       </section>
+
+      <ConfirmationModal
+        v-model:open="archiveConfirmationOpen"
+        title="Archive this class?"
+        description="New joins will stop. Every assigned assessment delivery for this class will close, and any Student currently taking one will be submitted automatically. Assessment records and Student results will be kept."
+        confirm-label="Archive Class"
+        confirm-color="warning"
+        icon="i-lucide-archive"
+        :loading="isUpdating"
+        @confirm="runClassAction('archive')"
+      />
 
       <ConfirmationModal
         v-model:open="approvalConfirmationOpen"
