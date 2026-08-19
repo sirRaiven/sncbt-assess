@@ -6,10 +6,10 @@ definePageMeta({
 
 useSeoMeta({
   title:
-    "My Profile",
+    "Instructor Profile",
 });
 </script>
 
 <template>
-  <PortalProfilePage role="instructor" />
+  <InstructorProfilePage />
 </template>
