@@ -223,9 +223,11 @@ export interface SubmitDeliveryAttemptResult {
 export interface StudentLiveLeaderboardEntry {
   rank: number;
   studentName: string;
-  score: number;
-  maximumScore: number;
   isCurrentStudent: boolean;
+  /** Only returned for the authenticated student. */
+  score?: number;
+  /** Only returned for the authenticated student. */
+  maximumScore?: number;
 }
 
 export interface StudentLiveLeaderboard {

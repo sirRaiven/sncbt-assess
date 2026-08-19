@@ -545,6 +545,9 @@ async function confirmPasswordChange(): Promise<void> {
         password:
           pendingPasswordChange.value
             .newPassword,
+        current_password:
+          pendingPasswordChange.value
+            .currentPassword,
       });
 
     if (passwordError) {

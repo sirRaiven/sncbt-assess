@@ -1577,7 +1577,7 @@ function saveRecovery():
     return;
   }
 
-  localStorage.setItem(
+  sessionStorage.setItem(
     recoveryKey.value,
     JSON.stringify({
       selectedOptionIds:
@@ -1603,7 +1603,7 @@ function restoreRecovery():
   }
 
   const raw =
-    localStorage.getItem(
+    sessionStorage.getItem(
       recoveryKey.value,
     );
 
@@ -1662,7 +1662,7 @@ function restoreRecovery():
         true;
     }
   } catch {
-    localStorage.removeItem(
+    sessionStorage.removeItem(
       recoveryKey.value,
     );
   }
@@ -1674,7 +1674,7 @@ function clearRecovery():
     recoveryKey.value
     && import.meta.client
   ) {
-    localStorage.removeItem(
+    sessionStorage.removeItem(
       recoveryKey.value,
     );
   }

@@ -20,11 +20,22 @@ const POLL_INTERVAL_MS = 8000;
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-function pointsLabel(entry: StudentLiveLeaderboardEntry): string {
+function pointsLabel(entry: StudentLiveLeaderboardEntry): string | null {
+  if (
+    !entry.isCurrentStudent
+    || entry.score === undefined
+  ) {
+    return null;
+  }
+
   const score = Number(entry.score);
 
   if (leaderboard.value?.scoringMode === "speed_bonus") {
     return `${score.toFixed(Number.isInteger(score) ? 0 : 2)} pts`;
+  }
+
+  if (entry.maximumScore === undefined) {
+    return null;
   }
 
   const maximum = Number(entry.maximumScore);
@@ -201,7 +212,10 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <p class="shrink-0 text-sm font-black text-highlighted">
+          <p
+            v-if="pointsLabel(entry)"
+            class="shrink-0 text-sm font-black text-highlighted"
+          >
             {{ pointsLabel(entry) }}
           </p>
         </div>

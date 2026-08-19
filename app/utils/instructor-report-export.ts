@@ -11,6 +11,16 @@ export interface CsvColumn<T> {
       | undefined;
 }
 
+function neutralizeSpreadsheetFormula(
+  value: string,
+): string {
+  // CSV exports are intended for human viewing in spreadsheet apps.
+  // Prefix formula-like cells with a tab so Excel does not execute them.
+  return /^[=+\-@]/u.test(value)
+    ? `\t${value}`
+    : value;
+}
+
 function escapeCsv(
   value: unknown,
 ): string {
@@ -18,7 +28,9 @@ function escapeCsv(
     value === null
     || value === undefined
       ? ""
-      : String(value);
+      : neutralizeSpreadsheetFormula(
+          String(value),
+        );
 
   return `"${text.replaceAll(
     '"',

@@ -91,14 +91,38 @@ const filteredMembers = computed(() => {
   );
 });
 
+const pendingRequestCount = computed(
+  () => {
+    if (enrollmentSettings.value) {
+      return Math.max(
+        0,
+        Number(
+          enrollmentSettings.value.pendingCount
+          || 0,
+        ),
+      );
+    }
+
+    if (activeView.value === "requests") {
+      return members.value.length;
+    }
+
+    return Math.max(
+      0,
+      Number(
+        classroom.value?.memberCounts.pending
+        || 0,
+      ),
+    );
+  },
+);
+
 const showRequests = computed(
   () =>
     Boolean(
       enrollmentSettings.value?.requiresApproval,
     )
-    || Boolean(
-      classroom.value?.memberCounts.pending,
-    ),
+    || pendingRequestCount.value > 0,
 );
 
 const visibleStudentIds = computed(
@@ -220,6 +244,19 @@ async function loadData(): Promise<void> {
       (id) => members.value.some((member) => member.id === id),
     );
 
+  const currentPendingCount =
+    settingsResult.data
+      ? Number(
+          settingsResult.data.pendingCount
+          || 0,
+        )
+      : activeView.value === "requests"
+        ? memberResult.data.members.length
+        : Number(
+            classroom.value.memberCounts.pending
+            || 0,
+          );
+
   enrollmentSettings.value =
     settingsResult.data
     || {
@@ -229,8 +266,17 @@ async function loadData(): Promise<void> {
         classroom.value.join_requires_approval
         ?? false,
       pendingCount:
-        classroom.value.memberCounts.pending,
+        currentPendingCount,
     };
+
+  classroom.value = {
+    ...classroom.value,
+    memberCounts: {
+      ...classroom.value.memberCounts,
+      pending:
+        currentPendingCount,
+    },
+  };
 
   isLoading.value = false;
 }
@@ -489,7 +535,7 @@ onMounted(
       <section class="flex flex-col gap-4 rounded-2xl border border-primary/10 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-5 py-4 shadow-sm shadow-primary/5 sm:flex-row sm:items-center sm:justify-between dark:border-primary/15 dark:from-primary/15 dark:via-primary/5">
         <div>
           <h1 class="text-2xl font-black tracking-tight text-highlighted">
-            {{ activeView === "requests" ? "Enrollment requests" : "Class roster" }}
+            {{ activeView === "requests" ? "Enrollment requests" : "Students" }}
           </h1>
           <p class="mt-1 text-sm text-muted">
             {{
@@ -510,11 +556,11 @@ onMounted(
           >
             Requests
             <UBadge
-              :color="classroom.memberCounts.pending ? 'warning' : 'neutral'"
+              :color="pendingRequestCount ? 'warning' : 'neutral'"
               variant="soft"
               size="sm"
             >
-              {{ classroom.memberCounts.pending }}
+              {{ pendingRequestCount }}
             </UBadge>
           </UButton>
 
@@ -525,7 +571,7 @@ onMounted(
             variant="outline"
             icon="i-lucide-users"
           >
-            Back to roster
+            Back to students
           </UButton>
 
           <UInput
