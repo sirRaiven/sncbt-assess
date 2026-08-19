@@ -115,6 +115,27 @@ export default defineNuxtRouteMiddleware(
       return;
     }
 
+    const recoveryGate = useCookie<string | null>(
+      "sncbt_recovery_gate",
+      {
+        sameSite: "strict",
+        secure: import.meta.env.PROD,
+        maxAge: 60 * 60,
+      },
+    );
+
+    if (
+      recoveryGate.value === "1"
+      && to.path !== "/reset-password"
+    ) {
+      return navigateTo({
+        path: "/reset-password",
+        query: {
+          mode: "recovery",
+        },
+      });
+    }
+
     const {
       loadProfile,
     } = useCurrentProfile();

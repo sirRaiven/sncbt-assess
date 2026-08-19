@@ -21,7 +21,6 @@ useSeoMeta({
 
 const supabase = useSupabaseClient();
 const requestUrl = useRequestURL();
-
 const studentNumberFormat = /^\d{2,}-\d{3,}$/;
 const employeeNumberFormat = /^[A-Za-z]+\d{2,}-\d{2,}$/;
 const studentNumberAllowedCharacters = /^[0-9-]+$/;
@@ -296,6 +295,18 @@ async function register(
     });
 
     if (error) {
+      const authCode = String(
+        (error as { code?: unknown }).code || "",
+      ).toLowerCase();
+
+      if (
+        authCode === "email_exists"
+        || authCode === "user_already_exists"
+      ) {
+        registrationCompleted.value = true;
+        return;
+      }
+
       throw error;
     }
 
@@ -481,7 +492,7 @@ async function register(
               variant="soft"
               icon="i-lucide-mail-check"
               title="Check your email"
-              description="Open the confirmation message sent to your email address to finish creating the account."
+              description="If the information can be used to create an account, a confirmation message will be sent to the email address provided."
             />
 
             <UForm

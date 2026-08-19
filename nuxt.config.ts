@@ -6,7 +6,7 @@ const productionSecurityHeaders = {
     "base-uri 'none'",
     "object-src 'none'",
     "frame-ancestors 'none'",
-    "frame-src 'none'",
+    "frame-src 'self'",
     "form-action 'self'",
     "script-src 'self' 'unsafe-inline'",
     "script-src-attr 'none'",
@@ -66,6 +66,12 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     securityContactEmail: process.env.SECURITY_CONTACT_EMAIL || "",
+
+    public: {
+      // Hosted SNCBT-AMS canonical origin. Override with NUXT_PUBLIC_APP_URL
+      // when intentionally running another environment.
+      appUrl: "https://sncbt-assess.autox.workers.dev",
+    },
   },
 
   supabase: {

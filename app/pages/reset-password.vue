@@ -1,10 +1,5 @@
 <script setup lang="ts">
 import type {
-  AuthChangeEvent,
-  Session,
-} from "@supabase/supabase-js";
-
-import type {
   FormSubmitEvent,
 } from "@nuxt/ui";
 
@@ -25,7 +20,16 @@ useSeoMeta({
 });
 
 const supabase = useSupabaseClient();
-const user = useSupabaseUser();
+const route = useRoute();
+
+const recoveryGate = useCookie<string | null>(
+  "sncbt_recovery_gate",
+  {
+    sameSite: "strict",
+    secure: import.meta.env.PROD,
+    maxAge: 60 * 60,
+  },
+);
 
 const schema = z
   .object({
@@ -80,38 +84,154 @@ const state = reactive<ResetPasswordSchema>({
   confirmPassword: "",
 });
 
-const isReady = ref(
-  Boolean(user.value?.sub),
-);
-
+const isVerifying = ref(true);
+const isReady = ref(false);
 const isSubmitting = ref(false);
-const resetCompleted = ref(false);
 const errorMessage = ref("");
 
-let recoveryTimeout:
-  | ReturnType<typeof setTimeout>
-  | undefined;
+function queryString(
+  value: unknown,
+): string {
+  if (typeof value === "string") {
+    return value.trim();
+  }
 
-let unsubscribe:
-  | (() => void)
-  | undefined;
-
-function handleAuthEvent(
-  event: AuthChangeEvent,
-  session: Session | null,
-): void {
   if (
-    event === "PASSWORD_RECOVERY"
-    || event === "SIGNED_IN"
-    || session?.user
+    Array.isArray(value)
+    && typeof value[0] === "string"
   ) {
-    isReady.value = true;
-    errorMessage.value = "";
+    return value[0].trim();
+  }
 
-    if (recoveryTimeout) {
-      clearTimeout(recoveryTimeout);
+  return "";
+}
+
+function cleanRecoveryUrl(): void {
+  if (!import.meta.client) {
+    return;
+  }
+
+  globalThis.history.replaceState(
+    globalThis.history.state,
+    "",
+    "/reset-password?mode=recovery",
+  );
+}
+
+function recoveryErrorMessage(
+  code: string,
+): string {
+  if (
+    code === "otp_expired"
+    || code === "token_expired"
+  ) {
+    return "The password-reset link has expired. Request a new reset link and try again.";
+  }
+
+  if (
+    code === "otp_disabled"
+    || code === "invalid_token"
+    || code === "bad_jwt"
+  ) {
+    return "The password-reset link is invalid or has already been used. Request a new reset link and try again.";
+  }
+
+  return "The password-reset link could not be verified. Request a new reset link and try again.";
+}
+
+async function verifyRecoveryLink(): Promise<void> {
+  isVerifying.value = true;
+  isReady.value = false;
+  errorMessage.value = "";
+
+  const returnedError =
+    queryString(route.query.error_code)
+    || queryString(route.query.error);
+
+  if (returnedError) {
+    recoveryGate.value = null;
+    errorMessage.value =
+      recoveryErrorMessage(
+        returnedError.toLowerCase(),
+      );
+    isVerifying.value = false;
+    return;
+  }
+
+  const tokenHash = queryString(
+    route.query.token_hash,
+  );
+
+  const recoveryType = queryString(
+    route.query.type,
+  ).toLowerCase();
+
+  // Production recovery uses Supabase TokenHash verification instead of the
+  // browser-bound PKCE code verifier. This works even when the reset email is
+  // opened on a different browser/device and avoids pkce_code_verifier_not_found.
+  if (
+    tokenHash
+    && recoveryType === "recovery"
+  ) {
+    const {
+      data,
+      error,
+    } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: "recovery",
+    });
+
+    if (error || !data.session?.user) {
+      const errorCode = String(
+        (error as { code?: unknown } | null)?.code || "",
+      ).toLowerCase();
+
+      if (import.meta.dev) {
+        console.error(
+          "[auth-recovery] Recovery token verification failed.",
+          {
+            code: errorCode || "unknown",
+            status: Number(
+              (error as { status?: unknown } | null)?.status || 0,
+            ),
+          },
+        );
+      }
+
+      recoveryGate.value = null;
+      errorMessage.value =
+        recoveryErrorMessage(errorCode);
+      isVerifying.value = false;
+      return;
+    }
+
+    recoveryGate.value = "1";
+    cleanRecoveryUrl();
+    isReady.value = true;
+    isVerifying.value = false;
+    return;
+  }
+
+  // Support a refresh after successful token verification. The recovery gate
+  // is created only after verifyOtp succeeds; then getUser() revalidates the
+  // temporary Auth session with Supabase before showing the password form.
+  if (recoveryGate.value === "1") {
+    const {
+      data,
+      error,
+    } = await supabase.auth.getUser();
+
+    if (!error && data.user) {
+      isReady.value = true;
+      isVerifying.value = false;
+      return;
     }
   }
+
+  recoveryGate.value = null;
+  errorMessage.value =
+    "The password-reset link is not in the expected SNCBT-AMS recovery format. Request a new reset link after the Supabase recovery email template is updated.";
+  isVerifying.value = false;
 }
 
 async function updatePassword(
@@ -121,6 +241,26 @@ async function updatePassword(
   errorMessage.value = "";
 
   try {
+    if (recoveryGate.value !== "1") {
+      throw new Error(
+        "Your password-reset session is no longer valid. Request a new reset link and try again.",
+      );
+    }
+
+    const {
+      data: userData,
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      isReady.value = false;
+      recoveryGate.value = null;
+
+      throw new Error(
+        "Your password-reset session is no longer valid. Request a new reset link and try again.",
+      );
+    }
+
     const {
       error,
     } = await supabase.auth.updateUser({
@@ -132,7 +272,7 @@ async function updatePassword(
       throw error;
     }
 
-    resetCompleted.value = true;
+    recoveryGate.value = null;
 
     await supabase.auth.signOut({
       scope: "local",
@@ -162,41 +302,7 @@ async function updatePassword(
 }
 
 onMounted(async () => {
-  const {
-    data: authListener,
-  } = supabase.auth.onAuthStateChange(
-    handleAuthEvent,
-  );
-
-  unsubscribe = () => {
-    authListener.subscription.unsubscribe();
-  };
-
-  const {
-    data,
-  } = await supabase.auth.getSession();
-
-  if (data.session?.user) {
-    isReady.value = true;
-  }
-
-  recoveryTimeout = setTimeout(
-    () => {
-      if (!isReady.value) {
-        errorMessage.value =
-          "The password-reset link is invalid or has expired.";
-      }
-    },
-    12_000,
-  );
-});
-
-onBeforeUnmount(() => {
-  if (recoveryTimeout) {
-    clearTimeout(recoveryTimeout);
-  }
-
-  unsubscribe?.();
+  await verifyRecoveryLink();
 });
 </script>
 
@@ -225,10 +331,7 @@ onBeforeUnmount(() => {
       </template>
 
       <div
-        v-if="
-          !isReady
-          && !errorMessage
-        "
+        v-if="isVerifying"
         class="py-8 text-center"
       >
         <UIcon
@@ -246,7 +349,7 @@ onBeforeUnmount(() => {
       </div>
 
       <UAlert
-        v-if="
+        v-else-if="
           errorMessage
           && !isReady
         "
@@ -258,7 +361,7 @@ onBeforeUnmount(() => {
       />
 
       <UForm
-        v-if="isReady"
+        v-else-if="isReady"
         :schema="schema"
         :state="state"
         class="space-y-5"

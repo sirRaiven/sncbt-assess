@@ -20,7 +20,32 @@ useSeoMeta({
 });
 
 const supabase = useSupabaseClient();
-const requestUrl = useRequestURL();
+const runtimeConfig = useRuntimeConfig();
+
+const appUrl = computed(() => {
+  const configured = String(
+    runtimeConfig.public.appUrl || "",
+  ).trim();
+
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+
+  if (import.meta.client) {
+    return globalThis.location.origin;
+  }
+
+  return "https://sncbt-assess.autox.workers.dev";
+});
+
+const recoveryGate = useCookie<string | null>(
+  "sncbt_recovery_gate",
+  {
+    sameSite: "strict",
+    secure: import.meta.env.PROD,
+    maxAge: 60 * 60,
+  },
+);
 
 const schema = z.object({
   email: z
@@ -48,6 +73,9 @@ async function requestPasswordReset(
   isSubmitting.value = true;
   errorMessage.value = "";
 
+  // Never carry a stale recovery gate into a new recovery attempt.
+  recoveryGate.value = null;
+
   try {
     const {
       error,
@@ -56,12 +84,26 @@ async function requestPasswordReset(
         .trim()
         .toLowerCase(),
       {
+        // Keep the hosted Auth redirect on the production SNCBT-AMS origin.
+        // The recovery email template uses TokenHash, so this is mainly a
+        // fallback/default redirect and must also be allow-listed in Supabase.
         redirectTo:
-          `${requestUrl.origin}/reset-password`,
+          `${appUrl.value}/reset-password`,
       },
     );
 
     if (error) {
+      const authCode = String(
+        (error as { code?: unknown }).code || "",
+      ).toLowerCase();
+
+      // Avoid account enumeration. A non-existing address receives the same
+      // public result as an existing account.
+      if (authCode === "user_not_found") {
+        requestCompleted.value = true;
+        return;
+      }
+
       throw error;
     }
 

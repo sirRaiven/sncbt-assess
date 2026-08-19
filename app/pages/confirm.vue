@@ -15,42 +15,129 @@ useSeoMeta({
   title: "Confirm account",
 });
 
-const user = useSupabaseUser();
+const supabase = useSupabaseClient();
+const route = useRoute();
 
 const isProcessing = ref(true);
 const errorMessage = ref("");
 
-let confirmationTimeout:
-  | ReturnType<typeof setTimeout>
-  | undefined;
-
-async function completeConfirmation(): Promise<void> {
-  if (!user.value?.sub) {
-    return;
+function queryString(
+  value: unknown,
+): string {
+  if (typeof value === "string") {
+    return value.trim();
   }
 
+  if (
+    Array.isArray(value)
+    && typeof value[0] === "string"
+  ) {
+    return value[0].trim();
+  }
+
+  return "";
+}
+
+async function loadConfirmedProfile(
+  userId: string,
+): Promise<void> {
+  const {
+    loadProfile,
+  } = useCurrentProfile();
+
+  const profile = await loadProfile({
+    force: true,
+    userId,
+  });
+
+  if (!profile) {
+    throw new Error(
+      "Your email was confirmed, but we couldn't finish preparing your account. Please sign in again or contact the system administrator.",
+    );
+  }
+
+  await navigateTo(
+    getAccountDestination(profile),
+  );
+}
+
+async function completeConfirmation(): Promise<void> {
+  isProcessing.value = true;
+  errorMessage.value = "";
+
   try {
-    const {
-      loadProfile,
-    } = useCurrentProfile();
+    const returnedError =
+      queryString(route.query.error_description)
+      || queryString(route.query.error);
 
-    const profile = await loadProfile({
-      force: true,
-      userId: user.value.sub,
-    });
-
-    if (!profile) {
+    if (returnedError) {
       throw new Error(
-        "Your email was confirmed, but we couldn't finish preparing your account. Please sign in again or contact the system administrator.",
+        "The confirmation link is invalid or has expired.",
       );
     }
 
-    if (confirmationTimeout) {
-      clearTimeout(confirmationTimeout);
+    const code = queryString(
+      route.query.code,
+    );
+
+    const flowId = queryString(
+      route.query.sb_flow_id,
+    );
+
+    if (code) {
+      const {
+        data,
+        error,
+      } = await supabase.auth.exchangeCodeForSession(
+        code,
+        flowId
+          ? {
+              flowId,
+            }
+          : undefined,
+      );
+
+      if (error || !data.session?.user) {
+        if (import.meta.dev) {
+          console.error(
+            "[auth-confirmation] PKCE exchange failed.",
+            {
+              code: String(
+                (error as { code?: unknown } | null)?.code || "unknown",
+              ),
+              status: Number(
+                (error as { status?: unknown } | null)?.status || 0,
+              ),
+            },
+          );
+        }
+
+        throw new Error(
+          "The confirmation link is invalid or has expired.",
+        );
+      }
+
+      await loadConfirmedProfile(
+        data.session.user.id,
+      );
+      return;
     }
 
-    await navigateTo(
-      getAccountDestination(profile),
+    // Support a refreshed/cleaned confirmation page when a valid session is
+    // already present, while validating that identity against Supabase Auth.
+    const {
+      data,
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error || !data.user) {
+      throw new Error(
+        "The confirmation link is invalid or has expired.",
+      );
+    }
+
+    await loadConfirmedProfile(
+      data.user.id,
     );
   } catch (error) {
     isProcessing.value = false;
@@ -63,37 +150,8 @@ async function completeConfirmation(): Promise<void> {
   }
 }
 
-watch(
-  user,
-  async (
-    currentUser,
-  ) => {
-    if (currentUser?.sub) {
-      await completeConfirmation();
-    }
-  },
-  {
-    immediate: true,
-  },
-);
-
-onMounted(() => {
-  confirmationTimeout = setTimeout(
-    () => {
-      if (!user.value?.sub) {
-        isProcessing.value = false;
-        errorMessage.value =
-          "The confirmation link is invalid or has expired.";
-      }
-    },
-    15_000,
-  );
-});
-
-onBeforeUnmount(() => {
-  if (confirmationTimeout) {
-    clearTimeout(confirmationTimeout);
-  }
+onMounted(async () => {
+  await completeConfirmation();
 });
 </script>
 

@@ -25,7 +25,6 @@ useSeoMeta({
 
 const route = useRoute();
 const supabase = useSupabaseClient();
-
 const schema = z.object({
   identifier: z
     .string()
