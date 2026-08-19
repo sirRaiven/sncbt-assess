@@ -489,6 +489,12 @@ onBeforeUnmount(
             "
             size="lg"
             square
+            :class="
+              props.role
+                === 'student'
+                ? 'hidden lg:inline-flex'
+                : undefined
+            "
             :aria-label="sidebarToggleLabel"
             :aria-expanded="sidebarOpen"
             aria-controls="portal-side-navigation"
@@ -535,7 +541,27 @@ onBeforeUnmount(
 
       <main class="portal-main safe-area-bottom mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-6 lg:px-8 lg:py-8">
         <slot />
+
+        <!--
+          Student mobile navigation is fixed to the viewport. This spacer keeps
+          the final page content and actions above the dock + device safe area.
+        -->
+        <div
+          v-if="
+            props.role
+            === 'student'
+          "
+          class="h-[calc(5.75rem+env(safe-area-inset-bottom))] lg:hidden"
+          aria-hidden="true"
+        />
       </main>
+
+      <StudentBottomNavigation
+        v-if="
+          props.role
+          === 'student'
+        "
+      />
     </div>
   </div>
 </template>
