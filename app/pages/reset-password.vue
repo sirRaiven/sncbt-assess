@@ -89,6 +89,12 @@ const isReady = ref(false);
 const isSubmitting = ref(false);
 const errorMessage = ref("");
 
+let authSubscription:
+  | {
+      unsubscribe: () => void;
+    }
+  | null = null;
+
 function queryString(
   value: unknown,
 ): string {
@@ -139,6 +145,49 @@ function recoveryErrorMessage(
   return "The password-reset link could not be verified. Request a new reset link and try again.";
 }
 
+function markRecoveryVerified(): void {
+  recoveryGate.value = "1";
+}
+
+async function waitForRecoverySession(): Promise<boolean> {
+  // The @supabase/ssr browser client processes the implicit recovery fragment
+  // during initialization. A short bounded wait covers the case where this
+  // page mounts while the Auth client is still saving the resulting session.
+  for (
+    let attempt = 0;
+    attempt < 20;
+    attempt += 1
+  ) {
+    const {
+      data,
+      error,
+    } = await supabase.auth.getUser();
+
+    if (
+      !error
+      && data.user
+      && (
+        recoveryGate.value === "requested"
+        || recoveryGate.value === "1"
+      )
+    ) {
+      markRecoveryVerified();
+      return true;
+    }
+
+    await new Promise<void>(
+      (resolve) => {
+        globalThis.setTimeout(
+          resolve,
+          100,
+        );
+      },
+    );
+  }
+
+  return false;
+}
+
 async function verifyRecoveryLink(): Promise<void> {
   isVerifying.value = true;
   isReady.value = false;
@@ -158,79 +207,30 @@ async function verifyRecoveryLink(): Promise<void> {
     return;
   }
 
-  const tokenHash = queryString(
-    route.query.token_hash,
-  );
+  // A ?code= callback belongs to the previous PKCE implementation. The new
+  // default-email flow deliberately omits a PKCE code challenge so newly
+  // requested links arrive with an implicit access/refresh-token fragment.
+  if (queryString(route.query.code)) {
+    recoveryGate.value = null;
+    errorMessage.value =
+      "This reset link was created by the previous recovery flow. Return to Sign In, request a new reset email, and use only the newest link.";
+    isVerifying.value = false;
+    return;
+  }
 
-  const recoveryType = queryString(
-    route.query.type,
-  ).toLowerCase();
+  const verified =
+    await waitForRecoverySession();
 
-  // Production recovery uses Supabase TokenHash verification instead of the
-  // browser-bound PKCE code verifier. This works even when the reset email is
-  // opened on a different browser/device and avoids pkce_code_verifier_not_found.
-  if (
-    tokenHash
-    && recoveryType === "recovery"
-  ) {
-    const {
-      data,
-      error,
-    } = await supabase.auth.verifyOtp({
-      token_hash: tokenHash,
-      type: "recovery",
-    });
-
-    if (error || !data.session?.user) {
-      const errorCode = String(
-        (error as { code?: unknown } | null)?.code || "",
-      ).toLowerCase();
-
-      if (import.meta.dev) {
-        console.error(
-          "[auth-recovery] Recovery token verification failed.",
-          {
-            code: errorCode || "unknown",
-            status: Number(
-              (error as { status?: unknown } | null)?.status || 0,
-            ),
-          },
-        );
-      }
-
-      recoveryGate.value = null;
-      errorMessage.value =
-        recoveryErrorMessage(errorCode);
-      isVerifying.value = false;
-      return;
-    }
-
-    recoveryGate.value = "1";
+  if (verified) {
     cleanRecoveryUrl();
     isReady.value = true;
     isVerifying.value = false;
     return;
   }
 
-  // Support a refresh after successful token verification. The recovery gate
-  // is created only after verifyOtp succeeds; then getUser() revalidates the
-  // temporary Auth session with Supabase before showing the password form.
-  if (recoveryGate.value === "1") {
-    const {
-      data,
-      error,
-    } = await supabase.auth.getUser();
-
-    if (!error && data.user) {
-      isReady.value = true;
-      isVerifying.value = false;
-      return;
-    }
-  }
-
   recoveryGate.value = null;
   errorMessage.value =
-    "The password-reset link is not in the expected SNCBT-AMS recovery format. Request a new reset link after the Supabase recovery email template is updated.";
+    "The password-reset link could not establish a recovery session. Request a new reset link from the deployed SNCBT-AMS site and try again.";
   isVerifying.value = false;
 }
 
@@ -302,7 +302,30 @@ async function updatePassword(
 }
 
 onMounted(async () => {
+  const {
+    data,
+  } = supabase.auth.onAuthStateChange(
+    (
+      event,
+      session,
+    ) => {
+      if (
+        event === "PASSWORD_RECOVERY"
+        && session?.user
+      ) {
+        markRecoveryVerified();
+      }
+    },
+  );
+
+  authSubscription = data.subscription;
+
   await verifyRecoveryLink();
+});
+
+onBeforeUnmount(() => {
+  authSubscription?.unsubscribe();
+  authSubscription = null;
 });
 </script>
 

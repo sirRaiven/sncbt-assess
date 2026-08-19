@@ -1,7 +1,31 @@
 /**
- * Recovery callbacks are handled explicitly by the callback pages.
- *
- * Keeping this no-op plugin at the old path makes the Phase 2C hotfix safe to
- * copy over installations that already received the earlier recovery listener.
+ * Capture Supabase's recovery-only auth event as early as the Nuxt application
+ * can subscribe. This protects the reset route even if the event fires before
+ * reset-password.vue finishes mounting.
  */
-export default defineNuxtPlugin(() => {});
+export default defineNuxtPlugin(() => {
+  const supabase = useSupabaseClient();
+
+  const recoveryGate = useCookie<string | null>(
+    "sncbt_recovery_gate",
+    {
+      sameSite: "strict",
+      secure: import.meta.env.PROD,
+      maxAge: 60 * 60,
+    },
+  );
+
+  supabase.auth.onAuthStateChange(
+    (
+      event,
+      session,
+    ) => {
+      if (
+        event === "PASSWORD_RECOVERY"
+        && session?.user
+      ) {
+        recoveryGate.value = "1";
+      }
+    },
+  );
+});
