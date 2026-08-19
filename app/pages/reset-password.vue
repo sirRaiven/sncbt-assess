@@ -31,6 +31,9 @@ const recoveryGate = useCookie<string | null>(
   },
 );
 
+const recoverySessionStorageKey =
+  "sncbt_recovery_session_verified";
+
 const schema = z
   .object({
     password: z
@@ -87,6 +90,7 @@ const state = reactive<ResetPasswordSchema>({
 const isVerifying = ref(true);
 const isReady = ref(false);
 const isSubmitting = ref(false);
+const isCancelling = ref(false);
 const errorMessage = ref("");
 
 let authSubscription:
@@ -117,10 +121,46 @@ function cleanRecoveryUrl(): void {
     return;
   }
 
+  // Recovery fragments contain bearer credentials. Remove them from the
+  // visible URL/history as soon as they have been copied into memory.
   globalThis.history.replaceState(
     globalThis.history.state,
     "",
     "/reset-password?mode=recovery",
+  );
+}
+
+function clearRecoveryMarker(): void {
+  recoveryGate.value = null;
+
+  if (import.meta.client) {
+    globalThis.sessionStorage.removeItem(
+      recoverySessionStorageKey,
+    );
+  }
+}
+
+function markRecoveryVerified(): void {
+  recoveryGate.value = "1";
+
+  if (import.meta.client) {
+    globalThis.sessionStorage.setItem(
+      recoverySessionStorageKey,
+      "1",
+    );
+  }
+}
+
+function hasVerifiedRecoveryMarker(): boolean {
+  if (!import.meta.client) {
+    return recoveryGate.value === "1";
+  }
+
+  return (
+    recoveryGate.value === "1"
+    || globalThis.sessionStorage.getItem(
+      recoverySessionStorageKey,
+    ) === "1"
   );
 }
 
@@ -145,47 +185,147 @@ function recoveryErrorMessage(
   return "The password-reset link could not be verified. Request a new reset link and try again.";
 }
 
-function markRecoveryVerified(): void {
-  recoveryGate.value = "1";
-}
-
-async function waitForRecoverySession(): Promise<boolean> {
-  // The @supabase/ssr browser client processes the implicit recovery fragment
-  // during initialization. A short bounded wait covers the case where this
-  // page mounts while the Auth client is still saving the resulting session.
-  for (
-    let attempt = 0;
-    attempt < 20;
-    attempt += 1
-  ) {
-    const {
-      data,
-      error,
-    } = await supabase.auth.getUser();
-
-    if (
-      !error
-      && data.user
-      && (
-        recoveryGate.value === "requested"
-        || recoveryGate.value === "1"
-      )
-    ) {
-      markRecoveryVerified();
-      return true;
-    }
-
-    await new Promise<void>(
-      (resolve) => {
-        globalThis.setTimeout(
-          resolve,
-          100,
-        );
-      },
-    );
+async function establishRecoverySessionFromHash(): Promise<
+  "verified" | "invalid" | "absent"
+> {
+  if (!import.meta.client) {
+    return "absent";
   }
 
-  return false;
+  const rawHash = globalThis.location.hash;
+
+  if (!rawHash || rawHash === "#") {
+    return "absent";
+  }
+
+  const params = new URLSearchParams(
+    rawHash.startsWith("#")
+      ? rawHash.slice(1)
+      : rawHash,
+  );
+
+  const returnedError =
+    params.get("error_code")
+    || params.get("error");
+
+  if (returnedError) {
+    cleanRecoveryUrl();
+    clearRecoveryMarker();
+    errorMessage.value = recoveryErrorMessage(
+      returnedError.toLowerCase(),
+    );
+    return "invalid";
+  }
+
+  const type = String(
+    params.get("type") || "",
+  ).toLowerCase();
+
+  const accessToken = String(
+    params.get("access_token") || "",
+  );
+
+  const refreshToken = String(
+    params.get("refresh_token") || "",
+  );
+
+  if (
+    type !== "recovery"
+    || !accessToken
+    || !refreshToken
+  ) {
+    cleanRecoveryUrl();
+    clearRecoveryMarker();
+    errorMessage.value =
+      "The password-reset link is incomplete or invalid. Request a new reset link and try again.";
+    return "invalid";
+  }
+
+  // Copy the credentials to memory and immediately remove them from the URL.
+  // Supabase's implicit flow places these bearer credentials in the fragment.
+  cleanRecoveryUrl();
+
+  const {
+    data,
+    error,
+  } = await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+
+  if (
+    error
+    || !data.session
+    || !data.user
+  ) {
+    clearRecoveryMarker();
+
+    if (import.meta.dev) {
+      console.error(
+        "[auth-recovery] Unable to establish the recovery session.",
+        {
+          code:
+            (error as { code?: string } | null)
+              ?.code
+            || "session_not_created",
+          status:
+            (error as { status?: number } | null)
+              ?.status
+            || null,
+        },
+      );
+    }
+
+    errorMessage.value =
+      "The password-reset link could not establish a recovery session. Request a new reset link and try again.";
+    return "invalid";
+  }
+
+  // getUser() validates the access token against Supabase Auth rather than
+  // trusting only the locally supplied token pair.
+  const {
+    data: userData,
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (
+    userError
+    || !userData.user
+  ) {
+    clearRecoveryMarker();
+
+    await supabase.auth.signOut({
+      scope: "local",
+    });
+
+    errorMessage.value =
+      "The password-reset link could not establish a recovery session. Request a new reset link and try again.";
+    return "invalid";
+  }
+
+  markRecoveryVerified();
+  return "verified";
+}
+
+async function verifyStoredRecoverySession(): Promise<boolean> {
+  if (!hasVerifiedRecoveryMarker()) {
+    return false;
+  }
+
+  const {
+    data,
+    error,
+  } = await supabase.auth.getUser();
+
+  if (
+    error
+    || !data.user
+  ) {
+    clearRecoveryMarker();
+    return false;
+  }
+
+  return true;
 }
 
 async function verifyRecoveryLink(): Promise<void> {
@@ -198,7 +338,7 @@ async function verifyRecoveryLink(): Promise<void> {
     || queryString(route.query.error);
 
   if (returnedError) {
-    recoveryGate.value = null;
+    clearRecoveryMarker();
     errorMessage.value =
       recoveryErrorMessage(
         returnedError.toLowerCase(),
@@ -207,28 +347,41 @@ async function verifyRecoveryLink(): Promise<void> {
     return;
   }
 
-  // A ?code= callback belongs to the previous PKCE implementation. The new
-  // default-email flow deliberately omits a PKCE code challenge so newly
-  // requested links arrive with an implicit access/refresh-token fragment.
+  // ?code= belongs to the PKCE variant. SNCBT-AMS currently uses the default
+  // Supabase email provider with an explicit implicit /recover request, so a
+  // newly generated recovery callback should contain bearer tokens in the
+  // URL fragment instead.
   if (queryString(route.query.code)) {
-    recoveryGate.value = null;
+    clearRecoveryMarker();
     errorMessage.value =
-      "This reset link was created by the previous recovery flow. Return to Sign In, request a new reset email, and use only the newest link.";
+      "This reset link belongs to an older recovery flow. Request a new reset link from the deployed SNCBT-AMS site and use only the newest email.";
     isVerifying.value = false;
     return;
   }
 
-  const verified =
-    await waitForRecoverySession();
+  const hashResult =
+    await establishRecoverySessionFromHash();
 
-  if (verified) {
-    cleanRecoveryUrl();
+  if (hashResult === "verified") {
     isReady.value = true;
     isVerifying.value = false;
     return;
   }
 
-  recoveryGate.value = null;
+  if (hashResult === "invalid") {
+    isVerifying.value = false;
+    return;
+  }
+
+  // Supports refreshing the already-verified reset page after its sensitive
+  // URL fragment has been removed.
+  if (await verifyStoredRecoverySession()) {
+    isReady.value = true;
+    isVerifying.value = false;
+    return;
+  }
+
+  clearRecoveryMarker();
   errorMessage.value =
     "The password-reset link could not establish a recovery session. Request a new reset link from the deployed SNCBT-AMS site and try again.";
   isVerifying.value = false;
@@ -241,7 +394,7 @@ async function updatePassword(
   errorMessage.value = "";
 
   try {
-    if (recoveryGate.value !== "1") {
+    if (!hasVerifiedRecoveryMarker()) {
       throw new Error(
         "Your password-reset session is no longer valid. Request a new reset link and try again.",
       );
@@ -254,7 +407,7 @@ async function updatePassword(
 
     if (userError || !userData.user) {
       isReady.value = false;
-      recoveryGate.value = null;
+      clearRecoveryMarker();
 
       throw new Error(
         "Your password-reset session is no longer valid. Request a new reset link and try again.",
@@ -272,10 +425,12 @@ async function updatePassword(
       throw error;
     }
 
-    recoveryGate.value = null;
+    clearRecoveryMarker();
 
+    // A password reset is a security-sensitive action. Revoke refresh tokens
+    // for all sessions so the user signs in again with the new password.
     await supabase.auth.signOut({
-      scope: "local",
+      scope: "global",
     });
 
     const {
@@ -299,6 +454,33 @@ async function updatePassword(
   } finally {
     isSubmitting.value = false;
   }
+}
+
+async function cancelRecovery(): Promise<void> {
+  if (isCancelling.value) {
+    return;
+  }
+
+  isCancelling.value = true;
+  clearRecoveryMarker();
+  cleanRecoveryUrl();
+
+  try {
+    await supabase.auth.signOut({
+      scope: "local",
+    });
+  } catch {
+    // The recovery session may not have been established; navigating away is
+    // still safe after clearing the local recovery marker and URL fragment.
+  }
+
+  const {
+    clearProfile,
+  } = useCurrentProfile();
+
+  clearProfile();
+
+  await navigateTo("/");
 }
 
 onMounted(async () => {
@@ -445,10 +627,11 @@ onBeforeUnmount(() => {
 
       <template #footer>
         <UButton
-          to="/"
           block
           color="neutral"
           variant="ghost"
+          :loading="isCancelling"
+          @click="cancelRecovery"
         >
           Return to Sign In
         </UButton>
