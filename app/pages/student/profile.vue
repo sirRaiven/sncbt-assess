@@ -1,15 +1,13 @@
 <script setup lang="ts">
 definePageMeta({
-  layout:
-    "student",
+  layout: "student",
 });
 
 useSeoMeta({
-  title:
-    "My Profile",
+  title: "Profile",
 });
 </script>
 
 <template>
-  <PortalProfilePage role="student" />
+  <StudentProfilePage />
 </template>
