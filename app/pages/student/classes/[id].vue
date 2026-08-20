@@ -9,6 +9,10 @@ import type {
   StudentAssessmentDelivery,
 } from "~/types/assessment-delivery";
 
+import type {
+  AppBreadcrumbItem,
+} from "~/types/navigation";
+
 definePageMeta({
   layout:
     "student",
@@ -46,6 +50,42 @@ const activeSection =
       === "classmates"
         ? "classmates"
         : "assessments",
+  );
+
+const classBreadcrumbs =
+  computed<
+    AppBreadcrumbItem[]
+  >(
+    () => [
+      {
+        label:
+          "Overview",
+        to:
+          "/student/dashboard",
+        icon:
+          "i-lucide-layout-dashboard",
+      },
+      {
+        label:
+          "My Classes",
+        to:
+          "/student/classes",
+      },
+      {
+        label:
+          classroom.value?.name
+          || "Class",
+        to:
+          `/student/classes/${classroomId.value}`,
+      },
+      {
+        label:
+          activeSection.value
+          === "classmates"
+            ? "Classmates"
+            : "Assignments",
+      },
+    ],
   );
 
 const {
@@ -431,9 +471,10 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      fallback-to="/student/classes"
+    <AppBreadcrumbs
+      :items="classBreadcrumbs"
     />
+
     <UAlert
       v-if="errorMessage"
       color="error"
@@ -995,6 +1036,13 @@ onMounted(
               Leave Class
             </UButton>
           </UCard>
+
+          <UAlert
+            color="warning"
+            variant="soft"
+            title="Leaving a class"
+            description="Your instructor must approve a new membership request if you decide to join this class again."
+          />
         </div>
       </div>
     </template>

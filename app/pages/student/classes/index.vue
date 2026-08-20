@@ -224,6 +224,10 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
+      :breadcrumbs="[
+        { label: 'Overview', to: '/student/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'My Classes' },
+      ]"
       eyebrow="Learning spaces"
       title="My classes"
       description="Open your active classes and pending join requests."
