@@ -191,10 +191,13 @@ onMounted(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      :fallback-to="`/instructor/classes/${classroomId}`"
-    />
     <PageHeader
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'My Classes', to: '/instructor/classes' },
+        { label: state.name || 'Class', to: `/instructor/classes/${classroomId}` },
+        { label: 'Edit' },
+      ]"
       eyebrow="Class settings"
       title="Edit class information"
       description="Update the subject, section, academic period, and class description."

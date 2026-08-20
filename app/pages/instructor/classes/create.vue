@@ -187,10 +187,12 @@ async function submit(
 
 <template>
   <div class="page-stack">
-    <PortalBackButton
-      fallback-to="/instructor/classes"
-    />
     <PageHeader
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'My Classes', to: '/instructor/classes' },
+        { label: 'Create' },
+      ]"
       eyebrow="New classroom"
       title="Create a class"
       description="Add the subject and section information. A unique class code will be generated after saving."

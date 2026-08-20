@@ -3,6 +3,10 @@ import type {
   InstructorClassroom,
 } from "~/types/classroom";
 
+import type {
+  AppBreadcrumbItem,
+} from "~/types/navigation";
+
 definePageMeta({
   layout: "instructor",
 });
@@ -21,6 +25,33 @@ const activeSection = computed<"assessments" | "students">(
   () => route.path.includes("/students")
     ? "students"
     : "assessments",
+);
+
+const classBreadcrumbs = computed<AppBreadcrumbItem[]>(
+  () => [
+    {
+      label: "Overview",
+      to: "/instructor/dashboard",
+      icon: "i-lucide-layout-dashboard",
+    },
+    {
+      label: "My Classes",
+      to: "/instructor/classes",
+    },
+    {
+      label:
+        classroom.value?.name
+        || "Class",
+      to:
+        `/instructor/classes/${classroomId.value}`,
+    },
+    {
+      label:
+        activeSection.value === "students"
+          ? "Students"
+          : "Assessments",
+    },
+  ],
 );
 
 const {
@@ -101,8 +132,8 @@ onMounted(() => {
     v-if="isWorkspaceRoute"
     class="page-stack"
   >
-    <PortalBackButton
-      fallback-to="/instructor/classes"
+    <AppBreadcrumbs
+      :items="classBreadcrumbs"
     />
 
     <UAlert

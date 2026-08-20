@@ -235,6 +235,10 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'My Classes' },
+      ]"
       eyebrow="Classroom management"
       title="My classes"
       description="Create classes, manage enrollment codes, and review student membership."
