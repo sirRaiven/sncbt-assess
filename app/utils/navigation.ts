@@ -93,6 +93,14 @@ const items: Record<
     },
     {
       label:
+        "Student Progress",
+      icon:
+        "i-lucide-users",
+      to:
+        "/instructor/student-progress",
+    },
+    {
+      label:
         "Live Sessions",
       icon:
         "i-lucide-radio-tower",
