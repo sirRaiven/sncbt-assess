@@ -19,6 +19,7 @@ useSeoMeta({
 
 const route = useRoute();
 const toast = useToast();
+const supabase = useSupabaseClient();
 
 const {
   classroomId,
@@ -61,6 +62,17 @@ const errorMessage = ref("");
 const query = ref("");
 const selectedMemberIds = ref<string[]>([]);
 
+const isRealtimeRefreshing =
+  ref(false);
+
+let realtimeRefreshTimer:
+  ReturnType<typeof setTimeout>
+  | null = null;
+
+let rosterChannel:
+  ReturnType<typeof supabase.channel>
+  | null = null;
+
 const removeModalOpen = ref(false);
 const memberToRemove =
   ref<ClassroomMember | null>(null);
@@ -92,29 +104,10 @@ const filteredMembers = computed(() => {
 });
 
 const pendingRequestCount = computed(
-  () => {
-    if (enrollmentSettings.value) {
-      return Math.max(
-        0,
-        Number(
-          enrollmentSettings.value.pendingCount
-          || 0,
-        ),
-      );
-    }
-
-    if (activeView.value === "requests") {
-      return members.value.length;
-    }
-
-    return Math.max(
-      0,
-      Number(
-        classroom.value?.memberCounts.pending
-        || 0,
-      ),
-    );
-  },
+  () =>
+    enrollmentSettings.value?.pendingCount
+    ?? classroom.value?.memberCounts.pending
+    ?? 0,
 );
 
 const showRequests = computed(
@@ -202,13 +195,26 @@ function clearSelection(): void {
   selectedMemberIds.value = [];
 }
 
-async function loadData(): Promise<void> {
+async function loadData(
+  options:
+    {
+      background?:
+        boolean;
+    } = {},
+): Promise<void> {
   if (!classroom.value) {
     return;
   }
 
-  isLoading.value = true;
-  errorMessage.value = "";
+  const background =
+    Boolean(
+      options.background,
+    );
+
+  if (!background) {
+    isLoading.value = true;
+    errorMessage.value = "";
+  }
 
   const [
     settingsResult,
@@ -228,11 +234,14 @@ async function loadData(): Promise<void> {
     memberResult.error
     || !memberResult.data
   ) {
-    errorMessage.value =
-      memberResult.error
-      || "We couldn't load the student list right now.";
+    if (!background) {
+      errorMessage.value =
+        memberResult.error
+        || "We couldn't load the student list right now.";
 
-    isLoading.value = false;
+      isLoading.value = false;
+    }
+
     return;
   }
 
@@ -244,19 +253,6 @@ async function loadData(): Promise<void> {
       (id) => members.value.some((member) => member.id === id),
     );
 
-  const currentPendingCount =
-    settingsResult.data
-      ? Number(
-          settingsResult.data.pendingCount
-          || 0,
-        )
-      : activeView.value === "requests"
-        ? memberResult.data.members.length
-        : Number(
-            classroom.value.memberCounts.pending
-            || 0,
-          );
-
   enrollmentSettings.value =
     settingsResult.data
     || {
@@ -266,19 +262,130 @@ async function loadData(): Promise<void> {
         classroom.value.join_requires_approval
         ?? false,
       pendingCount:
-        currentPendingCount,
+        classroom.value.memberCounts.pending,
     };
 
-  classroom.value = {
-    ...classroom.value,
-    memberCounts: {
-      ...classroom.value.memberCounts,
-      pending:
-        currentPendingCount,
-    },
-  };
+  if (!background) {
+    isLoading.value = false;
+  }
+}
 
-  isLoading.value = false;
+async function refreshRosterFromRealtime(): Promise<void> {
+  if (
+    isRealtimeRefreshing.value
+  ) {
+    return;
+  }
+
+  isRealtimeRefreshing.value =
+    true;
+
+  try {
+    await refreshClass();
+
+    await loadData({
+      background:
+        true,
+    });
+  } finally {
+    isRealtimeRefreshing.value =
+      false;
+  }
+}
+
+function scheduleRealtimeRosterRefresh(): void {
+  if (
+    realtimeRefreshTimer
+  ) {
+    clearTimeout(
+      realtimeRefreshTimer,
+    );
+  }
+
+  realtimeRefreshTimer =
+    setTimeout(
+      () => {
+        realtimeRefreshTimer =
+          null;
+
+        void refreshRosterFromRealtime();
+      },
+      250,
+    );
+}
+
+function stopRosterRealtime(): void {
+  if (
+    realtimeRefreshTimer
+  ) {
+    clearTimeout(
+      realtimeRefreshTimer,
+    );
+
+    realtimeRefreshTimer =
+      null;
+  }
+
+  if (
+    rosterChannel
+  ) {
+    void supabase.removeChannel(
+      rosterChannel,
+    );
+
+    rosterChannel =
+      null;
+  }
+}
+
+function startRosterRealtime(): void {
+  stopRosterRealtime();
+
+  const id =
+    classroomId.value;
+
+  if (!id) {
+    return;
+  }
+
+  rosterChannel =
+    supabase
+      .channel(
+        `instructor-class-roster:${id}`,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event:
+            "INSERT",
+          schema:
+            "public",
+          table:
+            "classroom_members",
+          filter:
+            `classroom_id=eq.${id}`,
+        },
+        () => {
+          scheduleRealtimeRosterRefresh();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event:
+            "UPDATE",
+          schema:
+            "public",
+          table:
+            "classroom_members",
+          filter:
+            `classroom_id=eq.${id}`,
+        },
+        () => {
+          scheduleRealtimeRosterRefresh();
+        },
+      )
+      .subscribe();
 }
 
 async function runMemberAction(
@@ -486,11 +593,21 @@ watch(
   () => {
     clearSelection();
     void loadData();
+    startRosterRealtime();
   },
 );
 
 onMounted(
-  loadData,
+  () => {
+    void loadData();
+    startRosterRealtime();
+  },
+);
+
+onBeforeUnmount(
+  () => {
+    stopRosterRealtime();
+  },
 );
 </script>
 
@@ -537,6 +654,7 @@ onMounted(
           <h1 class="text-2xl font-black tracking-tight text-highlighted">
             {{ activeView === "requests" ? "Enrollment requests" : "Students" }}
           </h1>
+
           <p class="mt-1 text-sm text-muted">
             {{
               activeView === "requests"
@@ -571,7 +689,7 @@ onMounted(
             variant="outline"
             icon="i-lucide-users"
           >
-            Back to students
+            Back to roster
           </UButton>
 
           <UInput
@@ -704,6 +822,8 @@ onMounted(
               />
 
               <UAvatar
+                :src="member.student.avatarUrl || undefined"
+                :alt="member.student.name"
                 :text="
                   member.student.name
                     .split(' ')

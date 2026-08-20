@@ -57,6 +57,7 @@ export interface ClassroomMemberStudent {
   name: string;
   email: string | null;
   studentNumber: string | null;
+  avatarUrl: string | null;
   accountStatus: string | null;
 }
 
