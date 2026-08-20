@@ -69,11 +69,14 @@ export interface StudentProgressAttempt {
 export interface StudentRecentResponse {
   attemptId: string;
   assessmentTitle: string;
+  subjectCode: string;
   classroomName: string;
+  attemptNumber: number;
   questionNumber: number | null;
   questionText: string;
   questionType: string;
   responsePreview: string;
+  correctAnswerPreview: string | null;
   isFinal: boolean;
   isCorrect: boolean | null;
   awardedPoints: number | null;

@@ -5,6 +5,7 @@ import type {
   InstructorStudentProgressDetail,
   InstructorStudentProgressOverview,
   StudentProgressListItem,
+  StudentRecentResponse,
 } from "~/types/instructor-student-progress";
 
 definePageMeta({
@@ -60,6 +61,102 @@ const attemptReview =
     | null
   >(
     null,
+  );
+
+interface RecentResponseGroup {
+  key: string;
+  attemptId: string;
+  assessmentTitle: string;
+  subjectCode: string;
+  classroomName: string;
+  attemptNumber: number;
+  latestActivityAt: string;
+  responses: StudentRecentResponse[];
+}
+
+const recentResponseGroups =
+  computed<
+    RecentResponseGroup[]
+  >(
+    () => {
+      const groups =
+        new Map<
+          string,
+          RecentResponseGroup
+        >();
+
+      for (
+        const activity
+        of detail.value
+          ?.recentActivity
+        ?? []
+      ) {
+        const key =
+          activity.attemptId;
+
+        const existing =
+          groups.get(
+            key,
+          );
+
+        if (existing) {
+          existing.responses.push(
+            activity,
+          );
+
+          if (
+            Date.parse(
+              activity.activityAt,
+            )
+            > Date.parse(
+                existing.latestActivityAt,
+              )
+          ) {
+            existing.latestActivityAt =
+              activity.activityAt;
+          }
+
+          continue;
+        }
+
+        groups.set(
+          key,
+          {
+            key,
+            attemptId:
+              activity.attemptId,
+            assessmentTitle:
+              activity.assessmentTitle,
+            subjectCode:
+              activity.subjectCode,
+            classroomName:
+              activity.classroomName,
+            attemptNumber:
+              activity.attemptNumber,
+            latestActivityAt:
+              activity.activityAt,
+            responses: [
+              activity,
+            ],
+          },
+        );
+      }
+
+      return [
+        ...groups.values(),
+      ].sort(
+        (
+          first,
+          second,
+        ) =>
+          Date.parse(
+            second.latestActivityAt,
+          )
+          - Date.parse(
+              first.latestActivityAt,
+            ),
+      );
+    },
   );
 
 const isLoadingOverview =
@@ -921,7 +1018,7 @@ onMounted(
 
         <template v-else-if="detail">
           <UCard>
-            <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
               <div class="flex min-w-0 items-center gap-4">
                 <UAvatar
                   :src="detail.student.avatarUrl || undefined"
@@ -936,7 +1033,7 @@ onMounted(
                     Student
                   </p>
 
-                  <h2 class="mt-1 truncate text-xl font-black text-highlighted sm:text-2xl">
+                  <h2 class="mt-1 break-words text-xl font-black leading-tight text-highlighted sm:text-2xl">
                     {{ detail.student.name }}
                   </h2>
 
@@ -957,12 +1054,15 @@ onMounted(
                 </div>
               </div>
 
-              <p class="text-sm text-muted">
-                Last activity:
-                <span class="font-semibold text-highlighted">
+              <div class="rounded-xl bg-elevated/60 px-4 py-3 lg:min-w-48">
+                <p class="text-xs font-bold uppercase tracking-[0.08em] text-muted">
+                  Last activity
+                </p>
+
+                <p class="mt-1 text-sm font-semibold text-highlighted">
                   {{ formatDateTime(detail.summary.lastActivityAt) }}
-                </span>
-              </p>
+                </p>
+              </div>
             </div>
 
             <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1012,13 +1112,13 @@ onMounted(
                 </h2>
 
                 <p class="mt-1 text-sm text-muted">
-                  The Student's latest recorded answers across your assessments.
+                  Latest question responses grouped by assessment attempt.
                 </p>
               </div>
             </template>
 
             <EmptyPanel
-              v-if="detail.recentActivity.length === 0"
+              v-if="recentResponseGroups.length === 0"
               icon="i-lucide-clipboard-list"
               title="No recent responses"
               description="This Student has not recorded an assessment response yet."
@@ -1026,70 +1126,153 @@ onMounted(
 
             <div
               v-else
-              class="divide-y divide-default"
+              class="space-y-4"
             >
-              <div
-                v-for="activity in detail.recentActivity"
-                :key="`${activity.attemptId}-${activity.activityAt}-${activity.questionNumber}`"
-                class="py-4 first:pt-0 last:pb-0"
+              <section
+                v-for="group in recentResponseGroups"
+                :key="group.key"
+                class="overflow-hidden rounded-2xl border border-default"
               >
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <p class="font-bold text-highlighted">
-                        {{ activity.assessmentTitle }}
+                <header class="border-b border-primary/10 bg-primary/5 px-4 py-4 sm:px-5 dark:bg-primary/10">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <p class="text-xs font-bold uppercase tracking-[0.1em] text-primary">
+                        Assessment
                       </p>
 
+                      <h3 class="mt-1 break-words text-base font-black leading-6 text-highlighted sm:text-lg">
+                        {{ group.assessmentTitle }}
+                      </h3>
+
+                      <p class="mt-1 text-xs text-muted">
+                        {{ group.subjectCode }}
+                        · {{ group.classroomName }}
+                        · Attempt {{ group.attemptNumber }}
+                      </p>
+                    </div>
+
+                    <div class="flex shrink-0 items-center gap-2">
                       <UBadge
-                        :color="
-                          activity.isCorrect === true
-                            ? 'success'
-                            : activity.isCorrect === false
-                              ? 'error'
-                              : 'neutral'
-                        "
+                        color="neutral"
                         variant="soft"
                         size="sm"
                       >
-                        {{
-                          activity.isCorrect === true
-                            ? "Correct"
-                            : activity.isCorrect === false
-                              ? "Incorrect"
-                              : activity.isFinal
-                                ? "Recorded"
-                                : "Saved"
-                        }}
+                        {{ group.responses.length }}
+                        response{{ group.responses.length === 1 ? "" : "s" }}
                       </UBadge>
-                    </div>
 
-                    <p class="mt-1 text-xs text-muted">
-                      {{ activity.classroomName }}
-                      <template v-if="activity.questionNumber">
-                        · Question {{ activity.questionNumber }}
-                      </template>
-                    </p>
-
-                    <p class="mt-2 line-clamp-2 text-sm text-muted">
-                      {{ activity.questionText }}
-                    </p>
-
-                    <div class="mt-2 rounded-lg bg-elevated/60 px-3 py-2">
-                      <p class="text-xs font-bold uppercase tracking-[0.06em] text-muted">
-                        Student response
-                      </p>
-                      <p class="mt-1 break-words text-sm font-semibold text-highlighted">
-                        {{ activity.responsePreview }}
-                      </p>
+                      <span class="text-xs text-muted">
+                        {{ formatDateTime(group.latestActivityAt) }}
+                      </span>
                     </div>
                   </div>
+                </header>
 
-                  <div class="shrink-0 text-left text-xs text-muted sm:text-right">
-                    <p>{{ formatDateTime(activity.activityAt) }}</p>
-                    <p class="mt-1">{{ formatDuration(activity.responseSeconds) }}</p>
-                  </div>
+                <div class="divide-y divide-default">
+                  <article
+                    v-for="activity in group.responses"
+                    :key="`${activity.attemptId}-${activity.activityAt}-${activity.questionNumber}`"
+                    class="px-4 py-4 sm:px-5"
+                  >
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <UBadge
+                            color="neutral"
+                            variant="soft"
+                            size="sm"
+                          >
+                            {{
+                              activity.questionNumber
+                                ? `Question ${activity.questionNumber}`
+                                : "Question"
+                            }}
+                          </UBadge>
+
+                          <UBadge
+                            :color="
+                              activity.isCorrect === true
+                                ? 'success'
+                                : activity.isCorrect === false
+                                  ? 'error'
+                                  : 'neutral'
+                            "
+                            variant="soft"
+                            size="sm"
+                          >
+                            {{
+                              activity.isCorrect === true
+                                ? "Correct"
+                                : activity.isCorrect === false
+                                  ? "Incorrect"
+                                  : activity.isFinal
+                                    ? "Recorded"
+                                    : "Saved"
+                            }}
+                          </UBadge>
+                        </div>
+
+                        <h4 class="mt-2 whitespace-pre-wrap text-sm font-bold leading-6 text-highlighted sm:text-base">
+                          {{ activity.questionText }}
+                        </h4>
+                      </div>
+
+                      <div class="shrink-0 text-xs text-muted sm:text-right">
+                        <p>{{ formatDateTime(activity.activityAt) }}</p>
+                        <p class="mt-1">
+                          Response time: {{ formatDuration(activity.responseSeconds) }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      class="mt-4 grid gap-3"
+                      :class="
+                        activity.isCorrect === false
+                        && activity.correctAnswerPreview
+                          ? 'md:grid-cols-2'
+                          : 'grid-cols-1'
+                      "
+                    >
+                      <div class="rounded-xl bg-elevated/60 p-4">
+                        <p class="text-xs font-bold uppercase tracking-[0.08em] text-muted">
+                          Student response
+                        </p>
+
+                        <p class="mt-2 break-words text-sm font-semibold leading-6 text-highlighted">
+                          {{ activity.responsePreview }}
+                        </p>
+                      </div>
+
+                      <div
+                        v-if="
+                          activity.isCorrect === false
+                          && activity.correctAnswerPreview
+                        "
+                        class="rounded-xl border border-success/20 bg-success/5 p-4"
+                      >
+                        <p class="text-xs font-bold uppercase tracking-[0.08em] text-success">
+                          Correct answer
+                        </p>
+
+                        <p class="mt-2 break-words text-sm font-semibold leading-6 text-highlighted">
+                          {{ activity.correctAnswerPreview }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                      <span v-if="activity.awardedPoints !== null">
+                        Awarded: {{ activity.awardedPoints }} point{{ activity.awardedPoints === 1 ? "" : "s" }}
+                      </span>
+
+                      <span v-if="activity.speedBonus > 0">
+                        Speed bonus: +{{ activity.speedBonus }}
+                      </span>
+                    </div>
+                  </article>
                 </div>
-              </div>
+              </section>
             </div>
           </UCard>
 
