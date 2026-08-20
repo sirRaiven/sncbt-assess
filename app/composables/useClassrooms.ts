@@ -8,6 +8,7 @@ import type {
   MembershipStatus,
   StudentClassListItem,
   StudentClassMembership,
+  StudentClassmate,
 } from "~/types/classroom";
 
 import {
@@ -325,6 +326,19 @@ export function useClassrooms() {
     );
   }
 
+  async function listClassmates(
+    classroomId: string,
+  ) {
+    return await invoke<{
+      classmates: StudentClassmate[];
+    }>(
+      "list-classmates",
+      {
+        classroomId,
+      },
+    );
+  }
+
   async function joinClass(
     joinCode: string,
   ) {
@@ -377,6 +391,7 @@ export function useClassrooms() {
     removeMember,
     listStudentClasses,
     getStudentClass,
+    listClassmates,
     joinClass,
     leaveClass,
   };

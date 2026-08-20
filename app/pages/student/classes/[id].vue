@@ -2,6 +2,7 @@
 import type {
   Classroom,
   StudentClassMembership,
+  StudentClassmate,
 } from "~/types/classroom";
 
 import type {
@@ -35,8 +36,21 @@ const classroomId =
       ),
   );
 
+const activeSection =
+  computed<
+    "assessments"
+    | "classmates"
+  >(
+    () =>
+      route.query.view
+      === "classmates"
+        ? "classmates"
+        : "assessments",
+  );
+
 const {
   getStudentClass,
+  listClassmates,
   leaveClass,
 } = useClassrooms();
 
@@ -56,6 +70,43 @@ const membership =
 
 const instructorName =
   ref("");
+
+const classmates =
+  ref<StudentClassmate[]>(
+    [],
+  );
+
+const isLoadingClassmates =
+  ref(false);
+
+const classmatesError =
+  ref("");
+
+const classmateQuery =
+  ref("");
+
+const filteredClassmates =
+  computed(
+    () => {
+      const keyword =
+        classmateQuery.value
+          .trim()
+          .toLowerCase();
+
+      if (!keyword) {
+        return classmates.value;
+      }
+
+      return classmates.value.filter(
+        (classmate) =>
+          classmate.name
+            .toLowerCase()
+            .includes(
+              keyword,
+            ),
+      );
+    },
+  );
 
 const deliveries =
   ref<StudentAssessmentDelivery[]>(
@@ -182,6 +233,62 @@ function deliveryAction(
   };
 }
 
+function classmateInitials(
+  name: string,
+): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(
+      (part) =>
+        part.charAt(0),
+    )
+    .slice(
+      0,
+      2,
+    )
+    .join("")
+    .toUpperCase()
+    || "ST";
+}
+
+async function loadClassmates():
+  Promise<void> {
+  isLoadingClassmates.value =
+    true;
+
+  classmatesError.value =
+    "";
+
+  const result =
+    await listClassmates(
+      classroomId.value,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    classmates.value =
+      [];
+
+    classmatesError.value =
+      result.error
+      || "Unable to load classmates.";
+
+    isLoadingClassmates.value =
+      false;
+
+    return;
+  }
+
+  classmates.value =
+    result.data.classmates;
+
+  isLoadingClassmates.value =
+    false;
+}
+
 async function loadClass():
   Promise<void> {
   isLoading.value =
@@ -225,10 +332,14 @@ async function loadClass():
     return;
   }
 
-  const deliveryResult =
-    await listStudentDeliveries(
+  const [
+    deliveryResult,
+  ] = await Promise.all([
+    listStudentDeliveries(
       classroomId.value,
-    );
+    ),
+    loadClassmates(),
+  ]);
 
   if (
     deliveryResult.error
@@ -498,8 +609,20 @@ onMounted(
         </div>
       </section>
 
+      <StudentClassNavigation
+        :classroom-id="classroom.id"
+        :active="activeSection"
+        :classmate-count="classmates.length"
+      />
+
       <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_21rem]">
         <div class="space-y-5">
+          <template
+            v-if="
+              activeSection
+              === 'assessments'
+            "
+          >
           <UCard>
             <template #header>
               <h2 class="font-black text-highlighted">
@@ -519,11 +642,11 @@ onMounted(
             <template #header>
               <div>
                 <h2 class="font-black text-highlighted">
-                  Class assessments
+                  Class assignments
                 </h2>
 
                 <p class="mt-1 text-sm text-muted">
-                  Assessments become available automatically based on the schedule set by your instructor.
+                  Assignments become available automatically based on the schedule set by your instructor.
                 </p>
               </div>
             </template>
@@ -666,6 +789,160 @@ onMounted(
               </article>
             </div>
           </UCard>
+          </template>
+
+          <template v-else>
+            <div class="space-y-5">
+              <section
+                class="flex flex-col gap-4 rounded-2xl border border-primary/10 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-5 py-4 shadow-sm shadow-primary/5 sm:flex-row sm:items-center sm:justify-between dark:border-primary/15 dark:from-primary/15 dark:via-primary/5"
+              >
+                <div>
+                  <h2 class="text-2xl font-black tracking-tight text-highlighted">
+                    Classmates
+                  </h2>
+
+                  <p class="mt-1 text-sm text-muted">
+                    Students who are currently enrolled in this class.
+                  </p>
+                </div>
+
+                <div class="flex w-full gap-2 sm:w-auto">
+                  <UInput
+                    v-model="classmateQuery"
+                    icon="i-lucide-search"
+                    placeholder="Search classmates"
+                    aria-label="Search classmates"
+                    class="w-full sm:w-72"
+                  />
+
+                  <UButton
+                    type="button"
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-refresh-cw"
+                    square
+                    :loading="isLoadingClassmates"
+                    aria-label="Refresh classmates"
+                    @click="loadClassmates"
+                  />
+                </div>
+              </section>
+
+              <UAlert
+                v-if="classmatesError"
+                color="warning"
+                variant="soft"
+                title="Classmates unavailable"
+                :description="classmatesError"
+              />
+
+              <div
+                v-if="isLoadingClassmates"
+                class="overflow-hidden rounded-2xl border border-primary/10 bg-default/95 shadow-lg shadow-primary/5 ring-1 ring-primary/5 dark:border-primary/15 dark:bg-default/90 dark:shadow-black/15"
+                aria-label="Loading classmates"
+                aria-busy="true"
+              >
+                <div class="flex items-center justify-between gap-3 border-b border-default bg-primary/5 px-4 py-4 sm:px-5 dark:bg-primary/10">
+                  <USkeleton class="h-5 w-28 rounded" />
+                  <USkeleton class="h-5 w-10 rounded-full" />
+                </div>
+
+                <div class="divide-y divide-default">
+                  <div
+                    v-for="number in 6"
+                    :key="number"
+                    class="flex items-center gap-3 px-4 py-3.5 sm:px-5"
+                  >
+                    <USkeleton class="size-10 shrink-0 rounded-full" />
+
+                    <div class="min-w-0 flex-1 space-y-2">
+                      <USkeleton
+                        class="h-4 rounded"
+                        :class="
+                          number % 2
+                            ? 'w-40'
+                            : 'w-52'
+                        "
+                      />
+                      <USkeleton class="h-3 w-24 rounded" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-else
+                class="overflow-hidden rounded-2xl border border-default bg-default"
+              >
+                <div class="flex items-center justify-between gap-3 border-b border-primary/10 bg-primary/5 px-4 py-3.5 sm:px-5 dark:bg-primary/10">
+                  <h3 class="font-bold text-highlighted">
+                    Classmates
+                  </h3>
+
+                  <UBadge
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                  >
+                    {{ classmates.length }}
+                  </UBadge>
+                </div>
+
+                <EmptyPanel
+                  v-if="classmates.length === 0"
+                  class="m-4"
+                  icon="i-lucide-users"
+                  title="No classmates yet"
+                  description="You are currently the only active Student in this class."
+                />
+
+                <EmptyPanel
+                  v-else-if="filteredClassmates.length === 0"
+                  class="m-4"
+                  icon="i-lucide-search-x"
+                  title="No matching classmates"
+                  description="Try a different classmate name."
+                />
+
+                <TransitionGroup
+                  v-else
+                  name="classmate-row"
+                  tag="ul"
+                  appear
+                  aria-label="Classmates"
+                  class="divide-y divide-default"
+                >
+                  <li
+                    v-for="(classmate, index) in filteredClassmates"
+                    :key="`${classmate.name}-${classmate.avatarUrl || 'initials'}`"
+                    class="classmate-row flex min-w-0 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-primary/5 sm:px-5"
+                    :style="{
+                      '--classmate-delay':
+                        `${Math.min(index, 8) * 35}ms`,
+                    }"
+                  >
+                    <UAvatar
+                      :src="classmate.avatarUrl || undefined"
+                      :text="classmateInitials(classmate.name)"
+                      :alt="classmate.name"
+                      size="md"
+                      class="shrink-0 ring-1 ring-primary/10"
+                    />
+
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate font-semibold text-highlighted">
+                        {{ classmate.name }}
+                      </p>
+
+                      <p class="mt-0.5 text-xs text-muted">
+                        Classmate
+                      </p>
+                    </div>
+                  </li>
+                </TransitionGroup>
+              </div>
+            </div>
+          </template>
         </div>
 
         <div class="space-y-5">
@@ -718,13 +995,6 @@ onMounted(
               Leave Class
             </UButton>
           </UCard>
-
-          <UAlert
-            color="warning"
-            variant="soft"
-            title="Leaving a class"
-            description="Your instructor must approve a new membership request if you decide to join this class again."
-          />
         </div>
       </div>
     </template>
@@ -743,3 +1013,50 @@ onMounted(
     />
   </div>
 </template>
+
+
+<style scoped>
+.classmate-row-enter-active,
+.classmate-row-leave-active {
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease,
+    background-color 160ms ease;
+}
+
+.classmate-row-enter-active {
+  transition-delay:
+    var(
+      --classmate-delay,
+      0ms
+    );
+}
+
+.classmate-row-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.classmate-row-leave-to {
+  opacity: 0;
+  transform: translateX(8px);
+}
+
+.classmate-row-move {
+  transition:
+    transform 220ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .classmate-row-enter-active,
+  .classmate-row-leave-active,
+  .classmate-row-move {
+    transition: none;
+  }
+
+  .classmate-row-enter-from,
+  .classmate-row-leave-to {
+    transform: none;
+  }
+}
+</style>

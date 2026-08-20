@@ -97,6 +97,11 @@ export interface InstructorSummary {
   name: string;
 }
 
+export interface StudentClassmate {
+  name: string;
+  avatarUrl: string | null;
+}
+
 export interface StudentClassListItem {
   membership: StudentClassMembership;
   classroom: Classroom;
