@@ -47,19 +47,47 @@ const classroomItems = computed(() => [
   { label: "All classes / sections", value: "__all__" },
   ...(overview.value?.options.classrooms ?? []),
 ]);
-const assessmentItems = computed(() => [
-  { label: "All assessments", value: "__all__" },
-  ...(overview.value?.options.assessments ?? []),
-]);
+const availableAssessmentItems = computed(() => overview.value?.options.assessments ?? []);
+const hasNoAssignedAssessments = computed(
+  () => selectedClassroom.value !== "__all__"
+    && overview.value !== null
+    && availableAssessmentItems.value.length === 0,
+);
+const assessmentItems = computed(() => {
+  if (hasNoAssignedAssessments.value) {
+    return [
+      {
+        label: "No assigned assessments",
+        value: "__none__",
+        disabled: true,
+      },
+    ];
+  }
+
+  return [
+    { label: "All assessments", value: "__all__" },
+    ...availableAssessmentItems.value,
+  ];
+});
 const selectedClassroom = computed({
   get: () => filters.classroomId || "__all__",
   set: (value: string) => {
-    filters.classroomId = value === "__all__" ? null : value;
+    const nextClassroomId = value === "__all__" ? null : value;
+    if (filters.classroomId === nextClassroomId) return;
+
+    filters.classroomId = nextClassroomId;
+    // An assessment selected for the previous class may not belong to the new
+    // class. Reset it immediately, then let the live filter request return the
+    // correct assessment options for the new class/section.
+    filters.assessmentId = null;
   },
 });
 const selectedAssessment = computed({
-  get: () => filters.assessmentId || "__all__",
+  get: () => hasNoAssignedAssessments.value
+    ? "__none__"
+    : (filters.assessmentId || "__all__"),
   set: (value: string) => {
+    if (value === "__none__") return;
     filters.assessmentId = value === "__all__" ? null : value;
   },
 });
@@ -210,30 +238,19 @@ function resetFilters(): void {
 }
 
 const resultColumns: CsvColumn<InstructorStudentResultRow>[] = [
+  { header: "No.", value: (_row, index) => index + 1 },
   { header: "Student Number", value: (row) => row.studentNumber },
-  { header: "Student", value: (row) => row.studentName },
-  { header: "Class", value: (row) => row.classroomName },
-  { header: "Section", value: (row) => row.section },
-  { header: "Assessment", value: (row) => row.assessmentTitle },
-  { header: "Subject Code", value: (row) => row.subjectCode },
-  { header: "Status", value: (row) => readableValue(row.status) },
+  { header: "Student Name", value: (row) => row.studentName },
   { header: "Score", value: (row) => `${row.score} / ${row.maximumScore}` },
-  { header: "Percentage", value: (row) => formatPercent(row.percentage) },
-  { header: "Correct", value: (row) => row.correctCount },
-  { header: "Wrong", value: (row) => row.wrongCount },
-  { header: "Unanswered", value: (row) => row.unansweredCount },
-  { header: "Completion Time", value: (row) => formatDuration(row.durationSeconds) },
   { header: "Submitted", value: (row) => formatDateTime(row.submittedAt) },
 ];
 
 function exportMeta(): ReportExportMeta {
   return {
     title: "Student Assessment Results",
-    subtitle: "Final submitted scores and completion records",
     period: periodLabel.value,
     classroom: selectedClassroomLabel.value,
     assessment: selectedAssessmentLabel.value,
-    generatedAt: overview.value?.generatedAt ?? new Date().toISOString(),
   };
 }
 function exportCsv(): void {
@@ -242,13 +259,13 @@ function exportCsv(): void {
 }
 function exportExcel(): void {
   const stamp = new Date().toISOString().slice(0, 10);
-  downloadExcelReport(`sncbt-student-results-${stamp}.xls`, exportMeta(), resultColumns, filteredResults.value);
+  downloadExcelReport(`sncbt-student-results-${stamp}.xlsx`, exportMeta(), resultColumns, filteredResults.value);
 }
 
 const exportMenuItems = computed<DropdownMenuItem[][]>(() => [
   [
     {
-      label: "Excel (.xls)",
+      label: "Excel (.xlsx)",
       icon: "i-lucide-file-spreadsheet",
       disabled: filteredResults.value.length === 0,
       onSelect: exportExcel,
@@ -263,7 +280,7 @@ const exportMenuItems = computed<DropdownMenuItem[][]>(() => [
       label: "Print / Save as PDF",
       icon: "i-lucide-printer",
       disabled: filteredResults.value.length === 0,
-      onSelect: printCurrentReport,
+      onSelect: () => printCurrentReport("SNCBT - Student Assessment Results"),
     },
   ],
 ]);
@@ -282,17 +299,61 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="page-stack report-print-area">
-    <InstructorReportPrintHeader
-      title="Student Assessment Results"
-      subtitle="Final submitted scores and completion records"
-      :period="periodLabel"
-      :generated-at="overview?.generatedAt || null"
-    />
+    <section class="print-only grading-sheet-export" aria-hidden="true">
+      <header class="grading-sheet-header">
+        <img
+          src="/images/sncbt-logo.png"
+          alt=""
+          class="grading-sheet-logo"
+        >
+        <p class="grading-sheet-school">ST. NICOLAS COLLEGE OF BUSINESS AND TECHNOLOGY</p>
+        <p class="grading-sheet-system">SNCBT ASSESSMENT MANAGEMENT SYSTEM</p>
+        <h1>STUDENT ASSESSMENT RESULTS</h1>
+      </header>
 
-    <div class="print-only report-scope">
-      <div><span>Class / Section:</span> <strong>{{ selectedClassroomLabel }}</strong></div>
-      <div><span>Assessment:</span> <strong>{{ selectedAssessmentLabel }}</strong></div>
-    </div>
+      <dl class="grading-sheet-details">
+        <div>
+          <dt>Reporting Period</dt>
+          <dd>{{ periodLabel }}</dd>
+        </div>
+        <div>
+          <dt>Class / Section</dt>
+          <dd>{{ selectedClassroomLabel }}</dd>
+        </div>
+        <div>
+          <dt>Assessment</dt>
+          <dd>{{ selectedAssessmentLabel }}</dd>
+        </div>
+      </dl>
+
+      <div class="grading-sheet-table-wrap">
+        <img
+          src="/images/sncbt-logo.png"
+          alt=""
+          class="grading-sheet-watermark"
+        >
+        <table class="grading-sheet-table">
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>Student No.</th>
+              <th>Student Name</th>
+              <th>Score</th>
+              <th>Submitted</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, index) in filteredResults" :key="`grading-${row.attemptId}`">
+              <td>{{ index + 1 }}</td>
+              <td>{{ row.studentNumber || "—" }}</td>
+              <td>{{ row.studentName }}</td>
+              <td>{{ row.score }} / {{ row.maximumScore }}</td>
+              <td>{{ formatDateTime(row.submittedAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <PageHeader
       class="no-print"
@@ -353,8 +414,15 @@ onBeforeUnmount(() => {
             :items="assessmentItems"
             value-key="value"
             label-key="label"
+            :disabled="hasNoAssignedAssessments"
             class="w-full"
           />
+          <p
+            v-if="hasNoAssignedAssessments"
+            class="mt-1.5 text-xs text-muted"
+          >
+            No assessment is assigned to this class/section in the selected date range.
+          </p>
         </UFormField>
         <div class="flex items-end">
           <UTooltip text="Reset filters">
@@ -511,40 +579,6 @@ onBeforeUnmount(() => {
         </UCard>
       </div>
 
-      <div class="print-only">
-        <table class="app-table">
-          <thead>
-            <tr>
-              <th>Student No.</th>
-              <th>Student</th>
-              <th>Class / Section</th>
-              <th>Assessment</th>
-              <th>Score</th>
-              <th>%</th>
-              <th>Correct</th>
-              <th>Wrong</th>
-              <th>Unanswered</th>
-              <th>Time</th>
-              <th>Submitted</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in filteredResults" :key="`print-${row.attemptId}`">
-              <td>{{ row.studentNumber || "—" }}</td>
-              <td>{{ row.studentName }}</td>
-              <td>{{ row.classroomName }} · {{ row.section }}</td>
-              <td>{{ row.assessmentTitle }}</td>
-              <td>{{ row.score }} / {{ row.maximumScore }}</td>
-              <td>{{ formatPercent(row.percentage) }}</td>
-              <td>{{ row.correctCount }}</td>
-              <td>{{ row.wrongCount }}</td>
-              <td>{{ row.unansweredCount }}</td>
-              <td>{{ formatDuration(row.durationSeconds) }}</td>
-              <td>{{ formatDateTime(row.submittedAt) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </template>
 
     <UModal v-model:open="errorModalOpen" title="Student results could not be loaded">
@@ -577,8 +611,8 @@ onBeforeUnmount(() => {
 
 @media print {
   @page {
-    size: A4 landscape;
-    margin: 14mm;
+    size: A4 portrait;
+    margin: 6.4mm;
   }
 
   body * {
@@ -595,8 +629,8 @@ onBeforeUnmount(() => {
     inset: 0 auto auto 0 !important;
     width: 100% !important;
     padding: 0 !important;
-    color: #111827 !important;
-    background: white !important;
+    color: #111 !important;
+    background: #fff !important;
   }
 
   .no-print {
@@ -607,43 +641,139 @@ onBeforeUnmount(() => {
     display: block !important;
   }
 
-  .report-scope {
-    margin: 10px 0 16px !important;
-    padding: 9px 12px !important;
-    border: 1px solid #d1d5db !important;
-    font-size: 10px !important;
+  .grading-sheet-export {
+    color: #111 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
   }
 
-  .report-scope > div {
-    display: inline-block !important;
-    margin-right: 28px !important;
+  .grading-sheet-header {
+    text-align: center !important;
+    page-break-inside: avoid !important;
   }
 
-  .report-scope span {
-    margin-right: 5px !important;
-    color: #4b5563 !important;
+  .grading-sheet-logo {
+    width: 56px !important;
+    height: 56px !important;
+    margin: 0 auto 5px !important;
+    object-fit: contain !important;
   }
 
-  .report-print-area table {
+  .grading-sheet-school {
+    margin: 0 !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+  }
+
+  .grading-sheet-system {
+    margin: 2px 0 0 !important;
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.07em !important;
+  }
+
+  .grading-sheet-header h1 {
+    margin: 9px 0 0 !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+  }
+
+  .grading-sheet-details {
+    margin: 13mm 0 8mm !important;
+    padding: 0 !important;
+    font-size: 8.5px !important;
+  }
+
+  .grading-sheet-details > div {
+    display: grid !important;
+    grid-template-columns: 32mm minmax(0, 1fr) !important;
+    gap: 3mm !important;
+    margin: 0 0 2.2mm !important;
+  }
+
+  .grading-sheet-details dt {
+    margin: 0 !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+  }
+
+  .grading-sheet-details dt::after {
+    content: " :" !important;
+  }
+
+  .grading-sheet-details dd {
+    margin: 0 !important;
+    font-weight: 600 !important;
+  }
+
+  .grading-sheet-table-wrap {
+    position: relative !important;
+  }
+
+  .grading-sheet-watermark {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    width: 230px !important;
+    height: 230px !important;
+    object-fit: contain !important;
+    opacity: 0.16 !important;
+    transform: translate(-50%, -48%) !important;
+    z-index: 0 !important;
+  }
+
+  .grading-sheet-table {
+    position: relative !important;
+    z-index: 1 !important;
     width: 100% !important;
     border-collapse: collapse !important;
+    table-layout: fixed !important;
+    background: transparent !important;
   }
 
-  .report-print-area th {
-    background: #f3f4f6 !important;
-    font-weight: 700 !important;
+  .grading-sheet-table thead {
+    display: table-header-group !important;
+  }
+
+  .grading-sheet-table th {
+    border: 1px solid #111 !important;
+    padding: 5px 4px !important;
+    background: #22a447 !important;
+    color: #fff !important;
+    font-size: 8px !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.03em !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  .report-print-area th,
-  .report-print-area td {
-    border: 1px solid #d1d5db !important;
-    padding: 7px 8px !important;
-    color: #111827 !important;
-    background-color: white !important;
-    font-size: 9.5px !important;
-    vertical-align: top !important;
+  .grading-sheet-table td {
+    border: 1px solid #111 !important;
+    padding: 4px !important;
+    color: #111 !important;
+    background: rgba(255, 255, 255, 0.72) !important;
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+    vertical-align: middle !important;
+    word-break: break-word !important;
+  }
+
+  .grading-sheet-table th:nth-child(1),
+  .grading-sheet-table td:nth-child(1) { width: 7% !important; text-align: center !important; }
+  .grading-sheet-table th:nth-child(2),
+  .grading-sheet-table td:nth-child(2) { width: 20% !important; text-align: center !important; }
+  .grading-sheet-table th:nth-child(3),
+  .grading-sheet-table td:nth-child(3) { width: 35% !important; }
+  .grading-sheet-table th:nth-child(4),
+  .grading-sheet-table td:nth-child(4) { width: 14% !important; text-align: center !important; }
+  .grading-sheet-table th:nth-child(5),
+  .grading-sheet-table td:nth-child(5) { width: 24% !important; text-align: center !important; }
+
+  .grading-sheet-table tr {
+    break-inside: avoid !important;
   }
 }
 </style>
