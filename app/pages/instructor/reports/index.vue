@@ -5,7 +5,6 @@ import type {
   InstructorClassPerformanceRow,
   InstructorReportFilters,
   InstructorReportsOverview,
-  InstructorStudentResultRow,
 } from "~/types/instructor-report";
 import {
   downloadCsv,
@@ -15,7 +14,7 @@ import {
 definePageMeta({ layout: "instructor" });
 useSeoMeta({ title: "Reports" });
 
-type PrimaryReportSection = "classes" | "assessments" | "students";
+type PrimaryReportSection = "classes" | "assessments";
 
 const { getOverview } = useInstructorReports();
 
@@ -120,38 +119,18 @@ const filteredAssessments = computed(() => {
   );
 });
 
-const filteredStudents = computed(() => {
-  const rows = overview.value?.students ?? [];
-  if (!normalizedQuery.value) return rows;
 
-  return rows.filter((row) =>
-    [
-      row.studentName,
-      row.studentNumber,
-      row.assessmentTitle,
-      row.subjectCode,
-      row.classroomName,
-      row.section,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase()
-      .includes(normalizedQuery.value),
-  );
-});
-
-const activeRowCount = computed(() => {
-  if (activeSection.value === "classes") return filteredClasses.value.length;
-  if (activeSection.value === "assessments") return filteredAssessments.value.length;
-  return filteredStudents.value.length;
-});
+const activeRowCount = computed(() =>
+  activeSection.value === "classes"
+    ? filteredClasses.value.length
+    : filteredAssessments.value.length,
+);
 
 const reportTitle = computed(
   () =>
     ({
       classes: "Class Assessment Summary",
       assessments: "Assessment Performance Summary",
-      students: "Student Assessment Results",
     })[activeSection.value],
 );
 
@@ -160,7 +139,6 @@ const sectionDescription = computed(
     ({
       classes: "Completion and average performance by class.",
       assessments: "Completion and average performance by assessment.",
-      students: "Final submitted assessment results.",
     })[activeSection.value],
 );
 
@@ -169,7 +147,6 @@ const searchPlaceholder = computed(
     ({
       classes: "Search class or section",
       assessments: "Search assessment",
-      students: "Search student or assessment",
     })[activeSection.value],
 );
 
@@ -190,14 +167,6 @@ function formatDateOnly(value: string | null): string {
   }).format(new Date(`${value}T00:00:00+08:00`));
 }
 
-function formatDateTime(value: string | null): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("en-PH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Manila",
-  }).format(new Date(value));
-}
 
 function formatPercent(value: number | null): string {
   return value === null ? "—" : `${value.toFixed(1)}%`;
@@ -267,49 +236,23 @@ function exportCurrentSection(): void {
     return;
   }
 
-  if (activeSection.value === "assessments") {
-    const columns: CsvColumn<InstructorAssessmentPerformanceRow>[] = [
-      { header: "Assessment", value: (row) => row.title },
-      { header: "Subject Code", value: (row) => row.subjectCode },
-      { header: "Type", value: (row) => readableValue(row.assessmentType) },
-      { header: "Questions", value: (row) => row.questionCount },
-      { header: "Total Points", value: (row) => row.totalPoints },
-      { header: "Classes", value: (row) => row.classCount },
-      { header: "Completed", value: (row) => row.completedAttempts },
-      { header: "Expected", value: (row) => row.expectedSubmissions },
-      { header: "Completion Rate", value: (row) => formatPercent(row.completionRate) },
-      { header: "Average Score", value: (row) => formatPercent(row.averagePercentage) },
-    ];
-
-    downloadCsv(
-      `sncbt-assessment-performance-summary-${stamp}.csv`,
-      columns,
-      filteredAssessments.value,
-    );
-    return;
-  }
-
-  const columns: CsvColumn<InstructorStudentResultRow>[] = [
-    { header: "Student", value: (row) => row.studentName },
-    { header: "Student Number", value: (row) => row.studentNumber },
-    { header: "Assessment", value: (row) => row.assessmentTitle },
+  const columns: CsvColumn<InstructorAssessmentPerformanceRow>[] = [
+    { header: "Assessment", value: (row) => row.title },
     { header: "Subject Code", value: (row) => row.subjectCode },
-    {
-      header: "Class",
-      value: (row) => `${row.classroomName} - ${row.section}`,
-    },
-    {
-      header: "Score",
-      value: (row) => `${row.score} / ${row.maximumScore}`,
-    },
-    { header: "Percentage", value: (row) => formatPercent(row.percentage) },
-    { header: "Submitted", value: (row) => formatDateTime(row.submittedAt) },
+    { header: "Type", value: (row) => readableValue(row.assessmentType) },
+    { header: "Questions", value: (row) => row.questionCount },
+    { header: "Total Points", value: (row) => row.totalPoints },
+    { header: "Classes", value: (row) => row.classCount },
+    { header: "Completed", value: (row) => row.completedAttempts },
+    { header: "Expected", value: (row) => row.expectedSubmissions },
+    { header: "Completion Rate", value: (row) => formatPercent(row.completionRate) },
+    { header: "Average Score", value: (row) => formatPercent(row.averagePercentage) },
   ];
 
   downloadCsv(
-    `sncbt-student-assessment-results-${stamp}.csv`,
+    `sncbt-assessment-performance-summary-${stamp}.csv`,
     columns,
-    filteredStudents.value,
+    filteredAssessments.value,
   );
 }
 
@@ -339,7 +282,7 @@ onMounted(loadReports);
       class="no-print"
       eyebrow="Assessment records"
       title="Reports"
-      description="Review formal class, assessment, and student performance records."
+      description="Review class and assessment performance analytics. Student scores now have their own Student Results workspace."
     >
       <template #actions>
         <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
@@ -488,20 +431,6 @@ onMounted(loadReports);
               <UIcon name="i-lucide-clipboard-check" class="size-4" />
               Assessment Summary
             </button>
-
-            <button
-              type="button"
-              class="flex min-h-9 items-center gap-2 rounded-lg px-3.5 text-sm font-bold transition"
-              :class="
-                activeSection === 'students'
-                  ? 'bg-primary/12 text-primary'
-                  : 'text-muted hover:bg-default hover:text-highlighted'
-              "
-              @click="activeSection = 'students'"
-            >
-              <UIcon name="i-lucide-graduation-cap" class="size-4" />
-              Student Results
-            </button>
           </div>
         </div>
 
@@ -596,7 +525,7 @@ onMounted(loadReports);
       </section>
 
       <!-- ASSESSMENT SUMMARY -->
-      <section v-else-if="activeSection === 'assessments'">
+      <section v-else>
         <EmptyPanel
           v-if="filteredAssessments.length === 0"
           icon="i-lucide-clipboard-check"
@@ -681,68 +610,6 @@ onMounted(loadReports);
         </template>
       </section>
 
-      <!-- STUDENT RESULTS -->
-      <section v-else>
-        <EmptyPanel
-          v-if="filteredStudents.length === 0"
-          icon="i-lucide-graduation-cap"
-          title="No student results"
-          description="Completed student results will appear here."
-        />
-
-        <template v-else>
-          <div class="report-desktop-table hidden table-shell table-scroll lg:block">
-            <table class="app-table">
-              <thead>
-                <tr>
-                  <th>Student</th>
-                  <th>Assessment / Class</th>
-                  <th>Score</th>
-                  <th>Percentage</th>
-                  <th>Submitted</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in filteredStudents" :key="row.attemptId">
-                  <td>
-                    <p class="font-black text-highlighted">{{ row.studentName }}</p>
-                    <p class="mt-1 text-xs text-muted">{{ row.studentNumber || "—" }}</p>
-                  </td>
-                  <td>
-                    <p class="font-semibold text-highlighted">{{ row.assessmentTitle }}</p>
-                    <p class="mt-1 text-xs text-muted">{{ row.subjectCode }} · {{ row.section }}</p>
-                  </td>
-                  <td><span class="font-black text-highlighted">{{ row.score }} / {{ row.maximumScore }}</span></td>
-                  <td><span class="font-black text-highlighted">{{ formatPercent(row.percentage) }}</span></td>
-                  <td><span class="text-sm text-highlighted">{{ formatDateTime(row.submittedAt) }}</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="report-mobile-cards space-y-3 lg:hidden">
-            <UCard v-for="row in filteredStudents" :key="row.attemptId">
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <p class="font-black text-highlighted">{{ row.studentName }}</p>
-                  <p class="mt-1 text-xs text-muted">{{ row.studentNumber || "Student" }}</p>
-                </div>
-                <p class="font-black text-primary">{{ formatPercent(row.percentage) }}</p>
-              </div>
-
-              <div class="mt-4 rounded-lg border border-default p-3">
-                <p class="text-sm font-bold text-highlighted">{{ row.assessmentTitle }}</p>
-                <p class="mt-1 text-xs text-muted">{{ row.subjectCode }} · {{ row.section }}</p>
-              </div>
-
-              <div class="mt-3 flex items-center justify-between text-sm">
-                <span class="text-muted">Score</span>
-                <strong class="text-highlighted">{{ row.score }} / {{ row.maximumScore }}</strong>
-              </div>
-            </UCard>
-          </div>
-        </template>
-      </section>
     </template>
 
     <UModal v-model:open="errorModalOpen" title="Report could not be loaded">

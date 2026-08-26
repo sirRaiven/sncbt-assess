@@ -101,6 +101,14 @@ const items: Record<
     },
     {
       label:
+        "Student Results",
+      icon:
+        "i-lucide-graduation-cap",
+      to:
+        "/instructor/results",
+    },
+    {
+      label:
         "Live Sessions",
       icon:
         "i-lucide-radio-tower",
