@@ -1450,6 +1450,35 @@ function handleBeforeUnload(
     "";
 }
 
+function retryExpiredQuestionNow():
+  void {
+  if (
+    !isOnline.value
+    || isSaving.value
+    || isSubmitting.value
+    || !questionPayload.value
+    || questionPayload.value.finalized
+    || questionSeconds.value !== 0
+    || questionTimeoutTriggered.value
+  ) {
+    return;
+  }
+
+  // Browsers can throttle timers/network work while a tab or
+  // mobile browser is backgrounded. Force an immediate recovery
+  // pass when the assessment becomes active again instead of
+  // waiting for the next retry window.
+  questionTimeoutRetryAtMs.value =
+    0;
+
+  void handleQuestionTimeout();
+}
+
+function handleWindowFocus():
+  void {
+  retryExpiredQuestionNow();
+}
+
 function handleVisibilityChange():
   void {
   if (
@@ -1489,6 +1518,8 @@ function handleVisibilityChange():
 
     scheduleIntegrityFlush();
   }
+
+  retryExpiredQuestionNow();
 }
 
 function showDeadlineWarning(
@@ -2779,6 +2810,122 @@ async function continueAfterFeedback():
   }
 }
 
+type QuestionTimeoutReconciliation =
+  | "finalized"
+  | "closed"
+  | "open"
+  | "unresolved";
+
+async function reconcileExpiredQuestion():
+  Promise<QuestionTimeoutReconciliation> {
+  if (
+    !delivery.value?.attempt
+    || !questionPayload.value
+  ) {
+    return "unresolved";
+  }
+
+  // A browser reload already recovers this failure because
+  // get-question calls the server-side preparation RPC. Do the
+  // same reconciliation here so a lost/slow save-answer response
+  // cannot leave a Student parked at 00:00 indefinitely.
+  const result =
+    await getQuestion(
+      delivery.value.attempt.id,
+      currentIndex.value,
+    );
+
+  if (
+    result.code === "ATTEMPT_CLOSED"
+    || result.error
+      ?.toLowerCase()
+      .includes("deadline")
+  ) {
+    await leaveAssessment(
+      `/student/assessments/${assignmentId.value}/completed`,
+    );
+
+    return "closed";
+  }
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    return "unresolved";
+  }
+
+  const payload =
+    result.data.payload;
+
+  syncServerClock(
+    payload.serverNow,
+  );
+
+  if (payload.finalized) {
+    applyQuestionPayload(
+      payload,
+      false,
+    );
+
+    return "finalized";
+  }
+
+  const serverRemainingSeconds =
+    secondsUntil(
+      payload.deadlineAt,
+    );
+
+  if (
+    serverRemainingSeconds !== null
+    && serverRemainingSeconds > 0
+  ) {
+    // If the server says the deadline has not actually arrived,
+    // resynchronize the local timer without overwriting a local
+    // answer that is still waiting to sync.
+    questionSeconds.value =
+      serverRemainingSeconds;
+
+    questionTimeoutTriggered.value =
+      false;
+
+    questionTimeoutRetryCount.value =
+      0;
+
+    questionTimeoutRetryAtMs.value =
+      0;
+
+    questionTimeoutSyncPending.value =
+      false;
+
+    return "open";
+  }
+
+  return "unresolved";
+}
+
+async function continueAfterQuestionTimeout():
+  Promise<void> {
+  questionTimeoutRetryCount.value =
+    0;
+
+  questionTimeoutRetryAtMs.value =
+    0;
+
+  if (isLastQuestion.value) {
+    await submit(
+      true,
+      "last_question_timer_expired",
+    );
+
+    return;
+  }
+
+  await loadQuestion(
+    currentIndex.value + 1,
+  );
+}
+
 async function handleQuestionTimeout():
   Promise<void> {
   if (
@@ -2817,51 +2964,60 @@ async function handleQuestionTimeout():
   questionTimeoutSyncPending.value =
     false;
 
-  if (!saved) {
-    if (
-      !isOnline.value
-    ) {
-      questionTimeoutTriggered.value =
-        false;
+  if (saved) {
+    await continueAfterQuestionTimeout();
 
-      return;
-    }
+    return;
+  }
 
-    questionTimeoutRetryCount.value +=
-      1;
+  // save-answer can have an uncertain outcome when the request is
+  // slow, the response is lost, or the timeout-finalization RPC
+  // wins a race on the server. Re-fetching the same question asks
+  // the authoritative preparation RPC to reconcile that state.
+  // This is the same recovery path that previously only happened
+  // after the Student manually closed and reopened the browser.
+  const reconciliation =
+    await reconcileExpiredQuestion();
 
-    questionTimeoutRetryAtMs.value =
-      currentServerTimeMs()
-      + 3000;
+  if (
+    reconciliation === "closed"
+  ) {
+    return;
+  }
 
-    // Release the timeout latch so the interval can retry. The
-    // server/database operation is idempotent after the matching
-    // SQL hotfix, so an uncertain network response cannot strand
-    // the student at 00:00.
+  if (
+    reconciliation === "finalized"
+  ) {
+    await continueAfterQuestionTimeout();
+
+    return;
+  }
+
+  if (
+    reconciliation === "open"
+  ) {
+    return;
+  }
+
+  if (!isOnline.value) {
     questionTimeoutTriggered.value =
       false;
 
     return;
   }
 
-  questionTimeoutRetryCount.value =
-    0;
+  questionTimeoutRetryCount.value +=
+    1;
 
   questionTimeoutRetryAtMs.value =
-    0;
+    currentServerTimeMs()
+    + 3000;
 
-  if (
-    isLastQuestion.value
-  ) {
-    await submit(
-      true,
-      "last_question_timer_expired",
-    );
-  } else {
-    await loadQuestion(
-      currentIndex.value + 1,
-    );
-  }
+  // Release the timeout latch so the interval can retry if both
+  // the save and the authoritative reconciliation were unable to
+  // confirm the server state.
+  questionTimeoutTriggered.value =
+    false;
 }
 
 function startTimer():
@@ -3006,6 +3162,11 @@ onMounted(
     );
 
     window.addEventListener(
+      "focus",
+      handleWindowFocus,
+    );
+
+    window.addEventListener(
       "beforeunload",
       handleBeforeUnload,
     );
@@ -3057,6 +3218,11 @@ onBeforeUnmount(
     window.removeEventListener(
       "offline",
       handleOffline,
+    );
+
+    window.removeEventListener(
+      "focus",
+      handleWindowFocus,
     );
 
     window.removeEventListener(
