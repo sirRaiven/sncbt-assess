@@ -316,6 +316,18 @@ async function runAction(
       "success",
   });
 
+  if (
+    action === "draft"
+    && "createdRevision" in result.data
+    && result.data.createdRevision
+  ) {
+    await navigateTo(
+      `/instructor/assessments/${result.data.assessment.id}/edit`,
+    );
+
+    return;
+  }
+
   if (action === "duplicate") {
     await navigateTo(
       `/instructor/assessments/${result.data.assessment.id}/settings`,
@@ -776,6 +788,13 @@ onMounted(
           >
             Return to Draft
           </UButton>
+
+          <p
+            v-if="assessment.status === 'published'"
+            class="text-xs leading-5 text-muted"
+          >
+            If Students already used this assessment, SNCBT Assess preserves that historical version and opens a new editable draft revision instead of changing past results.
+          </p>
 
           <UButton
             v-if="assessment.status === 'archived'"

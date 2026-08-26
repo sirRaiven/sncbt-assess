@@ -46,6 +46,7 @@ const {
   getQuestion,
   getAttemptSelectionPolicy,
   saveAnswer,
+  expireQuestion,
   submitAttempt,
 } = useAssessmentDelivery();
 
@@ -644,42 +645,16 @@ const estimatedUnansweredCount =
       ),
   );
 
-const saveStatusLabel =
+const questionTransitioning =
   computed(
-    () => {
-      if (!isOnline.value) {
-        return "Saved on device";
-      }
-
-      if (isSaving.value) {
-        return "Saving...";
-      }
-
-      if (pendingSync.value) {
-        return "Waiting to sync";
-      }
-
-      return "Saved";
-    },
-  );
-
-const saveStatusIcon =
-  computed(
-    () => {
-      if (!isOnline.value) {
-        return "i-lucide-cloud-off";
-      }
-
-      if (isSaving.value) {
-        return "i-lucide-refresh-cw";
-      }
-
-      if (pendingSync.value) {
-        return "i-lucide-cloud-upload";
-      }
-
-      return "i-lucide-cloud-check";
-    },
+    () =>
+      Boolean(
+        questionPayload.value
+        && !questionPayload.value
+          .finalized
+        && questionSeconds.value
+          === 0,
+      ),
   );
 
 const deadlineWarning =
@@ -1394,30 +1369,6 @@ function formatTime(
     safe % 60;
 
   return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
-}
-
-function formatSyncTime(
-  value: string | null,
-): string {
-  if (!value) {
-    return "";
-  }
-
-  return new Intl
-    .DateTimeFormat(
-      "en-PH",
-      {
-        hour:
-          "numeric",
-        minute:
-          "2-digit",
-        second:
-          "2-digit",
-      },
-    )
-    .format(
-      new Date(value),
-    );
 }
 
 function shouldWarnBeforeLeaving():
@@ -2811,6 +2762,7 @@ async function continueAfterFeedback():
 }
 
 type QuestionTimeoutReconciliation =
+  | "advanced"
   | "finalized"
   | "closed"
   | "open"
@@ -2825,14 +2777,23 @@ async function reconcileExpiredQuestion():
     return "unresolved";
   }
 
-  // A browser reload already recovers this failure because
-  // get-question calls the server-side preparation RPC. Do the
-  // same reconciliation here so a lost/slow save-answer response
-  // cannot leave a Student parked at 00:00 indefinitely.
-  const result =
+  const expiredIndex =
+    currentIndex.value;
+
+  const requestedIndex =
+    isLastQuestion.value
+      ? expiredIndex
+      : expiredIndex + 1;
+
+  // After a timeout, ask for the next index first. The server-side
+  // preparation RPC is authoritative and must reconcile the expired
+  // current question before it can deliver the next one. This avoids
+  // leaving the UI parked on the expired card just to confirm a state
+  // the server already knows how to advance during a browser reload.
+  let result =
     await getQuestion(
       delivery.value.attempt.id,
-      currentIndex.value,
+      requestedIndex,
     );
 
   if (
@@ -2849,6 +2810,19 @@ async function reconcileExpiredQuestion():
   }
 
   if (
+    (result.error || !result.data)
+    && requestedIndex !== expiredIndex
+  ) {
+    // A very tight deadline race can reject N+1 before N is observed
+    // as finalized. Prepare N once, then let the next retry request N+1.
+    result =
+      await getQuestion(
+        delivery.value.attempt.id,
+        expiredIndex,
+      );
+  }
+
+  if (
     result.error
     || !result.data
   ) {
@@ -2862,7 +2836,31 @@ async function reconcileExpiredQuestion():
     payload.serverNow,
   );
 
+  if (
+    payload.questionIndex
+      > expiredIndex
+  ) {
+    clearRecovery();
+
+    applyQuestionPayload(
+      payload,
+      false,
+    );
+
+    await nextTick();
+
+    questionAreaRef.value
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+    return "advanced";
+  }
+
   if (payload.finalized) {
+    clearRecovery();
+
     applyQuestionPayload(
       payload,
       false,
@@ -2880,23 +2878,10 @@ async function reconcileExpiredQuestion():
     serverRemainingSeconds !== null
     && serverRemainingSeconds > 0
   ) {
-    // If the server says the deadline has not actually arrived,
-    // resynchronize the local timer without overwriting a local
-    // answer that is still waiting to sync.
-    questionSeconds.value =
-      serverRemainingSeconds;
-
-    questionTimeoutTriggered.value =
-      false;
-
-    questionTimeoutRetryCount.value =
-      0;
-
-    questionTimeoutRetryAtMs.value =
-      0;
-
-    questionTimeoutSyncPending.value =
-      false;
+    applyQuestionPayload(
+      payload,
+      false,
+    );
 
     return "open";
   }
@@ -2923,13 +2908,15 @@ async function continueAfterQuestionTimeout():
 
   await loadQuestion(
     currentIndex.value + 1,
+    true,
   );
 }
 
 async function handleQuestionTimeout():
   Promise<void> {
   if (
-    !questionPayload.value
+    !delivery.value?.attempt
+    || !questionPayload.value
     || isSaving.value
     || isSubmitting.value
     || questionPayload.value.finalized
@@ -2951,36 +2938,142 @@ async function handleQuestionTimeout():
   questionTimeoutSyncPending.value =
     true;
 
-  const saved =
-    await synchronizeAnswer(
-      true,
+  pendingSync.value =
+    true;
+
+  saveRecovery();
+
+  const expiredIndex =
+    currentIndex.value;
+
+  const normalizedOptionIds =
+    normalizeSelectedOptionIds();
+
+  selectedOptionIds.value = [
+    ...normalizedOptionIds,
+  ];
+
+  const result =
+    await expireQuestion(
+      delivery.value.attempt.id,
+      questionPayload.value
+        .question.id,
+      expiredIndex,
       {
-        silentError:
-          questionTimeoutRetryCount.value
-            > 0,
+        selectedOptionIds:
+          normalizedOptionIds,
+        textResponse:
+          textResponse.value
+            .trim()
+          || null,
+        booleanResponse:
+          booleanResponse.value,
       },
     );
 
   questionTimeoutSyncPending.value =
     false;
 
-  if (saved) {
-    await continueAfterQuestionTimeout();
+  if (
+    !result.error
+    && result.data
+  ) {
+    clearRecovery();
 
-    return;
+    pendingSync.value =
+      false;
+
+    lastSyncedAt.value =
+      new Date()
+        .toISOString();
+
+    delivery.value.attempt
+      .answeredCount =
+        result.data
+          .answeredCount;
+
+    if (
+      result.data.attemptClosed
+    ) {
+      await leaveAssessment(
+        `/student/assessments/${assignmentId.value}/completed`,
+      );
+
+      return;
+    }
+
+    if (result.data.payload) {
+      const payload =
+        result.data.payload;
+
+      if (
+        payload.questionIndex
+          > expiredIndex
+      ) {
+        applyQuestionPayload(
+          payload,
+          false,
+        );
+
+        await nextTick();
+
+        questionAreaRef.value
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+
+        return;
+      }
+
+      if (payload.finalized) {
+        applyQuestionPayload(
+          payload,
+          false,
+        );
+
+        await continueAfterQuestionTimeout();
+
+        return;
+      }
+
+      const remaining =
+        secondsUntil(
+          payload.deadlineAt,
+        );
+
+      if (
+        remaining !== null
+        && remaining > 0
+      ) {
+        applyQuestionPayload(
+          payload,
+          false,
+        );
+
+        return;
+      }
+    }
+
+    if (isLastQuestion.value) {
+      await submit(
+        true,
+        "last_question_timer_expired",
+      );
+
+      return;
+    }
   }
 
-  // save-answer can have an uncertain outcome when the request is
-  // slow, the response is lost, or the timeout-finalization RPC
-  // wins a race on the server. Re-fetching the same question asks
-  // the authoritative preparation RPC to reconcile that state.
-  // This is the same recovery path that previously only happened
-  // after the Student manually closed and reopened the browser.
+  // Backward-compatible fallback: if the new expire-question action
+  // has not reached an Edge Function replica yet, or a transient relay
+  // error occurs, reconcile using get-question instead of freezing.
   const reconciliation =
     await reconcileExpiredQuestion();
 
   if (
     reconciliation === "closed"
+    || reconciliation === "advanced"
   ) {
     return;
   }
@@ -2999,6 +3092,9 @@ async function handleQuestionTimeout():
     return;
   }
 
+  pendingSync.value =
+    true;
+
   if (!isOnline.value) {
     questionTimeoutTriggered.value =
       false;
@@ -3009,13 +3105,22 @@ async function handleQuestionTimeout():
   questionTimeoutRetryCount.value +=
     1;
 
+  const retryDelay =
+    Math.min(
+      8000,
+      1500
+        * Math.max(
+          1,
+          questionTimeoutRetryCount.value,
+        ),
+    );
+
   questionTimeoutRetryAtMs.value =
     currentServerTimeMs()
-    + 3000;
+    + retryDelay;
 
-  // Release the timeout latch so the interval can retry if both
-  // the save and the authoritative reconciliation were unable to
-  // confirm the server state.
+  // Release the latch. startTimer(), focus, visibility and online
+  // recovery can now retry without creating overlapping requests.
   questionTimeoutTriggered.value =
     false;
 }
@@ -3304,17 +3409,14 @@ onBeforeRouteLeave(
 <template>
   <div class="min-h-screen bg-default">
     <header class="sticky top-0 z-30 border-b border-default bg-default/95 backdrop-blur">
-      <div class="px-4 py-3">
+      <div class="mx-auto max-w-5xl px-4 py-3 sm:px-6">
         <div class="flex items-start gap-3">
           <div class="min-w-0 flex-1">
-            <p class="truncate font-black text-highlighted">
-              {{
-                delivery?.title
-                || "Assessment"
-              }}
+            <p class="line-clamp-1 text-sm font-black text-highlighted sm:text-base">
+              {{ delivery?.title || "Assessment" }}
             </p>
 
-            <p class="truncate text-xs text-muted">
+            <p class="mt-0.5 line-clamp-1 text-xs text-muted">
               {{
                 delivery
                   ? `${delivery.subjectCode} · ${delivery.classroom.section}`
@@ -3327,10 +3429,10 @@ onBeforeRouteLeave(
             color="error"
             variant="soft"
             icon="i-lucide-send"
+            size="sm"
             :loading="isSubmitting"
-            @click="
-              submitModalOpen = true
-            "
+            aria-label="Submit assessment"
+            @click="submitModalOpen = true"
           >
             <span class="hidden sm:inline">
               Submit
@@ -3338,89 +3440,35 @@ onBeforeRouteLeave(
           </UButton>
         </div>
 
-        <div class="mt-3 flex flex-wrap items-center gap-2">
-          <UBadge
-            :color="
-              isOnline
-                ? 'success'
-                : 'warning'
-            "
-            variant="soft"
+        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+          <span
+            class="inline-flex items-center gap-1.5 font-medium"
+            :class="scheduleDeadlineColor === 'error' ? 'text-error' : scheduleDeadlineColor === 'warning' ? 'text-warning' : 'text-muted'"
           >
-            {{
-              isOnline
-                ? "Online"
-                : "Offline"
-            }}
-          </UBadge>
+            <UIcon name="i-lucide-clock-3" class="size-3.5" />
+            Closes in {{ formatTime(scheduleSeconds) }}
+          </span>
 
-          <UBadge
-            :color="
-              !isOnline
-              || pendingSync
-                ? 'warning'
-                : isSaving
-                  ? 'info'
-                  : 'success'
-            "
-            variant="soft"
+          <span
+            v-if="!isOnline"
+            class="inline-flex items-center gap-1.5 font-semibold text-warning"
           >
-            <UIcon
-              :name="saveStatusIcon"
-              class="mr-1 size-3.5"
-              :class="{
-                'animate-spin':
-                  isSaving,
-              }"
-            />
-            {{ saveStatusLabel }}
-            <span
-              v-if="
-                lastSyncedAt
-                && !pendingSync
-                && !isSaving
-                && isOnline
-              "
-              class="ml-1 hidden sm:inline"
-            >
-              · {{ formatSyncTime(lastSyncedAt) }}
-            </span>
-          </UBadge>
+            <UIcon name="i-lucide-wifi-off" class="size-3.5" />
+            Offline
+          </span>
 
-          <UBadge
-            :color="scheduleDeadlineColor"
-            variant="soft"
-            class="font-mono"
+          <span
+            v-else-if="isSaving || questionTimeoutSyncPending || questionTimeoutRetryCount > 0"
+            class="inline-flex items-center gap-1.5 font-semibold text-warning"
           >
-            Closes in
-            {{
-              formatTime(
-                scheduleSeconds,
-              )
-            }}
-          </UBadge>
-
-          <UBadge
-            v-if="integrityMonitoringActive"
-            :color="focusModeExited ? 'warning' : 'info'"
-            variant="soft"
-          >
-            <UIcon
-              :name="focusModeExited ? 'i-lucide-shield-alert' : 'i-lucide-shield-check'"
-              class="mr-1 size-3.5"
-            />
-            {{
-              focusModeExited
-                ? "Focus Mode exited"
-                : "Activity monitoring"
-            }}
-          </UBadge>
-
+            <UIcon name="i-lucide-loader-circle" class="size-3.5 animate-spin" />
+            {{ questionTransitioning ? "Moving to next question" : "Saving answer" }}
+          </span>
         </div>
       </div>
     </header>
 
-    <main class="mx-auto max-w-7xl p-4 lg:p-6">
+    <main class="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
       <UAlert
         v-if="errorMessage"
         class="mb-4"
@@ -3433,14 +3481,9 @@ onBeforeRouteLeave(
       <UAlert
         v-if="deadlineWarning"
         class="mb-4"
-        :color="
-          scheduleSeconds !== null
-          && scheduleSeconds <= 60
-            ? 'error'
-            : 'warning'
-        "
+        :color="scheduleSeconds !== null && scheduleSeconds <= 60 ? 'error' : 'warning'"
         variant="soft"
-        title="Class closing deadline is approaching"
+        title="Assessment closing soon"
         :description="deadlineWarning"
       />
 
@@ -3448,34 +3491,22 @@ onBeforeRouteLeave(
         v-if="focusGateRequired"
         class="mx-auto max-w-2xl"
       >
-        <div class="py-5 text-center">
-          <div class="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <UIcon
-              name="i-lucide-scan"
-              class="size-7"
-            />
+        <div class="py-4 text-center sm:py-6">
+          <div class="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <UIcon name="i-lucide-scan" class="size-6" />
           </div>
 
-          <h1 class="mt-4 text-2xl font-black text-highlighted">
+          <h1 class="mt-4 text-xl font-black text-highlighted sm:text-2xl">
             Enter Focus Mode
           </h1>
 
-          <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">
-            This assessment uses activity monitoring. Focus Mode helps keep the assessment active and records when you leave fullscreen or switch away from the assessment. These records do not automatically change your score.
+          <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted">
+            Focus Mode keeps the assessment fullscreen while activity monitoring is enabled. Leaving the assessment may be recorded for review, but does not automatically change your score.
           </p>
-
-          <UAlert
-            class="mt-5 text-left"
-            color="info"
-            variant="soft"
-            icon="i-lucide-timer-reset"
-            title="Your question timer has not started yet"
-            description="The first question will be delivered only after you enter Focus Mode."
-          />
 
           <UButton
             class="mt-5"
-            size="xl"
+            size="lg"
             icon="i-lucide-maximize"
             @click="enterFocusModeAndContinue"
           >
@@ -3486,348 +3517,279 @@ onBeforeRouteLeave(
 
       <div
         v-else-if="isLoading"
-        class="space-y-4"
+        class="mx-auto max-w-4xl space-y-4"
       >
-        <USkeleton class="h-12 rounded-xl" />
-        <USkeleton class="h-[34rem] rounded-xl" />
+        <USkeleton class="h-10 rounded-xl" />
+        <USkeleton class="h-[30rem] rounded-xl" />
       </div>
 
-      <template
-        v-else-if="
-          questionPayload
-        "
-      >
+      <template v-else-if="questionPayload">
         <div
           v-if="focusModeExited"
-          class="mb-4 flex flex-col gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4 sm:flex-row sm:items-center sm:justify-between"
+          class="mx-auto mb-4 flex max-w-4xl items-center justify-between gap-3 rounded-xl border border-warning/30 bg-warning/8 px-3 py-2.5"
         >
-          <div class="flex items-start gap-3">
+          <div class="flex min-w-0 items-center gap-2">
             <UIcon
               name="i-lucide-shield-alert"
-              class="mt-0.5 size-5 shrink-0 text-warning"
+              class="size-4 shrink-0 text-warning"
             />
-            <div>
-              <p class="font-bold text-highlighted">
-                Focus Mode is not active
-              </p>
-              <p class="mt-1 text-sm text-muted">
-                The fullscreen session was exited and the event was recorded. The question timer continues while Focus Mode is inactive.
-              </p>
-            </div>
+            <p class="truncate text-sm font-semibold text-highlighted">
+              Focus Mode exited. The timer is still running.
+            </p>
           </div>
 
           <UButton
             v-if="fullscreenSupported"
             color="warning"
             variant="soft"
+            size="xs"
             icon="i-lucide-maximize"
             class="shrink-0"
             @click="returnToFocusMode"
           >
-            Return to Focus Mode
+            Return
           </UButton>
         </div>
 
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p class="font-black text-highlighted">
-              Question
-              {{ currentIndex + 1 }}
-              of
-              {{ questionPayload.questionCount }}
-            </p>
+        <section class="mx-auto max-w-4xl">
+          <div class="mb-3 flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="text-sm font-black text-highlighted sm:text-base">
+                  Question {{ currentIndex + 1 }} of {{ questionPayload.questionCount }}
+                </p>
 
-            <p class="mt-1 text-sm text-muted">
-              {{ selectionInstruction }}
-            </p>
+                <span class="text-xs font-semibold text-muted">
+                  · {{ questionPayload.question.points }} {{ questionPayload.question.points === 1 ? "point" : "points" }}
+                </span>
+
+                <span
+                  v-if="questionPayload.question.questionType === 'checkbox' && requiredSelections !== null"
+                  class="text-xs font-semibold"
+                  :class="selectionRequirementMet ? 'text-success' : 'text-primary'"
+                >
+                  · {{ selectedAnswerCount }}/{{ requiredSelections }} selected
+                </span>
+              </div>
+
+              <p class="mt-1 text-sm text-muted">
+                {{ selectionInstruction }}
+              </p>
+            </div>
           </div>
 
-          <div class="flex flex-wrap gap-2">
-            <UBadge
-              color="neutral"
-              variant="soft"
-            >
-              {{ questionPayload.question.points }}
-              point{{
-                questionPayload.question.points === 1
-                  ? ""
-                  : "s"
-              }}
-            </UBadge>
+          <div class="mb-4 rounded-xl border border-default bg-elevated/40 px-3 py-3 sm:px-4">
+            <div class="flex items-center justify-between gap-4">
+              <div class="flex items-center gap-2">
+                <div class="flex size-8 items-center justify-center rounded-lg bg-default text-muted">
+                  <UIcon name="i-lucide-timer" class="size-4" />
+                </div>
+                <div>
+                  <p class="text-xs font-semibold text-muted">
+                    Question time
+                  </p>
+                  <p
+                    v-if="questionTransitioning"
+                    class="text-sm font-bold text-warning"
+                  >
+                    Time's up · moving on
+                  </p>
+                </div>
+              </div>
 
-            <UBadge
-              v-if="
-                questionPayload.question.questionType
-                === 'checkbox'
-                && requiredSelections !== null
-              "
-              :color="
-                selectionRequirementMet
-                  ? 'success'
-                  : 'primary'
-              "
-              variant="soft"
-            >
-              {{ selectedAnswerCount }} / {{ requiredSelections }} selected
-            </UBadge>
+              <span
+                class="shrink-0 font-mono text-xl font-black tabular-nums"
+                :class="{
+                  'text-error': questionTimerProgress <= 20,
+                  'text-warning': questionTimerProgress > 20 && questionTimerProgress <= 50,
+                }"
+              >
+                {{ formatTime(questionSeconds) }}
+              </span>
+            </div>
 
-            <UBadge
-              :color="
-                !isOnline
-                || pendingSync
-                  ? 'warning'
-                  : isSaving
-                    ? 'info'
-                    : 'success'
-              "
-              variant="soft"
+            <UProgress
+              class="mt-3"
+              :model-value="questionTimerProgress"
+              :max="100"
+              :color="questionTimerColor"
+              size="sm"
+            />
+
+            <div
+              v-if="questionTransitioning"
+              class="mt-2 flex items-center gap-2 text-xs font-semibold text-muted"
             >
               <UIcon
-                :name="saveStatusIcon"
-                class="mr-1 size-3.5"
-                :class="{
-                  'animate-spin':
-                    isSaving,
-                }"
+                v-if="isOnline"
+                name="i-lucide-loader-circle"
+                class="size-3.5 animate-spin text-warning"
               />
-              {{ saveStatusLabel }}
-            </UBadge>
-          </div>
-        </div>
-
-        <div class="mb-6 rounded-xl border border-default bg-elevated/50 p-4">
-          <div class="mb-2 flex items-center justify-between gap-3">
-            <div>
-              <p class="text-sm font-bold text-highlighted">
-                Answer time
-              </p>
-              <p class="text-xs text-muted">
-                This question has its own timer. When time runs out, the question closes and you move to the next question.
-              </p>
-            </div>
-
-            <span
-              class="shrink-0 font-mono text-lg font-black"
-              :class="{
-                'text-error':
-                  questionTimerProgress <= 20,
-                'text-warning':
-                  questionTimerProgress > 20
-                  && questionTimerProgress <= 50,
-              }"
-            >
-              {{ formatTime(questionSeconds) }}
-            </span>
-          </div>
-
-          <UProgress
-            :model-value="questionTimerProgress"
-            :max="100"
-            :color="questionTimerColor"
-            size="md"
-          />
-
-          <p
-            v-if="questionPayload.finalized"
-            class="mt-2 text-xs font-semibold text-muted"
-          >
-            This question is closed. You can review it and move to another question.
-          </p>
-
-          <p
-            v-else-if="
-              questionTimeoutSyncPending
-              && questionSeconds === 0
-            "
-            class="mt-2 text-xs font-semibold text-warning"
-          >
-            Time expired. Saving the question and preparing the next one...
-          </p>
-
-          <p
-            v-else-if="
-              questionTimeoutRetryCount > 0
-              && questionSeconds === 0
-            "
-            class="mt-2 text-xs font-semibold text-warning"
-          >
-            Time expired. We couldn't confirm the question yet, so SNCBT Assess is retrying automatically. Keep this page open.
-          </p>
-
-          <p
-            v-else-if="
-              questionTimeoutTriggered
-              && questionSeconds === 0
-            "
-            class="mt-2 text-xs font-semibold text-warning"
-          >
-            Time expired. Finalizing this question and preparing the next one...
-          </p>
-        </div>
-
-        <div ref="questionAreaRef">
-          <UCard>
-          <h1 class="text-2xl font-black leading-tight text-highlighted lg:text-3xl">
-            {{ questionPayload.question.questionText }}
-          </h1>
-
-          <img
-            v-if="questionPayload.question.imageUrl"
-            :src="questionPayload.question.imageUrl"
-            alt="Question illustration"
-            class="mt-6 max-h-80 w-full rounded-xl border border-default object-contain"
-          >
-
-          <div
-            v-if="isChoiceQuestion"
-            class="mt-8 grid gap-4 md:grid-cols-2"
-          >
-            <button
-              v-for="(option, index) in questionPayload.question.options"
-              :key="option.id"
-              type="button"
-              class="flex min-h-20 items-center gap-4 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
-              :class="
-                isSelected(option.id)
-                  ? 'border-primary bg-primary/10 ring-3 ring-primary/10'
-                  : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'
-              "
-              :disabled="isOptionChoiceDisabled(option.id)"
-              @click="selectOption(option.id)"
-            >
-              <span
-                class="flex size-9 shrink-0 items-center justify-center rounded-lg font-black"
-                :class="
-                  isSelected(option.id)
-                    ? 'bg-primary text-white'
-                    : 'bg-elevated text-muted'
-                "
-              >
-                {{ String.fromCharCode(65 + index) }}
+              <UIcon
+                v-else
+                name="i-lucide-wifi-off"
+                class="size-3.5 text-warning"
+              />
+              <span>
+                {{
+                  isOnline
+                    ? "Closing this question and opening the next one…"
+                    : "Connection lost. We'll continue automatically when you're back online."
+                }}
               </span>
-
-              <span class="font-bold text-highlighted">
-                {{ option.text }}
-              </span>
-            </button>
-          </div>
-
-          <div
-            v-else-if="questionPayload.question.questionType === 'fill_blank'"
-            class="mt-8 max-w-3xl"
-          >
-            <UFormField
-              label="Your answer"
-              help="Enter the word, phrase, or short answer that completes the question."
-            >
-              <UInput
-                v-model="textResponse"
-                size="xl"
-                class="w-full"
-                placeholder="Type your answer"
-                :maxlength="1000"
-                :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
-                @update:model-value="markAnswerChanged"
-              />
-            </UFormField>
-          </div>
-
-          <div
-            v-else-if="isTrueFalseQuestion"
-            class="mt-8 space-y-5"
-          >
-            <div class="grid gap-4 md:grid-cols-2">
-              <button
-                type="button"
-                class="flex min-h-20 items-center gap-4 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
-                :class="booleanResponse === true ? 'border-primary bg-primary/10 ring-3 ring-primary/10' : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'"
-                :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
-                @click="selectBoolean(true)"
-              >
-                <UIcon
-                  name="i-lucide-circle-check"
-                  class="size-6 shrink-0 text-success"
-                />
-                <span class="font-bold text-highlighted">True</span>
-              </button>
-
-              <button
-                type="button"
-                class="flex min-h-20 items-center gap-4 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
-                :class="booleanResponse === false ? 'border-primary bg-primary/10 ring-3 ring-primary/10' : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'"
-                :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
-                @click="selectBoolean(false)"
-              >
-                <UIcon
-                  name="i-lucide-circle-x"
-                  class="size-6 shrink-0 text-error"
-                />
-                <span class="font-bold text-highlighted">False</span>
-              </button>
             </div>
-
-            <UFormField
-              v-if="questionPayload.question.questionType === 'true_false_correction' && booleanResponse === false"
-              label="Why is it false?"
-              help="State the correction or provide the correct answer. This field is required when you choose False."
-              required
-            >
-              <UTextarea
-                v-model="textResponse"
-                :rows="4"
-                class="w-full"
-                placeholder="Explain why the statement is false or write the correct answer"
-                :maxlength="1000"
-                :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
-                @update:model-value="markAnswerChanged"
-              />
-            </UFormField>
           </div>
 
-          <div class="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-            <UButton
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-arrow-left"
-              :disabled="
-                !questionPayload.canGoPrevious
-                || isSaving
-                || (
-                  !questionPayload.finalized
-                  && (
-                    !selectionRequirementMet
-                    || questionTimeoutTriggered
-                    || questionSeconds === 0
-                  )
-                )
-              "
-              @click="goPrevious"
-            >
-              Previous
-            </UButton>
+          <div ref="questionAreaRef">
+            <UCard>
+              <h1 class="text-xl font-black leading-tight text-highlighted sm:text-2xl lg:text-3xl">
+                {{ questionPayload.question.questionText }}
+              </h1>
 
-            <UButton
-              :icon="
-                isLastQuestion
-                  ? 'i-lucide-send'
-                  : 'i-lucide-arrow-right'
-              "
-              :loading="isSaving"
-              :disabled="
-                !questionPayload.finalized
-                && (
-                  !selectionRequirementMet
-                  || questionTimeoutTriggered
-                  || questionSeconds === 0
-                )
-              "
-              @click="goNext"
-            >
-              {{ nextActionLabel }}
-            </UButton>
+              <img
+                v-if="questionPayload.question.imageUrl"
+                :src="questionPayload.question.imageUrl"
+                alt="Question illustration"
+                class="mt-5 max-h-80 w-full rounded-xl border border-default object-contain"
+              >
+
+              <div
+                v-if="questionTransitioning"
+                class="mt-7 flex min-h-44 flex-col items-center justify-center rounded-xl bg-elevated/55 px-5 text-center"
+                aria-live="polite"
+              >
+                <div class="flex size-11 items-center justify-center rounded-full bg-warning/10 text-warning">
+                  <UIcon name="i-lucide-arrow-right" class="size-5" />
+                </div>
+                <p class="mt-3 font-black text-highlighted">
+                  Time's up
+                </p>
+                <p class="mt-1 max-w-sm text-sm text-muted">
+                  This question is closed. SNCBT Assess is moving you to the next question automatically.
+                </p>
+                <UIcon
+                  v-if="isOnline"
+                  name="i-lucide-loader-circle"
+                  class="mt-4 size-5 animate-spin text-primary"
+                />
+              </div>
+
+              <template v-else>
+                <div
+                  v-if="isChoiceQuestion"
+                  class="mt-7 grid gap-3 md:grid-cols-2"
+                >
+                  <button
+                    v-for="(option, index) in questionPayload.question.options"
+                    :key="option.id"
+                    type="button"
+                    class="flex min-h-18 items-center gap-3 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
+                    :class="isSelected(option.id) ? 'border-primary bg-primary/10 ring-2 ring-primary/10' : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'"
+                    :disabled="isOptionChoiceDisabled(option.id)"
+                    @click="selectOption(option.id)"
+                  >
+                    <span
+                      class="flex size-9 shrink-0 items-center justify-center rounded-full font-black"
+                      :class="isSelected(option.id) ? 'bg-primary text-white' : 'bg-elevated text-muted'"
+                    >
+                      {{ String.fromCharCode(65 + index) }}
+                    </span>
+
+                    <span class="font-bold text-highlighted">
+                      {{ option.text }}
+                    </span>
+                  </button>
+                </div>
+
+                <div
+                  v-else-if="questionPayload.question.questionType === 'fill_blank'"
+                  class="mt-7 max-w-3xl"
+                >
+                  <UFormField label="Your answer">
+                    <UInput
+                      v-model="textResponse"
+                      size="xl"
+                      class="w-full"
+                      placeholder="Type your answer"
+                      :maxlength="1000"
+                      :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                      @update:model-value="markAnswerChanged"
+                    />
+                  </UFormField>
+                </div>
+
+                <div
+                  v-else-if="isTrueFalseQuestion"
+                  class="mt-7 space-y-5"
+                >
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      class="flex min-h-18 items-center gap-3 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
+                      :class="booleanResponse === true ? 'border-primary bg-primary/10 ring-2 ring-primary/10' : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'"
+                      :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                      @click="selectBoolean(true)"
+                    >
+                      <UIcon name="i-lucide-circle-check" class="size-6 shrink-0 text-success" />
+                      <span class="font-bold text-highlighted">True</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      class="flex min-h-18 items-center gap-3 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
+                      :class="booleanResponse === false ? 'border-primary bg-primary/10 ring-2 ring-primary/10' : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'"
+                      :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                      @click="selectBoolean(false)"
+                    >
+                      <UIcon name="i-lucide-circle-x" class="size-6 shrink-0 text-error" />
+                      <span class="font-bold text-highlighted">False</span>
+                    </button>
+                  </div>
+
+                  <UFormField
+                    v-if="questionPayload.question.questionType === 'true_false_correction' && booleanResponse === false"
+                    label="Correction"
+                    help="Write the correct statement or answer."
+                    required
+                  >
+                    <UTextarea
+                      v-model="textResponse"
+                      :rows="4"
+                      class="w-full"
+                      placeholder="Write the correction"
+                      :maxlength="1000"
+                      :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                      @update:model-value="markAnswerChanged"
+                    />
+                  </UFormField>
+                </div>
+
+                <div class="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-arrow-left"
+                    class="sm:w-auto"
+                    :disabled="!questionPayload.canGoPrevious || isSaving || (!questionPayload.finalized && (!selectionRequirementMet || questionTimeoutTriggered || questionSeconds === 0))"
+                    @click="goPrevious"
+                  >
+                    Previous
+                  </UButton>
+
+                  <UButton
+                    :icon="isLastQuestion ? 'i-lucide-send' : 'i-lucide-arrow-right'"
+                    :loading="isSaving"
+                    class="justify-center sm:w-auto"
+                    :disabled="!questionPayload.finalized && (!selectionRequirementMet || questionTimeoutTriggered || questionSeconds === 0)"
+                    @click="goNext"
+                  >
+                    {{ nextActionLabel }}
+                  </UButton>
+                </div>
+              </template>
+            </UCard>
           </div>
-          </UCard>
-        </div>
+        </section>
       </template>
     </main>
 

@@ -1,6 +1,7 @@
 import type {
   AttemptSelectionPolicyResponse,
   DeliveryQuestionPayload,
+  ExpireDeliveryQuestionResult,
   InstructorDeliveryListItem,
   InstructorDeliveryMonitor,
   SaveDeliveryAnswerResult,
@@ -47,54 +48,66 @@ export function useAssessmentDelivery() {
     functionName =
       "assessment-delivery",
   ): Promise<FunctionResult<T>> {
-    const timeoutMessage =
-      "__SNCBT_ASSESSMENT_REQUEST_TIMEOUT__";
-
     let timeoutId:
       ReturnType<typeof setTimeout>
       | null =
         null;
 
-    try {
-      const request =
-        supabase.functions
-          .invoke<T>(
-            functionName,
-            {
-              body: {
-                action,
-                ...(payload
-                  ? {
-                      payload,
-                    }
-                  : {}),
-              },
-            },
-          );
+    const controller =
+      new AbortController();
 
-      const timeout =
-        new Promise<never>(
-          (_, reject) => {
-            timeoutId =
-              setTimeout(
-                () =>
-                  reject(
-                    new Error(
-                      timeoutMessage,
-                    ),
-                  ),
-                timeoutMs,
-              );
+    let requestTimedOut =
+      false;
+
+    try {
+      timeoutId =
+        setTimeout(
+          () => {
+            requestTimedOut =
+              true;
+
+            // Supabase Functions supports AbortSignal. Cancelling the
+            // real fetch is important here: a Promise.race timeout
+            // leaves the original request running, which can overlap
+            // the timeout-recovery request for the same attempt row.
+            controller.abort();
           },
+          timeoutMs,
         );
 
       const {
         data,
         error,
-      } = await Promise.race([
-        request,
-        timeout,
-      ]);
+      } = await supabase.functions
+        .invoke<T>(
+          functionName,
+          {
+            body: {
+              action,
+              ...(payload
+                ? {
+                    payload,
+                  }
+                : {}),
+            },
+            signal:
+              controller.signal,
+          },
+        );
+
+      if (
+        requestTimedOut
+        || controller.signal.aborted
+      ) {
+        return {
+          data:
+            null,
+          error:
+            "We couldn't confirm that action in time. Your answer is still kept on this device and SNCBT Assess will recover automatically.",
+          code:
+            "REQUEST_TIMEOUT",
+        };
+      }
 
       if (error) {
         const parsed =
@@ -121,15 +134,19 @@ export function useAssessmentDelivery() {
       };
     } catch (error) {
       if (
-        error instanceof Error
-        && error.message
-          === timeoutMessage
+        requestTimedOut
+        || controller.signal.aborted
+        || (
+          error instanceof DOMException
+          && error.name
+            === "AbortError"
+        )
       ) {
         return {
           data:
             null,
           error:
-            "We couldn't confirm that action in time. Your selection is still kept on this device and can be retried.",
+            "We couldn't confirm that action in time. Your answer is still kept on this device and SNCBT Assess will recover automatically.",
           code:
             "REQUEST_TIMEOUT",
         };
@@ -326,7 +343,38 @@ export function useAssessmentDelivery() {
         finalize,
         commitForFeedback,
       },
-      8000,
+      finalize
+        ? 5000
+        : 8000,
+    );
+  }
+
+  async function expireQuestion(
+    attemptId: string,
+    questionId: string,
+    questionIndex: number,
+    answer: {
+      selectedOptionIds: string[];
+      textResponse: string | null;
+      booleanResponse: boolean | null;
+    },
+  ) {
+    return await invoke<
+      ExpireDeliveryQuestionResult
+    >(
+      "expire-question",
+      {
+        attemptId,
+        questionId,
+        questionIndex,
+        selectedOptionIds:
+          answer.selectedOptionIds,
+        textResponse:
+          answer.textResponse,
+        booleanResponse:
+          answer.booleanResponse,
+      },
+      12000,
     );
   }
 
@@ -406,6 +454,7 @@ export function useAssessmentDelivery() {
     getQuestion,
     getAttemptSelectionPolicy,
     saveAnswer,
+    expireQuestion,
     submitAttempt,
     getResult,
     getStudentLeaderboard,

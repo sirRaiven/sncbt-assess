@@ -37,6 +37,7 @@ const assessmentId = computed(
 const {
   getInstructorAssessment,
   publishAssessment,
+  returnAssessmentToDraft,
 } = useAssessments();
 
 const {
@@ -71,6 +72,7 @@ const deleteModalOpen = ref(false);
 const duplicateModalOpen = ref(false);
 const publishModalOpen = ref(false);
 const feedbackModalOpen = ref(false);
+const revisionModalOpen = ref(false);
 
 type FeedbackTone =
   | "primary"
@@ -128,8 +130,14 @@ function friendlyError(
     || normalized.includes(
       "already part of a student attempt",
     )
+    || normalized.includes(
+      "already been used in a student assessment",
+    )
+    || normalized.includes(
+      "editable revision",
+    )
   ) {
-    return "This question has already been used in a student assessment. It cannot be changed or deleted because previous student results must remain accurate. Create a new assessment or duplicate this assessment before making major changes.";
+    return "This assessment already has Student history. Create an editable revision so previous results remain unchanged while you edit and republish the new draft.";
   }
 
   if (
@@ -166,6 +174,83 @@ function friendlyError(
   }
 
   return fallback;
+}
+
+function isHistoryLocked(
+  code: string | null | undefined,
+  message: string | null | undefined,
+): boolean {
+  const normalized = String(
+    message || "",
+  ).toLowerCase();
+
+  return (
+    code === "QUESTION_HISTORY_LOCKED"
+    || code === "ASSESSMENT_HISTORY_LOCKED"
+    || normalized.includes(
+      "already been used in a student assessment",
+    )
+    || normalized.includes(
+      "previous student results must remain accurate",
+    )
+    || normalized.includes(
+      "editable revision",
+    )
+  );
+}
+
+function requestEditableRevision(): void {
+  feedbackModalOpen.value = false;
+  deleteModalOpen.value = false;
+  duplicateModalOpen.value = false;
+  revisionModalOpen.value = true;
+}
+
+async function createEditableRevision(): Promise<void> {
+  if (!assessment.value) {
+    return;
+  }
+
+  isRunningAction.value = true;
+
+  const result =
+    await returnAssessmentToDraft(
+      assessment.value.id,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    revisionModalOpen.value = false;
+
+    showFeedback(
+      "Editable draft was not created",
+      friendlyError(
+        result.error,
+        "SNCBT Assess could not create a safe editable revision. Please try again.",
+      ),
+      "error",
+      "i-lucide-circle-alert",
+    );
+
+    isRunningAction.value = false;
+    return;
+  }
+
+  revisionModalOpen.value = false;
+
+  toast.add({
+    title: result.data.createdRevision
+      ? "Editable revision created"
+      : "Assessment ready to edit",
+    description: result.data.message,
+    color: "success",
+  });
+
+  await navigateTo(
+    `/instructor/assessments/${result.data.assessment.id}/edit`,
+  );
 }
 
 const editor = reactive<{
@@ -364,6 +449,15 @@ function startNewQuestion(): void {
 
   formError.value =
     "";
+
+  nextTick(() => {
+    document
+      .getElementById("active-question-editor")
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+  });
 }
 
 function selectQuestion(
@@ -424,132 +518,9 @@ function selectQuestion(
     "";
 }
 
-function changeQuestionType(
-  value: AssessmentQuestionType,
-): void {
-  editor.questionType =
-    value;
 
-  if (
-    isChoiceQuestionType(
-      value,
-    )
-  ) {
-    if (editor.options.length < 2) {
-      editor.options =
-        emptyOptions();
-    }
 
-    editor.acceptedAnswersText =
-      "";
-    editor.correctBoolean =
-      null;
 
-    if (value === "multiple_choice") {
-      const firstCorrect =
-        editor.options.findIndex(
-          (option) =>
-            option.isCorrect,
-        );
-
-      editor.options.forEach(
-        (
-          option,
-          index,
-        ) => {
-          option.isCorrect =
-            index
-            === (
-              firstCorrect >= 0
-                ? firstCorrect
-                : 0
-            );
-        },
-      );
-    }
-
-    return;
-  }
-
-  if (value === "fill_blank") {
-    editor.correctBoolean =
-      null;
-    return;
-  }
-
-  if (
-    isTrueFalseQuestionType(
-      value,
-    )
-  ) {
-    editor.correctBoolean =
-      editor.correctBoolean
-      ?? true;
-
-    if (
-      value === "true_false"
-      || editor.correctBoolean
-        === true
-    ) {
-      editor.acceptedAnswersText =
-        "";
-    }
-  }
-}
-
-function setMultipleChoiceCorrect(
-  selectedIndex: number,
-): void {
-  editor.options.forEach(
-    (
-      option,
-      index,
-    ) => {
-      option.isCorrect =
-        index === selectedIndex;
-    },
-  );
-}
-
-function addOption(): void {
-  if (
-    editor.options.length >= 5
-  ) {
-    return;
-  }
-
-  editor.options.push({
-    text: "",
-    isCorrect: false,
-  });
-}
-
-function removeOption(
-  index: number,
-): void {
-  if (
-    editor.options.length <= 2
-  ) {
-    return;
-  }
-
-  editor.options.splice(
-    index,
-    1,
-  );
-
-  if (
-    editor.questionType
-      === "multiple_choice"
-    && !editor.options.some(
-      (option) =>
-        option.isCorrect,
-    )
-  ) {
-    editor.options[0].isCorrect =
-      true;
-  }
-}
 
 function validateEditor(): string | null {
   if (
@@ -862,23 +833,19 @@ async function save(): Promise<void> {
     return;
   }
 
-  isSaving.value =
-    true;
+  isSaving.value = true;
+  formError.value = "";
 
-  formError.value =
-    "";
-
-  const payload =
-    getEditorPayload();
+  const payload = getEditorPayload();
+  const wasCreating = isCreating.value;
 
   let result;
 
-  if (isCreating.value) {
-    result =
-      await createQuestion(
-        assessmentId.value,
-        payload,
-      );
+  if (wasCreating) {
+    result = await createQuestion(
+      assessmentId.value,
+      payload,
+    );
   } else {
     const questionId =
       selectedQuestionId.value;
@@ -894,24 +861,30 @@ async function save(): Promise<void> {
         "i-lucide-mouse-pointer-click",
       );
 
-      isSaving.value =
-        false;
-
+      isSaving.value = false;
       return;
     }
 
-    result =
-      await updateQuestion(
-        assessmentId.value,
-        questionId,
-        payload,
-      );
+    result = await updateQuestion(
+      assessmentId.value,
+      questionId,
+      payload,
+    );
   }
 
-  if (
-    result.error
-    || !result.data
-  ) {
+  if (result.error || !result.data) {
+    if (
+      isHistoryLocked(
+        result.code,
+        result.error,
+      )
+    ) {
+      formError.value = "";
+      isSaving.value = false;
+      requestEditableRevision();
+      return;
+    }
+
     formError.value = friendlyError(
       result.error,
       "The question could not be saved. Review the information and try again.",
@@ -924,36 +897,54 @@ async function save(): Promise<void> {
       "i-lucide-circle-alert",
     );
 
-    isSaving.value =
-      false;
-
+    isSaving.value = false;
     return;
   }
 
-  selectedQuestionId.value =
-    result.data.question.id;
+  const savedQuestion =
+    result.data.question;
+
+  if (wasCreating) {
+    questions.value = [
+      ...questions.value,
+      savedQuestion,
+    ].sort(
+      (first, second) =>
+        first.order_number
+        - second.order_number,
+    );
+  } else {
+    const questionIndex =
+      questions.value.findIndex(
+        (question) =>
+          question.id
+          === savedQuestion.id,
+      );
+
+    if (questionIndex >= 0) {
+      questions.value.splice(
+        questionIndex,
+        1,
+        savedQuestion,
+      );
+    }
+  }
+
+  // Keep the editor and card list in sync locally. This avoids the old
+  // full list refetch that made the question cards visibly reload.
+  selectQuestion(savedQuestion);
 
   duplicateModalOpen.value = false;
 
   toast.add({
-    title:
-      isCreating.value
-        ? "Question added"
-        : "Question updated",
-
-    description:
-      result.data.message,
-
-    color:
-      "success",
+    title: wasCreating
+      ? "Question added"
+      : "Question saved",
+    description: result.data.message,
+    color: "success",
   });
 
-  await loadData(
-    true,
-  );
-
-  isSaving.value =
-    false;
+  isSaving.value = false;
 }
 
 function requestDuplicateSelected(): void {
@@ -975,8 +966,7 @@ async function duplicateSelected(): Promise<void> {
     return;
   }
 
-  isRunningAction.value =
-    true;
+  isRunningAction.value = true;
 
   const result =
     await duplicateQuestion(
@@ -987,6 +977,17 @@ async function duplicateSelected(): Promise<void> {
     result.error
     || !result.data
   ) {
+    if (
+      isHistoryLocked(
+        result.code,
+        result.error,
+      )
+    ) {
+      isRunningAction.value = false;
+      requestEditableRevision();
+      return;
+    }
+
     duplicateModalOpen.value = false;
 
     showFeedback(
@@ -999,30 +1000,35 @@ async function duplicateSelected(): Promise<void> {
       "i-lucide-circle-alert",
     );
 
-    isRunningAction.value =
-      false;
-
+    isRunningAction.value = false;
     return;
   }
 
-  selectedQuestionId.value =
-    result.data.question.id;
+  const duplicatedQuestion =
+    result.data.question;
 
-  toast.add({
-    title:
-      "Question duplicated",
-    description:
-      result.data.message,
-    color:
-      "success",
-  });
-
-  await loadData(
-    true,
+  questions.value = [
+    ...questions.value,
+    duplicatedQuestion,
+  ].sort(
+    (first, second) =>
+      first.order_number
+      - second.order_number,
   );
 
-  isRunningAction.value =
-    false;
+  selectQuestion(
+    duplicatedQuestion,
+  );
+
+  duplicateModalOpen.value = false;
+
+  toast.add({
+    title: "Question duplicated",
+    description: result.data.message,
+    color: "success",
+  });
+
+  isRunningAction.value = false;
 }
 
 function requestRemoveSelected(): void {
@@ -1044,18 +1050,38 @@ async function removeSelected(): Promise<void> {
     return;
   }
 
-  isRunningAction.value =
-    true;
+  const removedQuestionId =
+    selectedQuestion.value.id;
+
+  const removedIndex =
+    questions.value.findIndex(
+      (question) =>
+        question.id
+        === removedQuestionId,
+    );
+
+  isRunningAction.value = true;
 
   const result =
     await deleteQuestion(
-      selectedQuestion.value.id,
+      removedQuestionId,
     );
 
   if (
     result.error
     || !result.data
   ) {
+    if (
+      isHistoryLocked(
+        result.code,
+        result.error,
+      )
+    ) {
+      isRunningAction.value = false;
+      requestEditableRevision();
+      return;
+    }
+
     deleteModalOpen.value = false;
 
     showFeedback(
@@ -1068,32 +1094,40 @@ async function removeSelected(): Promise<void> {
       "i-lucide-circle-alert",
     );
 
-    isRunningAction.value =
-      false;
-
+    isRunningAction.value = false;
     return;
   }
 
-  selectedQuestionId.value =
-    null;
+  questions.value =
+    questions.value.filter(
+      (question) =>
+        question.id
+        !== removedQuestionId,
+    );
 
   deleteModalOpen.value = false;
 
+  const nextQuestion =
+    questions.value[
+      Math.min(
+        Math.max(removedIndex, 0),
+        questions.value.length - 1,
+      )
+    ];
+
+  if (nextQuestion) {
+    selectQuestion(nextQuestion);
+  } else {
+    startNewQuestion();
+  }
+
   toast.add({
-    title:
-      "Question deleted",
-    description:
-      result.data.message,
-    color:
-      "success",
+    title: "Question deleted",
+    description: result.data.message,
+    color: "success",
   });
 
-  await loadData(
-    false,
-  );
-
-  isRunningAction.value =
-    false;
+  isRunningAction.value = false;
 }
 
 async function moveQuestion(
@@ -1115,13 +1149,15 @@ async function moveQuestion(
     return;
   }
 
+  const previousOrder = [
+    ...questions.value,
+  ];
+
   const reordered = [
     ...questions.value,
   ];
 
-  const [
-    moved,
-  ] = reordered.splice(
+  const [moved] = reordered.splice(
     index,
     1,
   );
@@ -1133,12 +1169,18 @@ async function moveQuestion(
   );
 
   questions.value =
-    reordered;
+    reordered.map(
+      (question, questionIndex) => ({
+        ...question,
+        order_number:
+          questionIndex + 1,
+      }),
+    );
 
   const result =
     await reorderQuestions(
       assessmentId.value,
-      reordered.map(
+      questions.value.map(
         (question) =>
           question.id,
       ),
@@ -1148,6 +1190,19 @@ async function moveQuestion(
     result.error
     || !result.data
   ) {
+    questions.value =
+      previousOrder;
+
+    if (
+      isHistoryLocked(
+        result.code,
+        result.error,
+      )
+    ) {
+      requestEditableRevision();
+      return;
+    }
+
     showFeedback(
       "Question order was not saved",
       friendlyError(
@@ -1157,17 +1212,7 @@ async function moveQuestion(
       "error",
       "i-lucide-circle-alert",
     );
-
-    await loadData(
-      true,
-    );
-
-    return;
   }
-
-  await loadData(
-    true,
-  );
 }
 
 function requestPublish(): void {
@@ -1257,12 +1302,53 @@ async function publish(): Promise<void> {
       "success",
   });
 
-  await loadData(
-    true,
-  );
+  assessment.value = {
+    ...assessment.value,
+    ...result.data.assessment,
+  };
 
   isRunningAction.value =
     false;
+}
+
+async function handleQuestionsImported(): Promise<void> {
+  const result =
+    await listQuestions(
+      assessmentId.value,
+    );
+
+  if (result.error || !result.data) {
+    showFeedback(
+      "Imported questions need a refresh",
+      friendlyError(
+        result.error,
+        "The questions were imported, but the updated list could not be refreshed. Reload the page to see the new questions.",
+      ),
+      "warning",
+      "i-lucide-refresh-cw",
+    );
+    return;
+  }
+
+  questions.value =
+    result.data.questions;
+
+  const existingSelection =
+    questions.value.find(
+      (question) =>
+        question.id
+        === selectedQuestionId.value,
+    );
+
+  if (existingSelection) {
+    selectQuestion(existingSelection);
+  } else if (questions.value.length > 0) {
+    selectQuestion(
+      questions.value[questions.value.length - 1],
+    );
+  } else {
+    startNewQuestion();
+  }
 }
 
 onMounted(
@@ -1276,24 +1362,17 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
-      eyebrow="Question Builder"
-      :title="
-        assessment?.title
-        || 'Assessment questions'
-      "
-      description="Create and organize multiple-choice, checkbox, fill-in-the-blank, and true-or-false questions before publishing."
+      :breadcrumbs="[
+        { label: 'Overview', to: '/instructor/dashboard', icon: 'i-lucide-layout-dashboard' },
+        { label: 'Assessments', to: '/instructor/assessments' },
+        { label: assessment?.title || 'Assessment' },
+        { label: 'Questions' },
+      ]"
+      eyebrow="Questions"
+      :title="assessment?.title || 'Assessment questions'"
+      description="Build, organize, and import questions in one continuous workspace."
     >
       <template #actions>
-        <UButton
-          v-if="isDraft"
-          :to="`/instructor/assessments/${assessmentId}/import`"
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-file-spreadsheet"
-        >
-          Import Excel
-        </UButton>
-
         <UButton
           :to="`/instructor/assessments/${assessmentId}/settings`"
           color="neutral"
@@ -1309,7 +1388,7 @@ onMounted(
           variant="outline"
           icon="i-lucide-eye"
         >
-          Preview as Student
+          Preview
         </UButton>
 
         <UButton
@@ -1317,9 +1396,7 @@ onMounted(
           color="success"
           icon="i-lucide-send"
           :loading="isRunningAction"
-          :disabled="
-            questions.length === 0
-          "
+          :disabled="questions.length === 0"
           @click="requestPublish"
         >
           Publish Assessment
@@ -1327,46 +1404,44 @@ onMounted(
       </template>
     </PageHeader>
 
+    <AssessmentWorkspaceNavigation
+      :assessment-id="assessmentId"
+      active="questions"
+    />
+
     <div
-      v-if="
-        assessment
-        && !isDraft
-      "
+      v-if="assessment && !isDraft"
       class="flex items-start gap-3 rounded-xl border border-default bg-elevated/60 p-4"
     >
       <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
         <UIcon
-          :name="
-            assessment.status === 'published'
-              ? 'i-lucide-circle-check'
-              : 'i-lucide-archive'
-          "
+          :name="assessment.status === 'published' ? 'i-lucide-circle-check' : 'i-lucide-archive'"
           class="size-5"
         />
       </div>
 
       <div>
         <p class="font-bold text-highlighted">
-          {{
-            assessment.status === 'published'
-              ? 'This assessment is published'
-              : 'This assessment is archived'
-          }}
+          {{ assessment.status === 'published' ? 'Published assessment' : 'Archived assessment' }}
         </p>
-
         <p class="mt-1 text-sm text-muted">
-          Questions are currently view-only. Open Assessment Settings to return the assessment to draft before editing.
+          Questions are view-only. Return the assessment to draft from Settings before editing.
         </p>
       </div>
     </div>
 
     <div
       v-if="isLoading"
-      class="grid gap-6 xl:grid-cols-[280px_1fr_310px]"
+      class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]"
     >
-      <USkeleton class="h-96 rounded-xl" />
-      <USkeleton class="h-[620px] rounded-xl" />
-      <USkeleton class="h-96 rounded-xl" />
+      <div class="space-y-4">
+        <USkeleton class="h-[520px] rounded-xl" />
+        <USkeleton class="h-32 rounded-xl" />
+      </div>
+      <div class="space-y-4">
+        <USkeleton class="h-64 rounded-xl" />
+        <USkeleton class="h-64 rounded-xl" />
+      </div>
     </div>
 
     <EmptyPanel
@@ -1378,11 +1453,7 @@ onMounted(
       <template #actions>
         <UButton
           icon="i-lucide-refresh-cw"
-          @click="
-            loadData(
-              false,
-            )
-          "
+          @click="loadData(false)"
         >
           Try Again
         </UButton>
@@ -1391,110 +1462,100 @@ onMounted(
 
     <div
       v-else-if="assessment"
-      class="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_310px]"
+      class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]"
     >
-      <UCard class="h-fit xl:sticky xl:top-24">
-        <template #header>
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <h2 class="font-bold text-highlighted">
+      <main class="min-w-0 space-y-4">
+        <div class="flex flex-col gap-3 rounded-xl border border-default bg-default/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="font-black text-highlighted">
                 Questions
               </h2>
-
-              <p class="text-xs text-muted">
+              <UBadge color="neutral" variant="soft">
                 {{ questions.length }}
-                total
-              </p>
+              </UBadge>
             </div>
-
-            <UButton
-              icon="i-lucide-plus"
-              size="sm"
-              :disabled="!isDraft"
-              aria-label="Add question"
-              @click="startNewQuestion"
-            />
+            <p class="mt-1 text-sm text-muted">
+              Select any card to edit it. Changes update without reloading the question list.
+            </p>
           </div>
-        </template>
 
-        <div
-          v-if="questions.length === 0"
-          class="py-6 text-center"
-        >
-          <UIcon
-            name="i-lucide-list-plus"
-            class="mx-auto size-7 text-muted"
-          />
-
-          <p class="mt-3 text-sm font-semibold text-highlighted">
-            No saved questions
-          </p>
-
-          <p class="mt-1 text-xs leading-5 text-muted">
-            Complete the editor and save your first question.
-          </p>
+          <UButton
+            v-if="isDraft"
+            icon="i-lucide-plus"
+            @click="startNewQuestion"
+          >
+            Add question
+          </UButton>
         </div>
 
-        <div
-          v-else
-          class="space-y-2"
+        <template
+          v-for="(question, index) in questions"
+          :key="question.id"
         >
           <div
-            v-for="(
-              question,
-              index
-            ) in questions"
-            :key="question.id"
-            class="rounded-lg border p-2 transition"
-            :class="
-              selectedQuestionId
-                === question.id
-                ? 'border-primary bg-primary/5'
-                : 'border-default'
-            "
+            v-if="!isCreating && selectedQuestionId === question.id"
+            id="active-question-editor"
+          >
+            <AssessmentQuestionEditorCard
+              :key="question.id"
+              :editor="editor"
+              :question-number="index + 1"
+              :is-creating="false"
+              :is-draft="isDraft"
+              :is-saving="isSaving"
+              :is-running-action="isRunningAction"
+              :form-error="formError"
+              @save="save"
+              @duplicate="requestDuplicateSelected"
+              @delete="requestRemoveSelected"
+            />
+          </div>
+
+          <UCard
+            v-else
+            class="transition hover:border-primary/45 hover:shadow-sm"
+            :ui="{
+              body: 'p-0 sm:p-0',
+            }"
           >
             <button
               type="button"
-              class="flex w-full items-start gap-3 p-1 text-left"
-              @click="
-                selectQuestion(
-                  question,
-                )
-              "
+              class="flex w-full items-start gap-4 px-5 py-5 text-left sm:px-6"
+              :aria-label="`Edit question ${index + 1}: ${question.question_text}`"
+              @click="selectQuestion(question)"
             >
-              <span
-                class="flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-black"
-                :class="
-                  selectedQuestionId
-                    === question.id
-                    ? 'bg-primary text-white'
-                    : 'bg-elevated text-muted'
-                "
-              >
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-elevated text-sm font-black text-muted">
                 {{ index + 1 }}
               </span>
 
               <div class="min-w-0 flex-1">
-                <p class="line-clamp-2 text-sm font-semibold text-highlighted">
+                <p class="line-clamp-2 font-semibold leading-6 text-highlighted">
                   {{ question.question_text }}
                 </p>
-
-                <p class="mt-1 text-xs text-muted">
-                  {{
-                    assessmentQuestionTypeLabel(
-                      question.question_type,
-                    )
-                  }}
-                  ·
-                  {{ question.points }}
-                  pt
-                </p>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <UBadge color="neutral" variant="soft" size="sm">
+                    {{ assessmentQuestionTypeLabel(question.question_type) }}
+                  </UBadge>
+                  <span class="text-xs text-muted">
+                    {{ question.points }} pt{{ Number(question.points) === 1 ? '' : 's' }}
+                  </span>
+                  <span class="text-xs text-muted">·</span>
+                  <span class="text-xs text-muted">
+                    {{ question.time_limit_seconds }} sec
+                  </span>
+                </div>
               </div>
+
+              <UIcon
+                name="i-lucide-pencil"
+                class="mt-1 size-4 shrink-0 text-muted"
+              />
             </button>
 
             <div
               v-if="isDraft"
-              class="mt-2 flex justify-end gap-1 border-t border-default pt-2"
+              class="flex justify-end gap-1 border-t border-default px-4 py-2"
             >
               <UButton
                 color="neutral"
@@ -1502,393 +1563,83 @@ onMounted(
                 size="xs"
                 icon="i-lucide-arrow-up"
                 :disabled="index === 0"
-                aria-label="Move question up"
-                @click="
-                  moveQuestion(
-                    index,
-                    -1,
-                  )
-                "
+                :aria-label="`Move question ${index + 1} up`"
+                @click="moveQuestion(index, -1)"
               />
-
               <UButton
                 color="neutral"
                 variant="ghost"
                 size="xs"
                 icon="i-lucide-arrow-down"
-                :disabled="
-                  index
-                  === questions.length - 1
-                "
-                aria-label="Move question down"
-                @click="
-                  moveQuestion(
-                    index,
-                    1,
-                  )
-                "
+                :disabled="index === questions.length - 1"
+                :aria-label="`Move question ${index + 1} down`"
+                @click="moveQuestion(index, 1)"
               />
             </div>
-          </div>
-        </div>
-      </UCard>
-
-      <UCard>
-        <template #header>
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p class="text-xs font-bold uppercase tracking-[0.16em] text-primary">
-                {{
-                  isCreating
-                    ? 'New question'
-                    : `Question ${
-                        questions.findIndex(
-                          (question) =>
-                            question.id
-                            === selectedQuestionId,
-                        ) + 1
-                      }`
-                }}
-              </p>
-
-              <h2 class="mt-1 font-bold text-highlighted">
-                {{
-                  isCreating
-                    ? 'Create question'
-                    : 'Edit question'
-                }}
-              </h2>
-            </div>
-
-            <div
-              v-if="
-                !isCreating
-                && isDraft
-              "
-              class="flex gap-2"
-            >
-              <UButton
-                color="neutral"
-                variant="ghost"
-                icon="i-lucide-copy-plus"
-                :loading="isRunningAction"
-                @click="requestDuplicateSelected"
-              >
-                Duplicate
-              </UButton>
-
-              <UButton
-                color="error"
-                variant="ghost"
-                icon="i-lucide-trash-2"
-                :disabled="isRunningAction"
-                @click="requestRemoveSelected"
-              >
-                Delete
-              </UButton>
-            </div>
-          </div>
+          </UCard>
         </template>
 
-        <fieldset
-          class="space-y-6"
-          :disabled="!isDraft"
+        <div
+          v-if="isCreating"
+          id="active-question-editor"
         >
-          <UFormField
-            label="Question type"
-            required
-          >
-            <USelect
-              :model-value="editor.questionType"
-              :items="[
-                {
-                  label: 'Multiple Choice',
-                  value: 'multiple_choice',
-                },
-                {
-                  label: 'Checkbox',
-                  value: 'checkbox',
-                },
-                {
-                  label: 'Fill in the Blanks',
-                  value: 'fill_blank',
-                },
-                {
-                  label: 'True or False',
-                  value: 'true_false',
-                },
-                {
-                  label: 'True or False + Correction',
-                  value: 'true_false_correction',
-                },
-              ]"
-              value-key="value"
-              label-key="label"
-              class="w-full"
-              @update:model-value="
-                changeQuestionType(
-                  $event as AssessmentQuestionType,
-                )
-              "
-            />
-          </UFormField>
+          <AssessmentQuestionEditorCard
+            key="new-question"
+            :editor="editor"
+            :question-number="questions.length + 1"
+            :is-creating="true"
+            :is-draft="isDraft"
+            :is-saving="isSaving"
+            :is-running-action="isRunningAction"
+            :form-error="formError"
+            @save="save"
+          />
+        </div>
 
-          <UFormField
-            label="Question text"
-            required
-          >
-            <UTextarea
-              v-model="editor.questionText"
-              :rows="5"
-              class="w-full"
-              placeholder="Write a clear question."
-            />
-          </UFormField>
+        <button
+          v-if="isDraft && !isCreating"
+          type="button"
+          class="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-default px-5 py-5 text-sm font-semibold text-muted transition hover:border-primary hover:bg-primary/5 hover:text-primary"
+          @click="startNewQuestion"
+        >
+          <UIcon name="i-lucide-plus-circle" class="size-5" />
+          Add another question
+        </button>
+      </main>
 
-          <div
-            v-if="isChoiceQuestion"
-          >
-            <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p class="font-semibold text-highlighted">
-                  Answer choices
-                </p>
+      <aside class="space-y-4 xl:sticky xl:top-24 xl:h-fit">
+        <AssessmentExcelImportPanel
+          :assessment-id="assessmentId"
+          :disabled="!isDraft"
+          @imported="handleQuestionsImported"
+          @history-locked="requestEditableRevision"
+        />
 
-                <p class="mt-1 text-xs text-muted">
-                  {{
-                    editor.questionType
-                      === 'multiple_choice'
-                      ? 'Select exactly one correct choice.'
-                      : 'Select every correct choice.'
-                  }}
-                </p>
-              </div>
-
-              <UButton
-                color="neutral"
-                variant="outline"
-                size="sm"
-                icon="i-lucide-plus"
-                :disabled="editor.options.length >= 5"
-                @click="addOption"
-              >
-                Add Choice
-              </UButton>
-            </div>
-
-            <div
-              v-if="duplicateOptionWarning"
-              class="mb-3 flex items-center gap-2 text-sm text-warning"
-            >
-              <UIcon
-                name="i-lucide-triangle-alert"
-                class="size-4 shrink-0"
-              />
-
-              <span>
-                Each answer choice should use different text.
-              </span>
-            </div>
-
-            <div class="space-y-3">
-              <div
-                v-for="(option, index) in editor.options"
-                :key="index"
-                class="flex items-center gap-3 rounded-xl border border-default p-3 focus-within:border-primary focus-within:ring-3 focus-within:ring-primary/10"
-              >
-                <input
-                  v-if="editor.questionType === 'multiple_choice'"
-                  type="radio"
-                  :name="`correct-${assessmentId}`"
-                  :checked="option.isCorrect"
-                  class="size-4 accent-brand-600"
-                  @change="setMultipleChoiceCorrect(index)"
-                >
-
-                <input
-                  v-else
-                  v-model="option.isCorrect"
-                  type="checkbox"
-                  class="size-4 accent-brand-600"
-                >
-
-                <UInput
-                  v-model="option.text"
-                  variant="none"
-                  class="w-full"
-                  :placeholder="`Choice ${index + 1}`"
-                />
-
-                <UButton
-                  color="neutral"
-                  variant="ghost"
-                  icon="i-lucide-x"
-                  size="sm"
-                  :disabled="editor.options.length <= 2"
-                  :aria-label="`Remove choice ${index + 1}`"
-                  @click="removeOption(index)"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-else-if="editor.questionType === 'fill_blank'"
-            class="rounded-xl border border-default bg-elevated/40 p-4"
-          >
-            <UFormField
-              label="Accepted answer(s)"
-              help="Enter one accepted answer per line. Matching ignores capitalization, extra spaces, and leading or trailing spaces."
-              required
-            >
-              <UTextarea
-                v-model="editor.acceptedAnswersText"
-                :rows="5"
-                class="w-full"
-                placeholder="Example answer\nAnother acceptable spelling"
-              />
-            </UFormField>
-          </div>
-
-          <div
-            v-else-if="isTrueFalseQuestion"
-            class="space-y-4 rounded-xl border border-default bg-elevated/40 p-4"
-          >
-            <div>
-              <p class="font-semibold text-highlighted">
-                Correct answer
-              </p>
-              <p class="mt-1 text-xs text-muted">
-                Select the correct truth value for this statement.
-              </p>
-            </div>
-
-            <div class="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                class="rounded-xl border p-4 text-left transition"
-                :class="editor.correctBoolean === true ? 'border-success bg-success/10' : 'border-default hover:border-success/40'"
-                @click="editor.correctBoolean = true; editor.acceptedAnswersText = ''"
-              >
-                <div class="flex items-center gap-3">
-                  <UIcon
-                    name="i-lucide-circle-check"
-                    class="size-5 text-success"
-                  />
-                  <span class="font-bold text-highlighted">True</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                class="rounded-xl border p-4 text-left transition"
-                :class="editor.correctBoolean === false ? 'border-error bg-error/10' : 'border-default hover:border-error/40'"
-                @click="editor.correctBoolean = false"
-              >
-                <div class="flex items-center gap-3">
-                  <UIcon
-                    name="i-lucide-circle-x"
-                    class="size-5 text-error"
-                  />
-                  <span class="font-bold text-highlighted">False</span>
-                </div>
-              </button>
-            </div>
-
-            <div
-              v-if="editor.questionType === 'true_false_correction'"
-              class="rounded-xl border border-primary/20 bg-primary/5 p-4"
-            >
-              <p class="text-sm font-semibold text-highlighted">
-                False-answer correction
-              </p>
-              <p class="mt-1 text-xs leading-5 text-muted">
-                Students who choose False will also be asked to state why the statement is false or provide the correct answer.
-              </p>
-
-              <UFormField
-                v-if="editor.correctBoolean === false"
-                class="mt-4"
-                label="Accepted correction(s)"
-                help="One accepted correction per line. The student must answer False and match one of these corrections to receive the point."
-                required
-              >
-                <UTextarea
-                  v-model="editor.acceptedAnswersText"
-                  :rows="4"
-                  class="w-full"
-                  placeholder="Write the correct statement or answer"
-                />
-              </UFormField>
-
-              <p
-                v-else
-                class="mt-3 text-xs text-muted"
-              >
-                Because True is the correct answer, a student choosing False remains incorrect even if they enter a correction.
-              </p>
-            </div>
-          </div>
-
-          <UFormField
-            label="Question image"
-            help="Optional. Paste the web address of an image for this question."
-          >
-            <UInput
-              v-model="editor.imageUrl"
-              type="url"
-              icon="i-lucide-image"
-              class="w-full"
-              placeholder="https://example.com/question-image.png"
-            />
-          </UFormField>
-
-          <div
-            v-if="editor.imageUrl"
-            class="overflow-hidden rounded-xl border border-default bg-elevated p-3"
-          >
-            <img
-              :src="editor.imageUrl"
-              alt="Question image preview"
-              class="mx-auto max-h-64 rounded-lg object-contain"
-            >
-          </div>
-
-          <UFormField
-            label="Answer explanation"
-            help="Optional. Students may see this after submitting when results are released."
-          >
-            <UTextarea
-              v-model="editor.explanation"
-              :rows="5"
-              class="w-full"
-              placeholder="Explain why the selected answer is correct."
-            />
-          </UFormField>
-
-          <div class="flex justify-end">
-            <UButton
-              size="lg"
-              icon="i-lucide-save"
-              :loading="isSaving"
-              @click="save"
-            >
-              {{
-                isCreating
-                  ? 'Add Question'
-                  : 'Save Question'
-              }}
-            </UButton>
-          </div>
-        </fieldset>
-      </UCard>
-
-      <div class="space-y-6 xl:sticky xl:top-24 xl:h-fit">
         <UCard>
           <template #header>
-            <h2 class="font-bold text-highlighted">
-              Question settings
-            </h2>
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h2 class="font-bold text-highlighted">
+                  Question settings
+                </h2>
+                <p class="text-xs text-muted">
+                  Applies to the active question.
+                </p>
+              </div>
+
+              <UBadge color="primary" variant="soft" size="sm">
+                Q{{
+                  isCreating
+                    ? questions.length + 1
+                    : Math.max(
+                        questions.findIndex(
+                          (question) => question.id === selectedQuestionId,
+                        ) + 1,
+                        1,
+                      )
+                }}
+              </UBadge>
+            </div>
           </template>
 
           <fieldset
@@ -1897,6 +1648,7 @@ onMounted(
           >
             <UFormField
               label="Points"
+              help="Score value for this question."
             >
               <UInput
                 v-model.number="editor.points"
@@ -1904,21 +1656,27 @@ onMounted(
                 min="0.01"
                 max="1000"
                 step="0.01"
+                icon="i-lucide-star"
                 class="w-full"
               />
             </UFormField>
 
             <UFormField
-              label="Time allowed"
-              help="Enter the number of seconds for this question."
+              label="Answer time"
+              help="Seconds before this question closes automatically."
             >
               <UInput
                 v-model.number="editor.timeLimitSeconds"
                 type="number"
                 min="5"
                 max="3600"
+                icon="i-lucide-timer"
                 class="w-full"
-              />
+              >
+                <template #trailing>
+                  <span class="text-xs text-muted">sec</span>
+                </template>
+              </UInput>
             </UFormField>
           </fieldset>
         </UCard>
@@ -1930,67 +1688,37 @@ onMounted(
             </h2>
           </template>
 
-          <dl class="space-y-4 text-sm">
-            <div class="flex justify-between gap-4">
-              <dt class="text-muted">
+          <dl class="space-y-3 text-sm">
+            <div class="flex items-center justify-between gap-4">
+              <dt class="flex items-center gap-2 text-muted">
+                <UIcon name="i-lucide-list-checks" class="size-4" />
                 Questions
               </dt>
-
-              <dd class="font-bold text-highlighted">
-                {{ questions.length }}
-              </dd>
+              <dd class="font-bold text-highlighted">{{ questions.length }}</dd>
             </div>
-
-            <div class="flex justify-between gap-4">
-              <dt class="text-muted">
+            <div class="flex items-center justify-between gap-4">
+              <dt class="flex items-center gap-2 text-muted">
+                <UIcon name="i-lucide-star" class="size-4" />
                 Total points
               </dt>
-
-              <dd class="font-bold text-highlighted">
-                {{ totalPoints }}
-              </dd>
+              <dd class="font-bold text-highlighted">{{ totalPoints }}</dd>
             </div>
-
-            <div class="flex justify-between gap-4">
-              <dt class="text-muted">
+            <div class="flex items-center justify-between gap-4">
+              <dt class="flex items-center gap-2 text-muted">
+                <UIcon name="i-lucide-clock-3" class="size-4" />
                 Estimated time
               </dt>
-
-              <dd class="font-bold text-highlighted">
-                {{ estimatedMinutes }}
-                min
-              </dd>
+              <dd class="font-bold text-highlighted">{{ estimatedMinutes }} min</dd>
             </div>
           </dl>
         </UCard>
-
-        <UCard>
-          <div class="flex items-start gap-3">
-            <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <UIcon
-                name="i-lucide-eye"
-                class="size-5"
-              />
-            </div>
-
-            <div>
-              <h2 class="font-bold text-highlighted">
-                Student view
-              </h2>
-
-              <p class="mt-1 text-sm leading-6 text-muted">
-                While answering, students see only the question and answer choices. Correct answers and explanations appear only when your result settings allow them.
-              </p>
-            </div>
-          </div>
-        </UCard>
-      </div>
+      </aside>
     </div>
 
     <ConfirmationModal
       v-model:open="duplicateModalOpen"
       title="Duplicate this question?"
-      description="A new copy will be added at the end of the question list. You can edit the copy without changing the original question."
+      description="A copy will be added to the assessment and opened immediately for editing."
       confirm-label="Duplicate Question"
       confirm-color="primary"
       icon="i-lucide-copy-plus"
@@ -2002,7 +1730,7 @@ onMounted(
     <ConfirmationModal
       v-model:open="deleteModalOpen"
       title="Delete this question?"
-      description="The question and its answer choices will be removed. Questions already used in a student assessment cannot be deleted because previous results must remain accurate."
+      description="Questions already used in a student attempt remain protected so previous results stay accurate."
       confirm-label="Delete Question"
       confirm-color="error"
       icon="i-lucide-trash-2"
@@ -2014,7 +1742,7 @@ onMounted(
     <ConfirmationModal
       v-model:open="publishModalOpen"
       title="Publish this assessment?"
-      description="Publishing makes the assessment ready to assign to classes. Return it to draft later when you need to make changes."
+      description="Publishing makes the assessment ready to schedule for classes. You can return it to draft later when changes are needed."
       confirm-label="Publish Assessment"
       confirm-color="success"
       icon="i-lucide-send"
@@ -2022,6 +1750,62 @@ onMounted(
       :dismissible="!isRunningAction"
       @confirm="publish"
     />
+
+    <UModal
+      v-model:open="revisionModalOpen"
+      :dismissible="!isRunningAction"
+      :ui="{
+        content: 'sm:max-w-xl',
+      }"
+    >
+      <template #content>
+        <div class="p-6">
+          <div class="flex items-start gap-4">
+            <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-warning/10 text-warning">
+              <UIcon name="i-lucide-history" class="size-5" />
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <h2 class="text-lg font-black text-highlighted">
+                Create an editable revision?
+              </h2>
+              <p class="mt-2 text-sm leading-6 text-muted">
+                This assessment has already been used by students. Changing or deleting its original questions would change historical results. Preserve that used version and continue in a new editable draft instead.
+              </p>
+
+              <div class="mt-4 rounded-xl border border-default bg-elevated/50 p-4 text-sm">
+                <p class="font-semibold text-highlighted">What happens next</p>
+                <ul class="mt-2 space-y-1.5 text-muted">
+                  <li>• Previous Student attempts and results remain unchanged.</li>
+                  <li>• The historical assessment version moves to Archive.</li>
+                  <li>• A new draft opens with the same title and questions.</li>
+                  <li>• You can edit, delete, add, reorder, import, and republish normally.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <UButton
+              color="neutral"
+              variant="outline"
+              :disabled="isRunningAction"
+              @click="revisionModalOpen = false"
+            >
+              Cancel
+            </UButton>
+
+            <UButton
+              icon="i-lucide-copy-check"
+              :loading="isRunningAction"
+              @click="createEditableRevision"
+            >
+              Create Editable Draft
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
 
     <UModal
       v-model:open="feedbackModalOpen"
@@ -2043,17 +1827,13 @@ onMounted(
                 'bg-elevated text-muted': feedback.color === 'neutral',
               }"
             >
-              <UIcon
-                :name="feedback.icon"
-                class="size-5"
-              />
+              <UIcon :name="feedback.icon" class="size-5" />
             </div>
 
             <div class="min-w-0 flex-1">
               <h2 class="text-lg font-black text-highlighted">
                 {{ feedback.title }}
               </h2>
-
               <p class="mt-2 text-sm leading-6 text-muted">
                 {{ feedback.description }}
               </p>

@@ -76,7 +76,7 @@ const assessmentActionDescription =
         ?.action
       === "archive"
         ? `Archive ${pendingAssessmentTitle.value}? Scheduled class access will close and linked open live sessions will be cancelled safely.`
-        : `Return ${pendingAssessmentTitle.value} to draft? Students will no longer receive published access until it is published again.`,
+        : `Prepare ${pendingAssessmentTitle.value} for editing? If no Student attempts exist, it returns to draft normally. If Students already used it, SNCBT Assess preserves that version and creates a new editable draft revision.`,
   );
 
 const counts = computed(() => ({
@@ -418,6 +418,18 @@ async function runAction(
     color:
       "success",
   });
+
+  if (
+    action === "draft"
+    && "createdRevision" in result.data
+    && result.data.createdRevision
+  ) {
+    await navigateTo(
+      `/instructor/assessments/${result.data.assessment.id}/edit`,
+    );
+
+    return;
+  }
 
   if (action === "duplicate") {
     await navigateTo(

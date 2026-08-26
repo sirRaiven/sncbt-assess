@@ -349,6 +349,8 @@ export function useAssessments() {
     return await invoke<
       MessageResponse & {
         assessment: Assessment;
+        createdRevision: boolean;
+        sourceAssessmentId: string | null;
       }
     >(
       "return-to-draft",

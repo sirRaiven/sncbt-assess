@@ -1462,6 +1462,10 @@ export type Database = {
         Args: { p_assessment_id: string; p_instructor_id: string }
         Returns: Json
       }
+      return_or_create_editable_assessment_draft: {
+        Args: { p_assessment_id: string; p_instructor_id: string }
+        Returns: Json
+      }
       save_assessment_question:
         | {
             Args: {

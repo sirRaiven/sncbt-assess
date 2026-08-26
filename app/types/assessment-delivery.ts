@@ -205,6 +205,16 @@ export interface SaveDeliveryAnswerResult {
   feedback?: DeliveryAnswerFeedback | null;
 }
 
+export interface ExpireDeliveryQuestionResult {
+  message: string;
+  saveConfirmed: boolean;
+  timedOut: boolean;
+  finalized: boolean;
+  answeredCount: number;
+  attemptClosed: boolean;
+  payload: DeliveryQuestionPayload | null;
+}
+
 export interface SubmitDeliveryAttemptResult {
   message: string;
   attemptId: string;
