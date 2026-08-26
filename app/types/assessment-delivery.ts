@@ -154,7 +154,8 @@ export interface SafeDeliveryQuestion {
   questionText: string;
   imageUrl: string | null;
   points: number;
-  timeLimitSeconds: number;
+  timeLimitSeconds: number | null;
+  showTimerProgress: boolean;
   orderNumber: number;
   options: SafeDeliveryOption[];
 }

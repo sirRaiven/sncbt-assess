@@ -675,7 +675,7 @@ const deadlineWarning =
         return "The class closes in less than 1 minute. Any active attempt will be submitted when the scheduled closing time is reached.";
       }
 
-      return "The class closing deadline is less than 5 minutes away. Continue answering each timed question and submit before the schedule closes.";
+      return "The class closing deadline is less than 5 minutes away. Continue answering and submit before the schedule closes.";
     },
   );
 
@@ -3534,7 +3534,7 @@ onBeforeRouteLeave(
               class="size-4 shrink-0 text-warning"
             />
             <p class="truncate text-sm font-semibold text-highlighted">
-              Focus Mode exited. The timer is still running.
+              Focus Mode exited. Assessment timing continues.
             </p>
           </div>
 
@@ -3578,7 +3578,10 @@ onBeforeRouteLeave(
             </div>
           </div>
 
-          <div class="mb-4 rounded-xl border border-default bg-elevated/40 px-3 py-3 sm:px-4">
+          <div
+            v-if="questionPayload.deadlineAt"
+            class="mb-4 rounded-xl border border-default bg-elevated/40 px-3 py-3 sm:px-4"
+          >
             <div class="flex items-center justify-between gap-4">
               <div class="flex items-center gap-2">
                 <div class="flex size-8 items-center justify-center rounded-lg bg-default text-muted">
@@ -3609,6 +3612,7 @@ onBeforeRouteLeave(
             </div>
 
             <UProgress
+              v-if="questionPayload.question.showTimerProgress"
               class="mt-3"
               :model-value="questionTimerProgress"
               :max="100"

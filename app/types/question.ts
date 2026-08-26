@@ -23,7 +23,8 @@ export interface AssessmentQuestion {
   image_url: string | null;
   explanation: string | null;
   points: number;
-  time_limit_seconds: number;
+  time_limit_seconds: number | null;
+  show_timer_progress: boolean;
   order_number: number;
   accepted_answers: string[];
   correct_boolean: boolean | null;
@@ -43,7 +44,8 @@ export interface QuestionEditorInput {
   imageUrl: string | null;
   explanation: string | null;
   points: number;
-  timeLimitSeconds: number;
+  timeLimitSeconds: number | null;
+  showTimerProgress: boolean;
   options: QuestionOptionInput[];
   acceptedAnswers: string[];
   correctBoolean: boolean | null;

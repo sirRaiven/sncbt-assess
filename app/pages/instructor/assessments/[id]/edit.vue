@@ -259,7 +259,9 @@ const editor = reactive<{
   imageUrl: string;
   explanation: string;
   points: number;
+  timeLimitEnabled: boolean;
   timeLimitSeconds: number;
+  showTimerProgress: boolean;
   options: QuestionOptionInput[];
   acceptedAnswersText: string;
   correctBoolean: boolean | null;
@@ -274,8 +276,12 @@ const editor = reactive<{
     "",
   points:
     1,
+  timeLimitEnabled:
+    true,
   timeLimitSeconds:
     30,
+  showTimerProgress:
+    true,
   options: [
     {
       text: "",
@@ -337,6 +343,15 @@ const totalPoints = computed(
     ),
 );
 
+const timedQuestionCount = computed(
+  () =>
+    questions.value.filter(
+      (question) =>
+        question.time_limit_seconds
+        !== null,
+    ).length,
+);
+
 const estimatedMinutes = computed(
   () =>
     Math.ceil(
@@ -346,7 +361,7 @@ const estimatedMinutes = computed(
           question,
         ) =>
           total
-          + question.time_limit_seconds,
+          + (question.time_limit_seconds ?? 0),
         0,
       )
       / 60,
@@ -435,8 +450,14 @@ function startNewQuestion(): void {
   editor.points =
     1;
 
+  editor.timeLimitEnabled =
+    true;
+
   editor.timeLimitSeconds =
     30;
+
+  editor.showTimerProgress =
+    true;
 
   editor.options =
     emptyOptions();
@@ -488,8 +509,17 @@ function selectQuestion(
       question.points,
     );
 
+  editor.timeLimitEnabled =
+    question.time_limit_seconds
+    !== null;
+
   editor.timeLimitSeconds =
-    question.time_limit_seconds;
+    question.time_limit_seconds
+    ?? 30;
+
+  editor.showTimerProgress =
+    question.show_timer_progress
+    ?? true;
 
   editor.options =
     question.options.length > 0
@@ -626,14 +656,17 @@ function validateEditor(): string | null {
   }
 
   if (
-    Number(
-      editor.timeLimitSeconds,
-    ) < 5
-    || Number(
-      editor.timeLimitSeconds,
-    ) > 3600
+    editor.timeLimitEnabled
+    && (
+      Number(
+        editor.timeLimitSeconds,
+      ) < 5
+      || Number(
+        editor.timeLimitSeconds,
+      ) > 3600
+    )
   ) {
-    return "Question time must be between 5 and 3600 seconds.";
+    return "Question time must be between 5 and 3600 seconds, or turn Answer time off for no per-question limit.";
   }
 
   if (
@@ -676,9 +709,14 @@ function getEditorPayload(): QuestionEditorInput {
       ),
 
     timeLimitSeconds:
-      Number(
-        editor.timeLimitSeconds,
-      ),
+      editor.timeLimitEnabled
+        ? Number(
+            editor.timeLimitSeconds,
+          )
+        : null,
+
+    showTimerProgress:
+      editor.showTimerProgress,
 
     options:
       isChoiceQuestion.value
@@ -1542,8 +1580,20 @@ onMounted(
                   </span>
                   <span class="text-xs text-muted">·</span>
                   <span class="text-xs text-muted">
-                    {{ question.time_limit_seconds }} sec
+                    {{
+                      question.time_limit_seconds === null
+                        ? "No time limit"
+                        : `${question.time_limit_seconds} sec`
+                    }}
                   </span>
+                  <template
+                    v-if="question.time_limit_seconds !== null && !question.show_timer_progress"
+                  >
+                    <span class="text-xs text-muted">·</span>
+                    <span class="text-xs text-muted">
+                      Progress hidden
+                    </span>
+                  </template>
                 </div>
               </div>
 
@@ -1661,23 +1711,73 @@ onMounted(
               />
             </UFormField>
 
-            <UFormField
-              label="Answer time"
-              help="Seconds before this question closes automatically."
-            >
-              <UInput
-                v-model.number="editor.timeLimitSeconds"
-                type="number"
-                min="5"
-                max="3600"
-                icon="i-lucide-timer"
-                class="w-full"
+            <div class="rounded-xl border border-default p-4">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="font-semibold text-highlighted">
+                    Answer time
+                  </p>
+                  <p class="mt-1 text-xs leading-5 text-muted">
+                    Turn off to let the student stay on this question until they continue or the class schedule closes.
+                  </p>
+                </div>
+
+                <USwitch
+                  v-model="editor.timeLimitEnabled"
+                  aria-label="Use a time limit for this question"
+                />
+              </div>
+
+              <UFormField
+                v-if="editor.timeLimitEnabled"
+                label="Time limit"
+                help="The question closes automatically when this time expires."
+                class="mt-4"
               >
-                <template #trailing>
-                  <span class="text-xs text-muted">sec</span>
-                </template>
-              </UInput>
-            </UFormField>
+                <UInput
+                  v-model.number="editor.timeLimitSeconds"
+                  type="number"
+                  min="5"
+                  max="3600"
+                  icon="i-lucide-timer"
+                  class="w-full"
+                >
+                  <template #trailing>
+                    <span class="text-xs text-muted">sec</span>
+                  </template>
+                </UInput>
+              </UFormField>
+
+              <div
+                v-else
+                class="mt-4 flex items-center gap-2 rounded-lg bg-elevated/60 px-3 py-2.5 text-xs font-medium text-muted"
+              >
+                <UIcon name="i-lucide-infinity" class="size-4 shrink-0" />
+                No per-question time limit
+              </div>
+            </div>
+
+            <div
+              class="rounded-xl border border-default p-4 transition"
+              :class="!editor.timeLimitEnabled ? 'opacity-55' : ''"
+            >
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="font-semibold text-highlighted">
+                    Show timer progress
+                  </p>
+                  <p class="mt-1 text-xs leading-5 text-muted">
+                    Show the question progress bar to students while the timer runs. The countdown remains visible.
+                  </p>
+                </div>
+
+                <USwitch
+                  v-model="editor.showTimerProgress"
+                  :disabled="!editor.timeLimitEnabled"
+                  aria-label="Show timer progress bar to students"
+                />
+              </div>
+            </div>
           </fieldset>
         </UCard>
 
@@ -1706,9 +1806,11 @@ onMounted(
             <div class="flex items-center justify-between gap-4">
               <dt class="flex items-center gap-2 text-muted">
                 <UIcon name="i-lucide-clock-3" class="size-4" />
-                Estimated time
+                Timed question time
               </dt>
-              <dd class="font-bold text-highlighted">{{ estimatedMinutes }} min</dd>
+              <dd class="font-bold text-highlighted">
+                {{ timedQuestionCount > 0 ? `${estimatedMinutes} min` : "No timers" }}
+              </dd>
             </div>
           </dl>
         </UCard>

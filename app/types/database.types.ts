@@ -1074,7 +1074,8 @@ export type Database = {
           points: number
           question_text: string
           question_type: Database["public"]["Enums"]["assessment_question_type"]
-          time_limit_seconds: number
+          time_limit_seconds: number | null
+          show_timer_progress: boolean
           updated_at: string
         }
         Insert: {
@@ -1089,7 +1090,8 @@ export type Database = {
           points?: number
           question_text: string
           question_type: Database["public"]["Enums"]["assessment_question_type"]
-          time_limit_seconds?: number
+          time_limit_seconds?: number | null
+          show_timer_progress?: boolean
           updated_at?: string
         }
         Update: {
@@ -1104,7 +1106,8 @@ export type Database = {
           points?: number
           question_text?: string
           question_type?: Database["public"]["Enums"]["assessment_question_type"]
-          time_limit_seconds?: number
+          time_limit_seconds?: number | null
+          show_timer_progress?: boolean
           updated_at?: string
         }
         Relationships: [
