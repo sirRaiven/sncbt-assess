@@ -224,6 +224,7 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
+      compact-mobile
       :breadcrumbs="[
         { label: 'Overview', to: '/student/dashboard', icon: 'i-lucide-layout-dashboard' },
         { label: 'My Classes' },
@@ -251,7 +252,27 @@ onMounted(
       :description="errorMessage"
     />
 
-    <UCard>
+    <div class="flex items-center gap-2 sm:hidden">
+      <UInput
+        v-model="query"
+        icon="i-lucide-search"
+        placeholder="Search classes"
+        aria-label="Search your classes"
+        class="min-w-0 flex-1"
+      />
+
+      <UButton
+        color="neutral"
+        variant="outline"
+        icon="i-lucide-refresh-cw"
+        square
+        :loading="isLoading"
+        aria-label="Refresh classes"
+        @click="loadClasses"
+      />
+    </div>
+
+    <UCard class="hidden sm:block">
       <div class="grid gap-3 lg:grid-cols-[1fr_auto]">
         <UInput
           v-model="query"
@@ -312,7 +333,7 @@ onMounted(
           body: 'p-0 sm:p-0',
         }"
       >
-        <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-5">
+        <div class="relative border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-4 sm:min-h-40 sm:p-5">
           <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-2">
               <div class="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15">
@@ -342,7 +363,7 @@ onMounted(
           <NuxtLink
             v-if="item.membership.membership_status !== 'pending'"
             :to="`/student/classes/${item.classroom.id}`"
-            class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+            class="group mt-4 block rounded-lg sm:mt-6 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
             :aria-label="`Open ${item.classroom.name}`"
           >
             <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
@@ -358,7 +379,7 @@ onMounted(
 
           <div
             v-else
-            class="mt-6"
+            class="mt-4 sm:mt-6"
           >
             <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted">
               {{ item.classroom.name }}
@@ -372,7 +393,7 @@ onMounted(
           </div>
         </div>
 
-        <div class="p-5">
+        <div class="p-4 sm:p-5">
           <div class="flex min-h-7 flex-wrap gap-2">
             <UBadge
               color="neutral"
@@ -387,6 +408,7 @@ onMounted(
               color="neutral"
               variant="soft"
               icon="i-lucide-calendar-range"
+              class="hidden sm:inline-flex"
             >
               {{ item.classroom.school_year }}
               ·

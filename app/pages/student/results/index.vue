@@ -165,6 +165,7 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
+      compact-mobile
       :breadcrumbs="[
         { label: 'Overview', to: '/student/dashboard', icon: 'i-lucide-layout-dashboard' },
         { label: 'My Results' },
@@ -179,6 +180,7 @@ onMounted(
           variant="outline"
           icon="i-lucide-refresh-cw"
           :loading="isLoading"
+          class="hidden sm:inline-flex"
           @click="loadResults"
         >
           Refresh

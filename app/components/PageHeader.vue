@@ -9,11 +9,13 @@ withDefaults(
     description?: string;
     eyebrow?: string;
     breadcrumbs?: AppBreadcrumbItem[];
+    compactMobile?: boolean;
   }>(),
   {
     description: "",
     eyebrow: "",
     breadcrumbs: () => [],
+    compactMobile: false,
   },
 );
 </script>
@@ -23,14 +25,17 @@ withDefaults(
     <AppBreadcrumbs
       v-if="breadcrumbs.length"
       :items="breadcrumbs"
-      class="mb-3"
+      :class="compactMobile ? 'mb-3 hidden sm:block' : 'mb-3'"
     />
 
     <div class="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
       <div class="min-w-0">
         <p
           v-if="eyebrow"
-          class="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-primary sm:text-xs sm:tracking-[0.18em]"
+          :class="[
+            'mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-primary sm:text-xs sm:tracking-[0.18em]',
+            compactMobile ? 'hidden sm:block' : '',
+          ]"
         >
           {{ eyebrow }}
         </p>
@@ -41,7 +46,10 @@ withDefaults(
 
         <p
           v-if="description"
-          class="mt-2 max-w-3xl text-sm leading-6 text-muted"
+          :class="[
+            'mt-2 max-w-3xl text-sm leading-6 text-muted',
+            compactMobile ? 'hidden sm:block' : '',
+          ]"
         >
           {{ description }}
         </p>

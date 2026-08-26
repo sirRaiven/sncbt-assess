@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type {
-  DeliveryAvailabilityStatus,
   StudentAssessmentDelivery,
 } from "~/types/assessment-delivery";
 
@@ -96,6 +95,56 @@ function hasCompletedAttempt(
   );
 }
 
+function deliveryPriority(
+  delivery:
+    StudentAssessmentDelivery,
+): number {
+  if (
+    delivery.attempt?.status
+    === "in_progress"
+  ) {
+    return 0;
+  }
+
+  if (
+    delivery.status === "open"
+    && (
+      delivery.canStart
+      || delivery.canResume
+    )
+  ) {
+    return 1;
+  }
+
+  if (delivery.status === "upcoming") {
+    return 2;
+  }
+
+  if (hasCompletedAttempt(delivery)) {
+    return 3;
+  }
+
+  return 4;
+}
+
+function deliveryPriorityTime(
+  delivery:
+    StudentAssessmentDelivery,
+): number {
+  if (delivery.status === "upcoming") {
+    return new Date(delivery.startsAt).getTime();
+  }
+
+  if (
+    hasCompletedAttempt(delivery)
+    && delivery.attempt?.submittedAt
+  ) {
+    return -new Date(delivery.attempt.submittedAt).getTime();
+  }
+
+  return new Date(delivery.endsAt).getTime();
+}
+
 const filteredDeliveries =
   computed(
     () => {
@@ -151,6 +200,18 @@ const filteredDeliveries =
           }
 
           return delivery.status === activeFilter.value;
+        })
+        .sort((first, second) => {
+          const priorityDifference =
+            deliveryPriority(first)
+            - deliveryPriority(second);
+
+          if (priorityDifference !== 0) {
+            return priorityDifference;
+          }
+
+          return deliveryPriorityTime(first)
+            - deliveryPriorityTime(second);
         });
     },
   );
@@ -428,6 +489,7 @@ onMounted(
 <template>
   <div class="page-stack">
     <PageHeader
+      compact-mobile
       :breadcrumbs="[
         { label: 'Overview', to: '/student/dashboard', icon: 'i-lucide-layout-dashboard' },
         { label: 'Assessments' },
@@ -442,6 +504,7 @@ onMounted(
           variant="outline"
           icon="i-lucide-refresh-cw"
           :loading="isLoading"
+          class="hidden sm:inline-flex"
           @click="loadDeliveries"
         >
           Refresh
@@ -457,7 +520,7 @@ onMounted(
       :description="errorMessage"
     />
 
-    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section class="hidden gap-4 sm:grid sm:grid-cols-2 xl:grid-cols-4">
       <StatCard
         label="Open now"
         :value="String(counts.open)"
@@ -487,7 +550,48 @@ onMounted(
       />
     </section>
 
-    <UCard>
+    <div class="space-y-2 sm:hidden">
+      <div class="flex items-center gap-2">
+        <UInput
+          v-model="query"
+          icon="i-lucide-search"
+          placeholder="Search assessments"
+          aria-label="Search your assessments"
+          class="min-w-0 flex-1"
+        />
+
+        <UButton
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-refresh-cw"
+          square
+          :loading="isLoading"
+          aria-label="Refresh assessments"
+          @click="loadDeliveries"
+        />
+      </div>
+
+      <div
+        role="group"
+        aria-label="Filter assessments"
+        class="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <UButton
+          v-for="item in filterItems"
+          :key="item.value"
+          color="neutral"
+          size="sm"
+          class="shrink-0"
+          :variant="activeFilter === item.value ? 'soft' : 'ghost'"
+          :aria-pressed="activeFilter === item.value"
+          @click="activeFilter = item.value"
+        >
+          {{ item.label }}
+        </UButton>
+      </div>
+    </div>
+
+    <UCard class="hidden sm:block">
       <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
         <UInput
           v-model="query"
@@ -547,7 +651,7 @@ onMounted(
         }"
       >
         <div
-          class="relative border-b border-default bg-gradient-to-br from-primary/18 via-primary/8 to-transparent p-5"
+          class="relative border-b border-default bg-gradient-to-br from-primary/18 via-primary/8 to-transparent p-4 sm:p-5"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-2">
@@ -593,7 +697,7 @@ onMounted(
           </NuxtLink>
         </div>
 
-        <div class="p-5">
+        <div class="p-4 sm:p-5">
           <div
             class="flex min-w-0 items-center gap-2 text-sm font-semibold text-primary"
           >
@@ -608,7 +712,7 @@ onMounted(
           </div>
 
           <div
-            class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted"
+            class="mt-4 hidden flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted sm:flex"
           >
             <span class="inline-flex items-center gap-1.5">
               <UIcon
