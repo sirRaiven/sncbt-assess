@@ -126,6 +126,21 @@ export function useClassrooms() {
     );
   }
 
+  async function duplicateClass(
+    classroomId: string,
+  ) {
+    return await invoke<
+      MessageResponse & {
+        classroom: InstructorClassroom;
+      }
+    >(
+      "duplicate-class",
+      {
+        classroomId,
+      },
+    );
+  }
+
   async function updateClass(
     classroomId: string,
     input: Omit<
@@ -378,6 +393,7 @@ export function useClassrooms() {
     listInstructorClasses,
     getInstructorClass,
     createClass,
+    duplicateClass,
     updateClass,
     archiveClass,
     reactivateClass,

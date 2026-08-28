@@ -19,6 +19,7 @@ const toast = useToast();
 
 const {
   listInstructorClasses,
+  duplicateClass,
   archiveClass,
 } = useClassrooms();
 
@@ -32,6 +33,12 @@ const busyClassroomId =
   ref<string | null>(null);
 const archiveModalOpen =
   ref(false);
+const duplicateModalOpen =
+  ref(false);
+const pendingDuplicateClass =
+  ref<InstructorClassroom | null>(
+    null,
+  );
 const pendingArchiveClass =
   ref<InstructorClassroom | null>(
     null,
@@ -106,6 +113,72 @@ function copyCode(
     color:
       "success",
   });
+}
+
+function requestDuplicateClass(
+  classroom: InstructorClassroom,
+): void {
+  pendingDuplicateClass.value =
+    classroom;
+  duplicateModalOpen.value =
+    true;
+}
+
+async function confirmDuplicateClass(): Promise<void> {
+  if (!pendingDuplicateClass.value) {
+    return;
+  }
+
+  const classroom =
+    pendingDuplicateClass.value;
+
+  busyClassroomId.value =
+    classroom.id;
+
+  const result =
+    await duplicateClass(
+      classroom.id,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title:
+        "Class could not be duplicated",
+      description:
+        result.error
+        || "The class could not be duplicated.",
+      color:
+        "error",
+    });
+
+    busyClassroomId.value =
+      null;
+    return;
+  }
+
+  classes.value = [
+    result.data.classroom,
+    ...classes.value,
+  ];
+
+  toast.add({
+    title:
+      "Class duplicated",
+    description:
+      `${result.data.classroom.name} was created with a new class code. Students and assessment records were not copied.`,
+    color:
+      "success",
+  });
+
+  duplicateModalOpen.value =
+    false;
+  pendingDuplicateClass.value =
+    null;
+  busyClassroomId.value =
+    null;
 }
 
 function requestArchiveClass(
@@ -200,6 +273,21 @@ function classroomMenuItems(
       },
     });
   }
+
+  navigationItems.push({
+    label:
+      "Duplicate Class",
+    icon:
+      "i-lucide-copy-plus",
+    disabled:
+      busyClassroomId.value
+      === classroom.id,
+    onSelect: () => {
+      requestDuplicateClass(
+        classroom,
+      );
+    },
+  });
 
   const archiveItems:
     DropdownMenuItem[] = [
@@ -470,6 +558,28 @@ onMounted(
         </div>
       </UCard>
     </div>
+
+    <ConfirmationModal
+      v-model:open="
+        duplicateModalOpen
+      "
+      title="Duplicate class?"
+      :description="
+        pendingDuplicateClass
+          ? `Create a copy of ${pendingDuplicateClass.name}? Class details and enrollment settings will be copied, but the new class will get a fresh class code. Students, pending requests, assessment assignments, attempts, and results will not be copied.`
+          : 'Create a fresh copy of this class without copying Student or assessment history?'
+      "
+      confirm-label="Duplicate Class"
+      icon="i-lucide-copy-plus"
+      :loading="
+        Boolean(
+          busyClassroomId,
+        )
+      "
+      @confirm="
+        confirmDuplicateClass
+      "
+    />
 
     <ConfirmationModal
       v-model:open="
