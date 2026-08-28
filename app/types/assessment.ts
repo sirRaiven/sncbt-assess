@@ -45,6 +45,10 @@ export interface Assessment {
   result_visibility: AssessmentResultVisibility;
   leaderboard_enabled: boolean;
   allow_backtracking: boolean;
+  /** Default per-question timer applied when instructors create or bulk-update questions. */
+  default_question_time_limit_seconds: number | null;
+  /** Default Student-side timer progress visibility for new/bulk-updated questions. */
+  default_show_timer_progress: boolean;
   /** @deprecated Whole-assessment timing is controlled by the class schedule. */
   overall_time_limit_seconds: number | null;
   question_count: number;

@@ -571,6 +571,8 @@ export type Database = {
           assessment_type: Database["public"]["Enums"]["assessment_type"]
           classroom_id: string | null
           created_at: string
+          default_question_time_limit_seconds: number | null
+          default_show_timer_progress: boolean
           id: string
           instructions: string | null
           instructor_id: string
@@ -597,6 +599,8 @@ export type Database = {
           assessment_type?: Database["public"]["Enums"]["assessment_type"]
           classroom_id?: string | null
           created_at?: string
+          default_question_time_limit_seconds?: number | null
+          default_show_timer_progress?: boolean
           id?: string
           instructions?: string | null
           instructor_id: string
@@ -623,6 +627,8 @@ export type Database = {
           assessment_type?: Database["public"]["Enums"]["assessment_type"]
           classroom_id?: string | null
           created_at?: string
+          default_question_time_limit_seconds?: number | null
+          default_show_timer_progress?: boolean
           id?: string
           instructions?: string | null
           instructor_id?: string
@@ -1242,6 +1248,15 @@ export type Database = {
       assert_assessment_publishable: {
         Args: { p_assessment_id: string; p_instructor_id: string }
         Returns: undefined
+      }
+      apply_assessment_question_timer_defaults: {
+        Args: {
+          p_assessment_id: string
+          p_instructor_id: string
+          p_show_timer_progress: boolean
+          p_time_limit_seconds: number | null
+        }
+        Returns: number
       }
       begin_scheduled_assessment_attempt: {
         Args: { p_assignment_id: string; p_student_id: string }

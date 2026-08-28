@@ -199,6 +199,30 @@ export function useQuestions() {
     );
   }
 
+  async function updateAllQuestionTimerSettings(
+    assessmentId: string,
+    input: {
+      timeLimitSeconds: number | null;
+      showTimerProgress: boolean;
+    },
+  ) {
+    return await invoke<
+      MessageResponse & {
+        updatedQuestionCount: number;
+        defaults: {
+          timeLimitSeconds: number | null;
+          showTimerProgress: boolean;
+        };
+      }
+    >(
+      "update-all-question-timer-settings",
+      {
+        assessmentId,
+        ...input,
+      },
+    );
+  }
+
   async function validateForPublish(
     assessmentId: string,
   ) {
@@ -221,6 +245,7 @@ export function useQuestions() {
     duplicateQuestion,
     deleteQuestion,
     reorderQuestions,
+    updateAllQuestionTimerSettings,
     validateForPublish,
   };
 }

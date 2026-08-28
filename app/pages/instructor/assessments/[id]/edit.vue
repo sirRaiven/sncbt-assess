@@ -47,6 +47,7 @@ const {
   duplicateQuestion,
   deleteQuestion,
   reorderQuestions,
+  updateAllQuestionTimerSettings,
   validateForPublish,
 } = useQuestions();
 
@@ -65,6 +66,7 @@ const isCreating = ref(true);
 const isLoading = ref(true);
 const isSaving = ref(false);
 const isRunningAction = ref(false);
+const isApplyingGeneralTimerSettings = ref(false);
 const errorMessage = ref("");
 const formError = ref("");
 
@@ -298,6 +300,12 @@ const editor = reactive<{
     null,
 });
 
+const generalTimerSettings = reactive({
+  timeLimitEnabled: true,
+  timeLimitSeconds: 30,
+  showTimerProgress: true,
+});
+
 const selectedQuestion = computed(
   () =>
     questions.value.find(
@@ -368,6 +376,29 @@ const estimatedMinutes = computed(
     ),
 );
 
+const customTimerQuestionCount = computed(
+  () =>
+    questions.value.filter(
+      (question) =>
+        question.time_limit_seconds
+          !== (
+            generalTimerSettings.timeLimitEnabled
+              ? Number(
+                  generalTimerSettings.timeLimitSeconds,
+                )
+              : null
+          )
+        || (question.show_timer_progress ?? true)
+          !== generalTimerSettings.showTimerProgress,
+    ).length,
+);
+
+const allQuestionsUseGeneralTimerSettings = computed(
+  () =>
+    questions.value.length > 0
+    && customTimerQuestionCount.value === 0,
+);
+
 const duplicateOptionWarning = computed(() => {
   if (!isChoiceQuestion.value) {
     return false;
@@ -390,6 +421,142 @@ const duplicateOptionWarning = computed(() => {
     !== normalized.length
   );
 });
+
+function syncGeneralTimerSettingsFromAssessment(): void {
+  if (!assessment.value) {
+    return;
+  }
+
+  const configuredSeconds =
+    assessment.value
+      .default_question_time_limit_seconds;
+
+  generalTimerSettings.timeLimitEnabled =
+    configuredSeconds !== null
+    && configuredSeconds !== undefined;
+
+  generalTimerSettings.timeLimitSeconds =
+    configuredSeconds
+    ?? 30;
+
+  generalTimerSettings.showTimerProgress =
+    assessment.value
+      .default_show_timer_progress
+    ?? true;
+}
+
+async function applyGeneralTimerSettings(): Promise<void> {
+  if (
+    !assessment.value
+    || !isDraft.value
+  ) {
+    return;
+  }
+
+  if (
+    generalTimerSettings.timeLimitEnabled
+    && (
+      Number(
+        generalTimerSettings.timeLimitSeconds,
+      ) < 5
+      || Number(
+        generalTimerSettings.timeLimitSeconds,
+      ) > 3600
+    )
+  ) {
+    showFeedback(
+      "Check the answer time",
+      "Use a value from 5 to 3600 seconds, or turn Answer time off for no per-question limit.",
+      "warning",
+      "i-lucide-timer-reset",
+    );
+    return;
+  }
+
+  isApplyingGeneralTimerSettings.value = true;
+
+  const timeLimitSeconds =
+    generalTimerSettings.timeLimitEnabled
+      ? Number(
+          generalTimerSettings.timeLimitSeconds,
+        )
+      : null;
+
+  const result =
+    await updateAllQuestionTimerSettings(
+      assessment.value.id,
+      {
+        timeLimitSeconds,
+        showTimerProgress:
+          generalTimerSettings.showTimerProgress,
+      },
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    if (
+      isHistoryLocked(
+        result.code,
+        result.error,
+      )
+    ) {
+      isApplyingGeneralTimerSettings.value = false;
+      requestEditableRevision();
+      return;
+    }
+
+    showFeedback(
+      "Timer settings were not applied",
+      friendlyError(
+        result.error,
+        "The all-question timer settings could not be applied. Please try again.",
+      ),
+      "error",
+      "i-lucide-circle-alert",
+    );
+
+    isApplyingGeneralTimerSettings.value = false;
+    return;
+  }
+
+  assessment.value = {
+    ...assessment.value,
+    default_question_time_limit_seconds:
+      timeLimitSeconds,
+    default_show_timer_progress:
+      generalTimerSettings.showTimerProgress,
+  };
+
+  questions.value =
+    questions.value.map(
+      (question) => ({
+        ...question,
+        time_limit_seconds:
+          timeLimitSeconds,
+        show_timer_progress:
+          generalTimerSettings.showTimerProgress,
+      }),
+    );
+
+  editor.timeLimitEnabled =
+    generalTimerSettings.timeLimitEnabled;
+
+  editor.timeLimitSeconds =
+    generalTimerSettings.timeLimitSeconds;
+
+  editor.showTimerProgress =
+    generalTimerSettings.showTimerProgress;
+
+  toast.add({
+    title: "All-question timer settings applied",
+    description: result.data.message,
+    color: "success",
+  });
+
+  isApplyingGeneralTimerSettings.value = false;
+}
 
 function emptyOptions(): QuestionOptionInput[] {
   return [
@@ -428,6 +595,17 @@ function acceptedAnswersFromEditor(): string[] {
   ];
 }
 
+function scrollToGeneralTimerSettings(): void {
+  document
+    .getElementById(
+      "all-question-timer-settings",
+    )
+    ?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+}
+
 function startNewQuestion(): void {
   selectedQuestionId.value =
     null;
@@ -451,13 +629,13 @@ function startNewQuestion(): void {
     1;
 
   editor.timeLimitEnabled =
-    true;
+    generalTimerSettings.timeLimitEnabled;
 
   editor.timeLimitSeconds =
-    30;
+    generalTimerSettings.timeLimitSeconds;
 
   editor.showTimerProgress =
-    true;
+    generalTimerSettings.showTimerProgress;
 
   editor.options =
     emptyOptions();
@@ -818,6 +996,8 @@ async function loadData(
 
   assessment.value =
     assessmentResult.data.assessment;
+
+  syncGeneralTimerSettingsFromAssessment();
 
   questions.value =
     questionResult.data.questions;
@@ -1518,13 +1698,26 @@ onMounted(
             </p>
           </div>
 
-          <UButton
+          <div
             v-if="isDraft"
-            icon="i-lucide-plus"
-            @click="startNewQuestion"
+            class="flex flex-wrap items-center gap-2"
           >
-            Add question
-          </UButton>
+            <UButton
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-timer-reset"
+              @click="scrollToGeneralTimerSettings"
+            >
+              Timer setup
+            </UButton>
+
+            <UButton
+              icon="i-lucide-plus"
+              @click="startNewQuestion"
+            >
+              Add question
+            </UButton>
+          </div>
         </div>
 
         <template
@@ -1664,6 +1857,142 @@ onMounted(
           @imported="handleQuestionsImported"
           @history-locked="requestEditableRevision"
         />
+        <UCard id="all-question-timer-settings">
+          <template #header>
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex min-w-0 items-start gap-3">
+                <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <UIcon name="i-lucide-timer-reset" class="size-4.5" />
+                </span>
+                <div class="min-w-0">
+                  <h2 class="font-bold text-highlighted">
+                    All question timers
+                  </h2>
+                  <p class="mt-0.5 text-xs leading-5 text-muted">
+                    Set the timer behavior once for every question in this assessment.
+                  </p>
+                </div>
+              </div>
+
+              <UBadge color="primary" variant="soft" size="sm">
+                All questions
+              </UBadge>
+            </div>
+          </template>
+
+          <fieldset
+            class="space-y-4"
+            :disabled="!isDraft || isApplyingGeneralTimerSettings"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="font-semibold text-highlighted">
+                  Answer time
+                </p>
+                <p class="mt-1 text-xs leading-5 text-muted">
+                  Turn off to remove the per-question time limit from all current questions and new questions you add next.
+                </p>
+              </div>
+
+              <USwitch
+                v-model="generalTimerSettings.timeLimitEnabled"
+                aria-label="Use an answer time for all questions"
+              />
+            </div>
+
+            <UFormField
+              v-if="generalTimerSettings.timeLimitEnabled"
+              label="Answer time for all"
+              help="This value is applied to every question. You can still adjust an individual question afterward."
+            >
+              <UInput
+                v-model.number="generalTimerSettings.timeLimitSeconds"
+                type="number"
+                min="5"
+                max="3600"
+                icon="i-lucide-timer"
+                class="w-full"
+              >
+                <template #trailing>
+                  <span class="text-xs text-muted">sec</span>
+                </template>
+              </UInput>
+            </UFormField>
+
+            <div
+              v-else
+              class="flex items-center gap-2 rounded-lg bg-elevated/60 px-3 py-2.5 text-xs font-medium text-muted"
+            >
+              <UIcon name="i-lucide-infinity" class="size-4 shrink-0" />
+              No per-question time limit for all questions
+            </div>
+
+            <div
+              class="flex items-start justify-between gap-4 border-t border-default pt-4 transition"
+              :class="!generalTimerSettings.timeLimitEnabled ? 'opacity-55' : ''"
+            >
+              <div class="min-w-0">
+                <p class="font-semibold text-highlighted">
+                  Show timer progress
+                </p>
+                <p class="mt-1 text-xs leading-5 text-muted">
+                  Show the Student-side progress bar for every timed question. The numeric countdown remains visible.
+                </p>
+              </div>
+
+              <USwitch
+                v-model="generalTimerSettings.showTimerProgress"
+                :disabled="!generalTimerSettings.timeLimitEnabled"
+                aria-label="Show timer progress for all questions"
+              />
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-default pt-4">
+              <div class="min-w-0">
+                <UBadge
+                  v-if="questions.length === 0"
+                  color="neutral"
+                  variant="soft"
+                  size="sm"
+                >
+                  Default for new questions
+                </UBadge>
+                <UBadge
+                  v-else-if="allQuestionsUseGeneralTimerSettings"
+                  color="success"
+                  variant="soft"
+                  size="sm"
+                >
+                  Applied to all
+                </UBadge>
+                <UBadge
+                  v-else
+                  color="warning"
+                  variant="soft"
+                  size="sm"
+                >
+                  {{ customTimerQuestionCount }} custom {{ customTimerQuestionCount === 1 ? "question" : "questions" }}
+                </UBadge>
+
+                <p
+                  v-if="customTimerQuestionCount > 0"
+                  class="mt-1 text-xs leading-5 text-muted"
+                >
+                  Applying this will replace those individual timer values.
+                </p>
+              </div>
+
+              <UButton
+                icon="i-lucide-check-check"
+                :loading="isApplyingGeneralTimerSettings"
+                :disabled="!isDraft"
+                @click="applyGeneralTimerSettings"
+              >
+                Apply to all
+              </UButton>
+            </div>
+          </fieldset>
+        </UCard>
 
         <UCard>
           <template #header>
@@ -1673,7 +2002,7 @@ onMounted(
                   Question settings
                 </h2>
                 <p class="text-xs text-muted">
-                  Applies to the active question.
+                  Applies only to the active question and can override the all-question timer settings.
                 </p>
               </div>
 
