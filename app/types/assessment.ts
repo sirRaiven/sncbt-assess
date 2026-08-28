@@ -18,6 +18,12 @@ export type AssessmentResultVisibility =
   | "score_only"
   | "score_and_answers";
 
+export type ExamPermitStatus =
+  | "permit"
+  | "promissory_note"
+  | "fully_paid"
+  | "to_follow";
+
 export interface AssessmentClassroomSummary {
   id: string;
   name: string;
@@ -45,6 +51,8 @@ export interface Assessment {
   result_visibility: AssessmentResultVisibility;
   leaderboard_enabled: boolean;
   allow_backtracking: boolean;
+  /** Examination-only pre-start permit declaration requirement. */
+  require_exam_permit: boolean;
   /** Default per-question timer applied when instructors create or bulk-update questions. */
   default_question_time_limit_seconds: number | null;
   /** Default Student-side timer progress visibility for new/bulk-updated questions. */
@@ -86,6 +94,7 @@ export interface AssessmentDetailsInput {
   randomizeOptions: boolean;
   resultVisibility: AssessmentResultVisibility;
   allowBacktracking: boolean;
+  requireExamPermit: boolean;
 }
 
 export interface AssessmentCreateInput

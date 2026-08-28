@@ -105,6 +105,9 @@ const schema = z.object({
 
   allowBacktracking:
     z.boolean(),
+
+  requireExamPermit:
+    z.boolean(),
 });
 
 type CreateAssessmentSchema =
@@ -122,6 +125,7 @@ const state = reactive<CreateAssessmentSchema>({
   randomizeOptions: false,
   resultVisibility: "score_and_answers",
   allowBacktracking: true,
+  requireExamPermit: true,
 });
 
 const subjectSourceItems = computed(
@@ -270,6 +274,8 @@ async function submit(
         event.data.resultVisibility,
       allowBacktracking:
         event.data.allowBacktracking,
+      requireExamPermit:
+        event.data.requireExamPermit,
     });
 
   if (
@@ -480,6 +486,33 @@ async function submit(
                 class="w-full"
               />
             </UFormField>
+
+            <div
+              v-if="state.assessmentType === 'examination'"
+              class="flex items-start justify-between gap-4 rounded-xl border border-default bg-elevated/35 p-4"
+            >
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <UIcon
+                    name="i-lucide-badge-check"
+                    class="size-4 text-primary"
+                  />
+
+                  <p class="font-semibold text-highlighted">
+                    Require exam permit
+                  </p>
+                </div>
+
+                <p class="mt-1 text-sm leading-5 text-muted">
+                  Students must complete an exam access declaration before starting.
+                </p>
+              </div>
+
+              <USwitch
+                v-model="state.requireExamPermit"
+                aria-label="Require exam permit before starting"
+              />
+            </div>
 
             <UFormField
               label="Instructions"

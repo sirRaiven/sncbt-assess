@@ -170,11 +170,15 @@ export type Database = {
           created_at: string
           current_question_index: number
           expires_at: string | null
+          exam_access_recorded_at: string | null
+          exam_access_status: string | null
+          exam_access_reference_number: string | null
           id: string
           last_activity_at: string | null
           locked_at: string | null
           maximum_score: number
           option_order: Json | null
+          permit_number: string | null
           question_order: string[] | null
           session_id: string | null
           speed_bonus_total: number
@@ -200,11 +204,15 @@ export type Database = {
           created_at?: string
           current_question_index?: number
           expires_at?: string | null
+          exam_access_recorded_at?: string | null
+          exam_access_status?: string | null
+          exam_access_reference_number?: string | null
           id?: string
           last_activity_at?: string | null
           locked_at?: string | null
           maximum_score?: number
           option_order?: Json | null
+          permit_number?: string | null
           question_order?: string[] | null
           session_id?: string | null
           speed_bonus_total?: number
@@ -230,11 +238,15 @@ export type Database = {
           created_at?: string
           current_question_index?: number
           expires_at?: string | null
+          exam_access_recorded_at?: string | null
+          exam_access_status?: string | null
+          exam_access_reference_number?: string | null
           id?: string
           last_activity_at?: string | null
           locked_at?: string | null
           maximum_score?: number
           option_order?: Json | null
+          permit_number?: string | null
           question_order?: string[] | null
           session_id?: string | null
           speed_bonus_total?: number
@@ -582,6 +594,7 @@ export type Database = {
           question_count: number
           randomize_options: boolean
           randomize_questions: boolean
+          require_exam_permit: boolean
           result_visibility: Database["public"]["Enums"]["assessment_result_visibility"]
           scoring_mode: Database["public"]["Enums"]["assessment_scoring_mode"]
           source_assessment_id: string | null
@@ -610,6 +623,7 @@ export type Database = {
           question_count?: number
           randomize_options?: boolean
           randomize_questions?: boolean
+          require_exam_permit?: boolean
           result_visibility?: Database["public"]["Enums"]["assessment_result_visibility"]
           scoring_mode?: Database["public"]["Enums"]["assessment_scoring_mode"]
           source_assessment_id?: string | null
@@ -638,6 +652,7 @@ export type Database = {
           question_count?: number
           randomize_options?: boolean
           randomize_questions?: boolean
+          require_exam_permit?: boolean
           result_visibility?: Database["public"]["Enums"]["assessment_result_visibility"]
           scoring_mode?: Database["public"]["Enums"]["assessment_scoring_mode"]
           source_assessment_id?: string | null
@@ -1260,6 +1275,15 @@ export type Database = {
       }
       begin_scheduled_assessment_attempt: {
         Args: { p_assignment_id: string; p_student_id: string }
+        Returns: string
+      }
+      begin_scheduled_assessment_attempt_with_access_declaration: {
+        Args: {
+          p_assignment_id: string
+          p_exam_access_status?: string | null
+          p_permit_number?: string | null
+          p_student_id: string
+        }
         Returns: string
       }
       begin_student_attempt: {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  ExamAccessStatus,
   StudentAssessmentDelivery,
 } from "~/types/assessment-delivery";
 
@@ -67,6 +68,73 @@ const errorMessage =
 
 const startModalOpen =
   ref(false);
+
+const examAccessStatus =
+  ref<ExamAccessStatus | null>(null);
+
+const accessReferenceNumber =
+  ref("");
+
+const examAccessItems: Array<{
+  label: string;
+  description: string;
+  value: ExamAccessStatus;
+  referenceLabel?: string;
+  referencePlaceholder?: string;
+}> = [
+  {
+    label: "PERMIT",
+    description: "Enter your permit number.",
+    value: "permit",
+    referenceLabel: "Permit number",
+    referencePlaceholder: "Enter your permit number",
+  },
+  {
+    label: "PROMISSORY NOTE",
+    description: "Enter your promissory note number.",
+    value: "promissory_note",
+    referenceLabel: "Promissory note number",
+    referencePlaceholder: "Enter your promissory note number",
+  },
+  {
+    label: "FULLY PAID",
+    description: "Enter your fully paid receipt number.",
+    value: "fully_paid",
+    referenceLabel: "Fully paid receipt number",
+    referencePlaceholder: "Enter your receipt number",
+  },
+  {
+    label: "TO FOLLOW",
+    description: "No reference number yet. This attempt is recorded as To Follow.",
+    value: "to_follow",
+  },
+];
+
+const selectedExamAccessItem =
+  computed(
+    () =>
+      examAccessItems.find(
+        (item) =>
+          item.value
+          === examAccessStatus.value,
+      ) ?? null,
+  );
+
+const requiresAccessReference =
+  computed(
+    () =>
+      Boolean(
+        selectedExamAccessItem.value
+          ?.referenceLabel,
+      ),
+  );
+
+watch(
+  examAccessStatus,
+  () => {
+    accessReferenceNumber.value = "";
+  },
+);
 
 const completedStatuses = [
   "submitted",
@@ -237,6 +305,41 @@ const actionLabel =
     },
   );
 
+const requiresExamPermit =
+  computed(
+    () =>
+      Boolean(
+        delivery.value
+          ?.assessmentType
+          === "examination"
+        && delivery.value
+          .requireExamPermit
+        && delivery.value.canStart
+        && !delivery.value.canResume,
+      ),
+  );
+
+const examAccessReady =
+  computed(
+    () => {
+      if (!requiresExamPermit.value) {
+        return true;
+      }
+
+      if (!examAccessStatus.value) {
+        return false;
+      }
+
+      if (requiresAccessReference.value) {
+        return accessReferenceNumber.value
+          .trim()
+          .length > 0;
+      }
+
+      return true;
+    },
+  );
+
 const canProceed =
   computed(
     () =>
@@ -337,12 +440,40 @@ function requestProceed(): void {
 
 async function startAttempt():
   Promise<void> {
+  if (!examAccessReady.value) {
+    toast.add({
+      title:
+        "Exam access details required",
+      description:
+        !examAccessStatus.value
+          ? "Choose your exam access status before starting."
+          : requiresAccessReference.value
+            ? `Enter your ${selectedExamAccessItem.value?.referenceLabel?.toLowerCase() ?? "reference number"} before starting.`
+            : "Complete the exam access declaration before starting.",
+      color:
+        "warning",
+    });
+
+    return;
+  }
+
   isStarting.value =
     true;
 
   const result =
     await beginAttempt(
       assignmentId.value,
+      requiresExamPermit.value
+        && examAccessStatus.value
+        ? {
+            status:
+              examAccessStatus.value,
+            referenceNumber:
+              requiresAccessReference.value
+                ? accessReferenceNumber.value.trim()
+                : null,
+          }
+        : undefined,
     );
 
   if (
@@ -776,7 +907,103 @@ onMounted(
       "
       icon="i-lucide-play"
       :loading="isStarting"
+      :confirm-disabled="!examAccessReady"
       @confirm="startAttempt"
-    />
+    >
+      <div
+        v-if="requiresExamPermit"
+        class="mt-4 space-y-4 rounded-xl border border-default bg-elevated/35 p-4"
+      >
+        <div>
+          <p class="text-sm font-bold text-highlighted">
+            Exam access
+          </p>
+
+          <p class="mt-1 text-sm leading-5 text-muted">
+            Select the status that applies to you. This is recorded with your attempt.
+          </p>
+        </div>
+
+        <fieldset>
+          <legend class="text-sm font-semibold text-highlighted">
+            Exam access status
+            <span class="text-error">*</span>
+          </legend>
+
+          <div
+            class="mt-2 grid gap-2 sm:grid-cols-2"
+            role="radiogroup"
+            aria-label="Exam access status"
+          >
+            <label
+              v-for="item in examAccessItems"
+              :key="item.value"
+              class="cursor-pointer rounded-xl border p-3 transition-colors focus-within:ring-2 focus-within:ring-primary/50"
+              :class="
+                examAccessStatus === item.value
+                  ? 'border-primary bg-primary/8'
+                  : 'border-default bg-default/40 hover:bg-elevated/70'
+              "
+            >
+              <input
+                v-model="examAccessStatus"
+                class="sr-only"
+                type="radio"
+                name="exam-access-status"
+                :value="item.value"
+              >
+
+              <span class="flex items-start gap-2">
+                <span
+                  class="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border"
+                  :class="
+                    examAccessStatus === item.value
+                      ? 'border-primary bg-primary text-white'
+                      : 'border-default'
+                  "
+                  aria-hidden="true"
+                >
+                  <span
+                    v-if="examAccessStatus === item.value"
+                    class="size-1.5 rounded-full bg-white"
+                  />
+                </span>
+
+                <span class="min-w-0">
+                  <span class="block text-xs font-black tracking-wide text-highlighted">
+                    {{ item.label }}
+                  </span>
+
+                  <span class="mt-0.5 block text-xs leading-4 text-muted">
+                    {{ item.description }}
+                  </span>
+                </span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <UFormField
+          v-if="requiresAccessReference"
+          :label="selectedExamAccessItem?.referenceLabel"
+          required
+        >
+          <UInput
+            v-model="accessReferenceNumber"
+            maxlength="100"
+            autocomplete="off"
+            :placeholder="selectedExamAccessItem?.referencePlaceholder"
+            class="w-full"
+          />
+        </UFormField>
+
+        <div
+          v-else-if="examAccessStatus === 'to_follow'"
+          class="rounded-lg border border-warning/25 bg-warning/8 px-3 py-2 text-xs leading-5 text-muted"
+        >
+          <span class="font-semibold text-highlighted">To Follow</span> is recorded for this attempt. You can continue without a reference number.
+        </div>
+      </div>
+    </ConfirmationModal>
   </div>
 </template>

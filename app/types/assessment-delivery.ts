@@ -25,6 +25,12 @@ export type DeliveryAttemptStatus =
   | "locked"
   | "cancelled";
 
+export type ExamAccessStatus =
+  | "permit"
+  | "promissory_note"
+  | "fully_paid"
+  | "to_follow";
+
 export interface DeliveryClassSummary {
   id: string;
   name: string;
@@ -127,6 +133,7 @@ export interface StudentAssessmentDelivery {
   questionCount: number;
   totalPoints: number;
   allowBacktracking: boolean;
+  requireExamPermit: boolean;
   resultVisibility: AssessmentResultVisibility;
   startsAt: string;
   endsAt: string;

@@ -2,6 +2,7 @@ import type {
   AttemptSelectionPolicyResponse,
   DeliveryQuestionPayload,
   ExpireDeliveryQuestionResult,
+  ExamAccessStatus,
   InstructorDeliveryListItem,
   InstructorDeliveryMonitor,
   SaveDeliveryAnswerResult,
@@ -269,6 +270,10 @@ export function useAssessmentDelivery() {
 
   async function beginAttempt(
     assignmentId: string,
+    examAccess?: {
+      status: ExamAccessStatus;
+      referenceNumber?: string | null;
+    },
   ) {
     return await invoke<
       MessageResponse
@@ -281,6 +286,11 @@ export function useAssessmentDelivery() {
       "begin-attempt",
       {
         assignmentId,
+        examAccessStatus:
+          examAccess?.status,
+        referenceNumber:
+          examAccess?.referenceNumber
+          ?? null,
       },
     );
   }

@@ -21,6 +21,7 @@ withDefaults(
       | "neutral";
     icon?: string;
     loading?: boolean;
+    confirmDisabled?: boolean;
     dismissible?: boolean;
   }>(),
   {
@@ -33,6 +34,8 @@ withDefaults(
     icon:
       "i-lucide-circle-help",
     loading:
+      false,
+    confirmDisabled:
       false,
     dismissible:
       true,
@@ -135,6 +138,7 @@ function confirm(): void {
         :color="confirmColor"
         size="lg"
         :loading="loading"
+        :disabled="loading || confirmDisabled"
         @click="confirm"
       >
         {{ confirmLabel }}
