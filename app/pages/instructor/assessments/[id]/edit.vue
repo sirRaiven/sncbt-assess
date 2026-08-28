@@ -1851,25 +1851,19 @@ onMounted(
       </main>
 
       <aside class="space-y-4 xl:sticky xl:top-24 xl:h-fit">
-        <AssessmentExcelImportPanel
-          :assessment-id="assessmentId"
-          :disabled="!isDraft"
-          @imported="handleQuestionsImported"
-          @history-locked="requestEditableRevision"
-        />
         <UCard id="all-question-timer-settings">
           <template #header>
-            <div class="flex items-start justify-between gap-3">
-              <div class="flex min-w-0 items-start gap-3">
-                <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <UIcon name="i-lucide-timer-reset" class="size-4.5" />
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex min-w-0 items-center gap-3">
+                <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <UIcon name="i-lucide-timer-reset" class="size-4" />
                 </span>
                 <div class="min-w-0">
                   <h2 class="font-bold text-highlighted">
-                    All question timers
+                    Timer defaults
                   </h2>
-                  <p class="mt-0.5 text-xs leading-5 text-muted">
-                    Set the timer behavior once for every question in this assessment.
+                  <p class="text-xs text-muted">
+                    Apply one setup to the whole assessment.
                   </p>
                 </div>
               </div>
@@ -1881,108 +1875,104 @@ onMounted(
           </template>
 
           <fieldset
-            class="space-y-4"
+            class="space-y-3"
             :disabled="!isDraft || isApplyingGeneralTimerSettings"
           >
-            <div class="flex items-start justify-between gap-4">
-              <div class="min-w-0">
-                <p class="font-semibold text-highlighted">
-                  Answer time
-                </p>
-                <p class="mt-1 text-xs leading-5 text-muted">
-                  Turn off to remove the per-question time limit from all current questions and new questions you add next.
-                </p>
-              </div>
+            <div class="overflow-hidden rounded-xl border border-default divide-y divide-default">
+              <div class="p-3.5">
+                <div class="flex items-center justify-between gap-4">
+                  <div class="min-w-0">
+                    <p class="font-semibold text-highlighted">
+                      Answer time
+                    </p>
+                    <p class="text-xs text-muted">
+                      Per-question time limit.
+                    </p>
+                  </div>
 
-              <USwitch
-                v-model="generalTimerSettings.timeLimitEnabled"
-                aria-label="Use an answer time for all questions"
-              />
-            </div>
+                  <USwitch
+                    v-model="generalTimerSettings.timeLimitEnabled"
+                    aria-label="Use an answer time for all questions"
+                  />
+                </div>
 
-            <UFormField
-              v-if="generalTimerSettings.timeLimitEnabled"
-              label="Answer time for all"
-              help="This value is applied to every question. You can still adjust an individual question afterward."
-            >
-              <UInput
-                v-model.number="generalTimerSettings.timeLimitSeconds"
-                type="number"
-                min="5"
-                max="3600"
-                icon="i-lucide-timer"
-                class="w-full"
-              >
-                <template #trailing>
-                  <span class="text-xs text-muted">sec</span>
-                </template>
-              </UInput>
-            </UFormField>
-
-            <div
-              v-else
-              class="flex items-center gap-2 rounded-lg bg-elevated/60 px-3 py-2.5 text-xs font-medium text-muted"
-            >
-              <UIcon name="i-lucide-infinity" class="size-4 shrink-0" />
-              No per-question time limit for all questions
-            </div>
-
-            <div
-              class="flex items-start justify-between gap-4 border-t border-default pt-4 transition"
-              :class="!generalTimerSettings.timeLimitEnabled ? 'opacity-55' : ''"
-            >
-              <div class="min-w-0">
-                <p class="font-semibold text-highlighted">
-                  Show timer progress
-                </p>
-                <p class="mt-1 text-xs leading-5 text-muted">
-                  Show the Student-side progress bar for every timed question. The numeric countdown remains visible.
-                </p>
-              </div>
-
-              <USwitch
-                v-model="generalTimerSettings.showTimerProgress"
-                :disabled="!generalTimerSettings.timeLimitEnabled"
-                aria-label="Show timer progress for all questions"
-              />
-            </div>
-
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-default pt-4">
-              <div class="min-w-0">
-                <UBadge
-                  v-if="questions.length === 0"
-                  color="neutral"
-                  variant="soft"
-                  size="sm"
+                <UFormField
+                  v-if="generalTimerSettings.timeLimitEnabled"
+                  label="Duration"
+                  class="mt-3"
                 >
-                  Default for new questions
-                </UBadge>
-                <UBadge
-                  v-else-if="allQuestionsUseGeneralTimerSettings"
-                  color="success"
-                  variant="soft"
-                  size="sm"
-                >
-                  Applied to all
-                </UBadge>
-                <UBadge
+                  <UInput
+                    v-model.number="generalTimerSettings.timeLimitSeconds"
+                    type="number"
+                    min="5"
+                    max="3600"
+                    icon="i-lucide-timer"
+                    class="w-full"
+                  >
+                    <template #trailing>
+                      <span class="text-xs text-muted">sec</span>
+                    </template>
+                  </UInput>
+                </UFormField>
+
+                <div
                   v-else
-                  color="warning"
-                  variant="soft"
-                  size="sm"
+                  class="mt-3 flex items-center gap-2 text-xs font-medium text-muted"
                 >
-                  {{ customTimerQuestionCount }} custom {{ customTimerQuestionCount === 1 ? "question" : "questions" }}
-                </UBadge>
-
-                <p
-                  v-if="customTimerQuestionCount > 0"
-                  class="mt-1 text-xs leading-5 text-muted"
-                >
-                  Applying this will replace those individual timer values.
-                </p>
+                  <UIcon name="i-lucide-infinity" class="size-4 shrink-0" />
+                  No time limit
+                </div>
               </div>
+
+              <div
+                class="flex items-center justify-between gap-4 p-3.5 transition"
+                :class="!generalTimerSettings.timeLimitEnabled ? 'opacity-55' : ''"
+              >
+                <div class="min-w-0">
+                  <p class="font-semibold text-highlighted">
+                    Timer progress
+                  </p>
+                  <p class="text-xs text-muted">
+                    Show the progress bar to students.
+                  </p>
+                </div>
+
+                <USwitch
+                  v-model="generalTimerSettings.showTimerProgress"
+                  :disabled="!generalTimerSettings.timeLimitEnabled"
+                  aria-label="Show timer progress for all questions"
+                />
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-3 pt-1">
+              <UBadge
+                v-if="questions.length === 0"
+                color="neutral"
+                variant="soft"
+                size="sm"
+              >
+                Default ready
+              </UBadge>
+              <UBadge
+                v-else-if="allQuestionsUseGeneralTimerSettings"
+                color="success"
+                variant="soft"
+                size="sm"
+              >
+                All questions match
+              </UBadge>
+              <UBadge
+                v-else
+                color="warning"
+                variant="soft"
+                size="sm"
+              >
+                {{ customTimerQuestionCount }} {{ customTimerQuestionCount === 1 ? "override" : "overrides" }}
+              </UBadge>
 
               <UButton
+                size="sm"
                 icon="i-lucide-check-check"
                 :loading="isApplyingGeneralTimerSettings"
                 :disabled="!isDraft"
@@ -1994,6 +1984,13 @@ onMounted(
           </fieldset>
         </UCard>
 
+        <AssessmentExcelImportPanel
+          :assessment-id="assessmentId"
+          :disabled="!isDraft"
+          @imported="handleQuestionsImported"
+          @history-locked="requestEditableRevision"
+        />
+
         <UCard>
           <template #header>
             <div class="flex items-center justify-between gap-3">
@@ -2002,7 +1999,7 @@ onMounted(
                   Question settings
                 </h2>
                 <p class="text-xs text-muted">
-                  Applies only to the active question and can override the all-question timer settings.
+                  Current question only.
                 </p>
               </div>
 
@@ -2022,13 +2019,10 @@ onMounted(
           </template>
 
           <fieldset
-            class="space-y-5"
+            class="space-y-3"
             :disabled="!isDraft"
           >
-            <UFormField
-              label="Points"
-              help="Score value for this question."
-            >
+            <UFormField label="Points">
               <UInput
                 v-model.number="editor.points"
                 type="number"
@@ -2040,63 +2034,62 @@ onMounted(
               />
             </UFormField>
 
-            <div class="rounded-xl border border-default p-4">
-              <div class="flex items-start justify-between gap-4">
-                <div class="min-w-0">
-                  <p class="font-semibold text-highlighted">
-                    Answer time
-                  </p>
-                  <p class="mt-1 text-xs leading-5 text-muted">
-                    Turn off to let the student stay on this question until they continue or the class schedule closes.
-                  </p>
+            <div class="overflow-hidden rounded-xl border border-default divide-y divide-default">
+              <div class="p-3.5">
+                <div class="flex items-center justify-between gap-4">
+                  <div class="min-w-0">
+                    <p class="font-semibold text-highlighted">
+                      Answer time
+                    </p>
+                    <p class="text-xs text-muted">
+                      No limit when turned off.
+                    </p>
+                  </div>
+
+                  <USwitch
+                    v-model="editor.timeLimitEnabled"
+                    aria-label="Use a time limit for this question"
+                  />
                 </div>
 
-                <USwitch
-                  v-model="editor.timeLimitEnabled"
-                  aria-label="Use a time limit for this question"
-                />
-              </div>
-
-              <UFormField
-                v-if="editor.timeLimitEnabled"
-                label="Time limit"
-                help="The question closes automatically when this time expires."
-                class="mt-4"
-              >
-                <UInput
-                  v-model.number="editor.timeLimitSeconds"
-                  type="number"
-                  min="5"
-                  max="3600"
-                  icon="i-lucide-timer"
-                  class="w-full"
+                <UFormField
+                  v-if="editor.timeLimitEnabled"
+                  label="Duration"
+                  class="mt-3"
                 >
-                  <template #trailing>
-                    <span class="text-xs text-muted">sec</span>
-                  </template>
-                </UInput>
-              </UFormField>
+                  <UInput
+                    v-model.number="editor.timeLimitSeconds"
+                    type="number"
+                    min="5"
+                    max="3600"
+                    icon="i-lucide-timer"
+                    class="w-full"
+                  >
+                    <template #trailing>
+                      <span class="text-xs text-muted">sec</span>
+                    </template>
+                  </UInput>
+                </UFormField>
+
+                <div
+                  v-else
+                  class="mt-3 flex items-center gap-2 text-xs font-medium text-muted"
+                >
+                  <UIcon name="i-lucide-infinity" class="size-4 shrink-0" />
+                  No time limit
+                </div>
+              </div>
 
               <div
-                v-else
-                class="mt-4 flex items-center gap-2 rounded-lg bg-elevated/60 px-3 py-2.5 text-xs font-medium text-muted"
+                class="flex items-center justify-between gap-4 p-3.5 transition"
+                :class="!editor.timeLimitEnabled ? 'opacity-55' : ''"
               >
-                <UIcon name="i-lucide-infinity" class="size-4 shrink-0" />
-                No per-question time limit
-              </div>
-            </div>
-
-            <div
-              class="rounded-xl border border-default p-4 transition"
-              :class="!editor.timeLimitEnabled ? 'opacity-55' : ''"
-            >
-              <div class="flex items-start justify-between gap-4">
                 <div class="min-w-0">
                   <p class="font-semibold text-highlighted">
-                    Show timer progress
+                    Timer progress
                   </p>
-                  <p class="mt-1 text-xs leading-5 text-muted">
-                    Show the question progress bar to students while the timer runs. The countdown remains visible.
+                  <p class="text-xs text-muted">
+                    Show the progress bar.
                   </p>
                 </div>
 
