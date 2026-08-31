@@ -671,6 +671,16 @@ onMounted(
               >
                 {{ assessmentTypeLabel(delivery.assessmentType) }}
               </UBadge>
+
+              <UBadge
+                v-if="delivery.personalAccess && delivery.personalAccess.status !== 'closed'"
+                color="primary"
+                variant="soft"
+                size="sm"
+                icon="i-lucide-user-round-check"
+              >
+                {{ delivery.personalAccess.type === 'second_chance' ? 'Second chance' : 'Make-up' }}
+              </UBadge>
             </div>
 
             <StatusPill

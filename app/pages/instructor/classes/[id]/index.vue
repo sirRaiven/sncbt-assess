@@ -83,6 +83,8 @@ const scheduleActionOpen = ref(false);
 const scheduleAction = ref<ScheduleAction | null>(null);
 const pendingScheduleDelivery = ref<InstructorDeliveryListItem | null>(null);
 const isScheduleActionSaving = ref(false);
+const studentAccessOpen = ref(false);
+const studentAccessAssignmentId = ref<string | null>(null);
 
 const assignedAssessments = computed(
   () => assessments.value
@@ -206,6 +208,11 @@ function requestScheduleAction(
   scheduleActionOpen.value = true;
 }
 
+function openStudentAccess(delivery: InstructorDeliveryListItem): void {
+  studentAccessAssignmentId.value = delivery.assignmentId;
+  studentAccessOpen.value = true;
+}
+
 function assessmentMenuItems(
   assessment: AssessmentWithClassroom,
 ): DropdownMenuItem[][] {
@@ -264,6 +271,12 @@ function assessmentMenuItems(
           ),
       });
     }
+
+    scheduleItems.push({
+      label: "Manage student access",
+      icon: "i-lucide-user-round-cog",
+      onSelect: () => openStudentAccess(delivery),
+    });
 
     scheduleItems.push({
       label: "View live monitoring",
@@ -1116,6 +1129,12 @@ onMounted(() => {
           </UCard>
         </div>
       </section>
+
+      <AssessmentStudentAccessModal
+        v-model:open="studentAccessOpen"
+        :assignment-id="studentAccessAssignmentId"
+        @updated="loadAssignedAssessments"
+      />
 
       <AssessmentScheduleActionModal
         v-model:open="scheduleActionOpen"

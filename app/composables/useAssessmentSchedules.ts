@@ -3,6 +3,10 @@ import type {
   InstructorAssessmentScheduleOverview,
 } from "~/types/assessment-schedule";
 
+import type {
+  AssessmentStudentAccessOverview,
+} from "~/types/assessment-student-access";
+
 import {
   parseUserFacingFunctionError,
 } from "~/utils/user-facing-error";
@@ -198,6 +202,47 @@ export function useAssessmentSchedules() {
     );
   }
 
+  async function listStudentAccess(
+    assignmentId: string,
+  ) {
+    return await invoke<AssessmentStudentAccessOverview>(
+      "list-student-access",
+      { assignmentId },
+    );
+  }
+
+  async function grantStudentAccess(
+    assignmentId: string,
+    studentId: string,
+    startsAt: string,
+    endsAt: string,
+    reason = "",
+  ) {
+    return await invoke<AssessmentStudentAccessOverview>(
+      "grant-student-access",
+      {
+        assignmentId,
+        studentId,
+        startsAt,
+        endsAt,
+        reason,
+      },
+    );
+  }
+
+  async function revokeStudentAccess(
+    assignmentId: string,
+    grantId: string,
+  ) {
+    return await invoke<AssessmentStudentAccessOverview>(
+      "revoke-student-access",
+      {
+        assignmentId,
+        grantId,
+      },
+    );
+  }
+
   return {
     getInstructorSchedule,
     saveSchedules,
@@ -205,5 +250,8 @@ export function useAssessmentSchedules() {
     editSchedule,
     extendSchedule,
     reopenSchedule,
+    listStudentAccess,
+    grantStudentAccess,
+    revokeStudentAccess,
   };
 }

@@ -796,6 +796,16 @@ onMounted(
             </p>
           </section>
 
+          <UAlert
+            v-if="delivery.personalAccess && delivery.personalAccess.status !== 'closed'"
+            class="mt-5"
+            color="primary"
+            variant="soft"
+            icon="i-lucide-user-round-check"
+            :title="delivery.personalAccess.type === 'second_chance' ? 'Second chance granted' : 'Personal make-up access'"
+            :description="`${delivery.personalAccess.type === 'second_chance' ? 'You have one additional attempt' : 'You have a personal assessment window'} until ${formatDate(delivery.personalAccess.endsAt)}. This access applies only to you.`"
+          />
+
           <div
             v-if="
               attemptPolicy

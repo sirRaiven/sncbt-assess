@@ -232,6 +232,106 @@ export type Database = {
           },
         ]
       }
+      assessment_student_access_grants: {
+        Row: {
+          additional_attempts: number
+          assessment_id: string
+          assignment_id: string
+          classroom_id: string
+          consumed_at: string | null
+          consumed_attempt_id: string | null
+          created_at: string
+          ends_at: string
+          grant_type: string
+          id: string
+          instructor_id: string
+          reason: string | null
+          revoked_at: string | null
+          starts_at: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          additional_attempts?: number
+          assessment_id: string
+          assignment_id: string
+          classroom_id: string
+          consumed_at?: string | null
+          consumed_attempt_id?: string | null
+          created_at?: string
+          ends_at: string
+          grant_type: string
+          id?: string
+          instructor_id: string
+          reason: string | null
+          revoked_at?: string | null
+          starts_at: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          additional_attempts?: number
+          assessment_id?: string
+          assignment_id?: string
+          classroom_id?: string
+          consumed_at?: string | null
+          consumed_attempt_id?: string | null
+          created_at?: string
+          ends_at?: string
+          grant_type?: string
+          id?: string
+          instructor_id?: string
+          reason?: string | null
+          revoked_at?: string | null
+          starts_at?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_student_access_grants_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_student_access_grants_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_student_access_grants_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_student_access_grants_consumed_attempt_id_fkey"
+            columns: ["consumed_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_student_access_grants_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_student_access_grants_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessment_attempts: {
         Row: {
           answered_count: number
@@ -1347,6 +1447,15 @@ export type Database = {
         }
         Returns: number
       }
+      begin_granted_assessment_attempt_with_access: {
+        Args: {
+          p_assignment_id: string
+          p_exam_access_status?: string | null
+          p_permit_number?: string | null
+          p_student_id: string
+        }
+        Returns: string
+      }
       begin_scheduled_assessment_attempt: {
         Args: { p_assignment_id: string; p_student_id: string }
         Returns: string
@@ -1363,6 +1472,21 @@ export type Database = {
       begin_student_attempt: {
         Args: { p_session_id: string; p_student_id: string }
         Returns: string
+      }
+      grant_student_assessment_access: {
+        Args: {
+          p_assignment_id: string
+          p_ends_at: string
+          p_instructor_id: string
+          p_reason?: string | null
+          p_starts_at: string
+          p_student_id: string
+        }
+        Returns: string
+      }
+      revoke_student_assessment_access_grant: {
+        Args: { p_grant_id: string; p_instructor_id: string }
+        Returns: undefined
       }
       close_assessment_session: {
         Args: {
@@ -1685,7 +1809,7 @@ export type Database = {
           p_assignment_id: string
           p_ends_at: string
           p_instructor_id: string
-          p_reason: string
+          p_reason?: string | null
           p_starts_at: string
         }
         Returns: Json

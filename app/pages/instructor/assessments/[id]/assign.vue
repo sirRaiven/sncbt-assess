@@ -120,6 +120,8 @@ const scheduleActionOpen = ref(false);
 const scheduleAction = ref<ScheduleAction | null>(null);
 const pendingScheduleAction = ref<AssessmentScheduleItem | null>(null);
 const isScheduleActionSaving = ref(false);
+const studentAccessOpen = ref(false);
+const studentAccessAssignmentId = ref<string | null>(null);
 
 const selectedRows =
   computed(
@@ -703,6 +705,11 @@ function requestScheduleAction(
     true;
 }
 
+function openStudentAccess(schedule: AssessmentScheduleItem): void {
+  studentAccessAssignmentId.value = schedule.id;
+  studentAccessOpen.value = true;
+}
+
 function scheduleMenuItems(
   schedule: AssessmentScheduleItem,
 ): DropdownMenuItem[][] {
@@ -750,6 +757,11 @@ function scheduleMenuItems(
   }
 
   const secondaryItems: DropdownMenuItem[] = [
+    {
+      label: "Manage student access",
+      icon: "i-lucide-user-round-cog",
+      onSelect: () => openStudentAccess(schedule),
+    },
     {
       label: "View live monitoring",
       icon: "i-lucide-radio-tower",
@@ -1463,6 +1475,12 @@ onMounted(
         </div>
       </template>
     </UModal>
+
+    <AssessmentStudentAccessModal
+      v-model:open="studentAccessOpen"
+      :assignment-id="studentAccessAssignmentId"
+      @updated="loadData"
+    />
 
     <AssessmentScheduleActionModal
       v-model:open="scheduleActionOpen"

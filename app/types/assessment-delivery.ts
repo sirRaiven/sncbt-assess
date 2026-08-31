@@ -86,6 +86,7 @@ export interface InstructorAssessmentScheduleOverview {
 export interface DeliveryAttemptSummary {
   id: string;
   status: DeliveryAttemptStatus;
+  attemptNumber?: number;
   startedAt: string | null;
   expiresAt: string | null;
   submittedAt: string | null;
@@ -119,6 +120,16 @@ export interface DeliveryAttemptPolicy {
   latestScore: number | null;
 }
 
+export interface StudentPersonalAssessmentAccess {
+  id: string;
+  type: "make_up" | "second_chance";
+  startsAt: string;
+  endsAt: string;
+  status: "upcoming" | "open" | "closed";
+  consumed: boolean;
+  canStart: boolean;
+}
+
 export interface StudentAssessmentDelivery {
   assignmentId: string;
   assessmentId: string;
@@ -144,6 +155,7 @@ export interface StudentAssessmentDelivery {
   classroom: DeliveryClassSummary;
   attempt: DeliveryAttemptSummary | null;
   attemptPolicy?: DeliveryAttemptPolicy | null;
+  personalAccess?: StudentPersonalAssessmentAccess | null;
   canStart: boolean;
   canResume: boolean;
   canViewResult: boolean;
