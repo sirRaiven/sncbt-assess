@@ -11,13 +11,13 @@ export const APP_INSTITUTION =
   "St. Nicolas College of Business and Technology" as const;
 
 export const APP_VERSION =
-  "0.1.0" as const;
+  "0.2.0" as const;
 
 export const APP_VERSION_LABEL =
   `v${APP_VERSION}` as const;
 
 export const APP_RELEASE_NAME =
-  "September 2026 Update" as const;
+  "Installable App Update" as const;
 
 export const APP_RELEASE_DATE =
   "September 2026" as const;

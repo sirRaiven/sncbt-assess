@@ -10,10 +10,16 @@
           <BrandMark />
         </NuxtLink>
 
-        <UColorModeButton
-          size="lg"
-          variant="ghost"
-        />
+        <div class="flex items-center gap-1 sm:gap-2">
+          <ClientOnly>
+            <PwaInstallButton />
+          </ClientOnly>
+
+          <UColorModeButton
+            size="lg"
+            variant="ghost"
+          />
+        </div>
       </UContainer>
     </header>
 

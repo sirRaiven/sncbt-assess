@@ -523,6 +523,10 @@ onBeforeUnmount(
         </template>
 
         <template #right>
+          <ClientOnly>
+            <PwaInstallButton />
+          </ClientOnly>
+
           <UColorModeButton
             size="lg"
             variant="ghost"
