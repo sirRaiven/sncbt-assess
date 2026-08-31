@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from "@nuxt/ui";
+
 import type {
   AssessmentWithClassroom,
 } from "~/types/assessment";
+
+import type {
+  InstructorDeliveryListItem,
+} from "~/types/assessment-delivery";
 
 import type {
   ClassroomEnrollmentSettings,
@@ -36,11 +42,20 @@ const {
   listInstructorAssessments,
 } = useAssessments();
 
+const {
+  listInstructorDeliveries,
+} = useAssessmentDelivery();
+
 const enrollmentSettings =
   ref<ClassroomEnrollmentSettings | null>(null);
 
 const assessments =
   ref<AssessmentWithClassroom[]>([]);
+
+const deliveries =
+  ref<InstructorDeliveryListItem[]>([]);
+
+const deliveryDataAvailable = ref(false);
 
 const isLoadingEnrollment = ref(true);
 const isLoadingAssessments = ref(true);
@@ -86,26 +101,143 @@ function typeLabel(value: string): string {
     .join(" ");
 }
 
+function formatPublishedDate(value: string | null): string {
+  if (!value) return "";
+
+  return new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeZone: "Asia/Manila",
+  }).format(new Date(value));
+}
+
+function formatScheduleWindow(
+  startsAt: string,
+  endsAt: string,
+): string {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+
+  const dateFormatter = new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "Asia/Manila",
+  });
+
+  const timeFormatter = new Intl.DateTimeFormat("en-PH", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Asia/Manila",
+  });
+
+  const sameDate = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Manila",
+  });
+
+  if (sameDate.format(start) === sameDate.format(end)) {
+    return `${dateFormatter.format(start)} · ${timeFormatter.format(start)}–${timeFormatter.format(end)}`;
+  }
+
+  return `${dateFormatter.format(start)} ${timeFormatter.format(start)} – ${dateFormatter.format(end)} ${timeFormatter.format(end)}`;
+}
+
+function deliveryPriority(
+  delivery: InstructorDeliveryListItem,
+): number {
+  switch (delivery.status) {
+    case "open":
+      return 0;
+    case "upcoming":
+      return 1;
+    case "closed":
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+function assessmentDelivery(
+  assessmentId: string,
+): InstructorDeliveryListItem | null {
+  const matching = deliveries.value
+    .filter(
+      (delivery) =>
+        delivery.assessmentId === assessmentId
+        && delivery.classroom.id === classroomId.value
+        && delivery.status !== "cancelled",
+    )
+    .sort((first, second) => {
+      const priority = deliveryPriority(first) - deliveryPriority(second);
+      if (priority !== 0) return priority;
+
+      if (first.status === "closed" && second.status === "closed") {
+        return new Date(second.endsAt).getTime() - new Date(first.endsAt).getTime();
+      }
+
+      return new Date(first.startsAt).getTime() - new Date(second.startsAt).getTime();
+    });
+
+  return matching[0] ?? null;
+}
+
+function assessmentMenuItems(
+  assessment: AssessmentWithClassroom,
+): DropdownMenuItem[][] {
+  const delivery = assessmentDelivery(assessment.id);
+
+  return [
+    [
+      {
+        label: "Edit assessment",
+        icon: "i-lucide-pencil",
+        to: `/instructor/assessments/${assessment.id}/edit`,
+      },
+      {
+        label: "View live monitoring",
+        icon: "i-lucide-radio-tower",
+        to: delivery
+          ? `/instructor/sessions/${delivery.assignmentId}/monitor`
+          : undefined,
+        disabled: !delivery,
+      },
+    ],
+  ];
+}
+
 async function loadAssignedAssessments(): Promise<void> {
   isLoadingAssessments.value = true;
   assessmentError.value = "";
 
-  const result =
-    await listInstructorAssessments();
+  const [assessmentResult, deliveryResult] =
+    await Promise.all([
+      listInstructorAssessments(),
+      listInstructorDeliveries(),
+    ]);
 
   if (
-    result.error
-    || !result.data
+    assessmentResult.error
+    || !assessmentResult.data
   ) {
     assessmentError.value =
-      result.error
+      assessmentResult.error
       || "We couldn't load the assigned assessments right now.";
     isLoadingAssessments.value = false;
     return;
   }
 
   assessments.value =
-    result.data.assessments;
+    assessmentResult.data.assessments;
+
+  deliveries.value =
+    deliveryResult.data?.deliveries
+    ?? [];
+
+  deliveryDataAvailable.value =
+    Boolean(deliveryResult.data);
+
   isLoadingAssessments.value = false;
 }
 
@@ -436,9 +568,6 @@ onMounted(() => {
                   </UBadge>
                 </div>
 
-                  <p class="mt-1 text-sm text-muted">
-                    Assessments currently connected to this class.
-                  </p>
                 </div>
               </div>
 
@@ -529,68 +658,101 @@ onMounted(() => {
             v-else
             class="space-y-3 p-4 sm:p-5"
           >
-            <NuxtLink
+            <article
               v-for="assessment in assignedAssessments"
               :key="assessment.id"
-              :to="`/instructor/assessments/${assessment.id}/edit`"
-              class="group flex items-center gap-4 rounded-2xl border border-primary/10 bg-gradient-to-r from-default via-default to-primary/5 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md hover:shadow-primary/10 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30 sm:p-5 dark:border-primary/15 dark:to-primary/10"
-              :aria-label="`Edit ${assessment.title}`"
+              class="rounded-2xl border border-primary/10 bg-gradient-to-r from-default via-default to-primary/5 p-4 shadow-sm transition-colors hover:border-primary/20 sm:p-5 dark:border-primary/15 dark:to-primary/10"
             >
-              <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
-                <UIcon
-                  name="i-lucide-clipboard-check"
-                  class="size-5"
-                />
-              </div>
-
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <UBadge
-                    color="neutral"
-                    variant="soft"
-                    size="sm"
-                  >
-                    {{ typeLabel(assessment.assessment_type) }}
-                  </UBadge>
-
-                  <StatusPill
-                    :status="assessment.status"
+              <div class="flex min-w-0 items-start gap-3 sm:gap-4">
+                <div class="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+                  <UIcon
+                    name="i-lucide-clipboard-check"
+                    class="size-5"
                   />
                 </div>
 
-                <h3 class="mt-2 truncate font-bold text-highlighted transition-colors group-hover:text-primary">
-                  {{ assessment.title }}
-                </h3>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <UBadge
+                      color="neutral"
+                      variant="soft"
+                      size="sm"
+                    >
+                      {{ typeLabel(assessment.assessment_type) }}
+                    </UBadge>
 
-                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-                  <span class="inline-flex items-center gap-1.5">
-                    <UIcon
-                      name="i-lucide-list-checks"
-                      class="size-3.5"
-                    />
-                    {{ assessment.question_count }} question{{ assessment.question_count === 1 ? "" : "s" }}
-                  </span>
+                    <StatusPill :status="assessment.status" />
 
-                  <span class="inline-flex items-center gap-1.5">
-                    <UIcon
-                      name="i-lucide-circle-dot"
-                      class="size-3.5"
-                    />
-                    {{ assessment.total_points }} point{{ assessment.total_points === 1 ? "" : "s" }}
-                  </span>
+                    <span
+                      v-if="assessment.status === 'published' && assessment.published_at"
+                      class="text-xs text-muted"
+                    >
+                      Published {{ formatPublishedDate(assessment.published_at) }}
+                    </span>
+                  </div>
+
+                  <NuxtLink
+                    :to="`/instructor/assessments/${assessment.id}/edit`"
+                    class="mt-2 block w-fit max-w-full font-bold text-highlighted transition-colors hover:text-primary focus-visible:rounded focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+                  >
+                    <span class="line-clamp-2">{{ assessment.title }}</span>
+                  </NuxtLink>
+
+                  <div class="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
+                    <span class="inline-flex items-center gap-1.5">
+                      <UIcon name="i-lucide-list-checks" class="size-3.5" />
+                      {{ assessment.question_count }} question{{ assessment.question_count === 1 ? "" : "s" }}
+                    </span>
+
+                    <span class="inline-flex items-center gap-1.5">
+                      <UIcon name="i-lucide-circle-dot" class="size-3.5" />
+                      {{ assessment.total_points }} point{{ assessment.total_points === 1 ? "" : "s" }}
+                    </span>
+
+                    <span
+                      v-if="assessmentDelivery(assessment.id)"
+                      class="inline-flex min-w-0 items-center gap-1.5"
+                    >
+                      <UIcon name="i-lucide-calendar-clock" class="size-3.5 shrink-0" />
+                      <span class="truncate">
+                        {{ formatScheduleWindow(assessmentDelivery(assessment.id)!.startsAt, assessmentDelivery(assessment.id)!.endsAt) }}
+                      </span>
+                    </span>
+
+                    <span
+                      v-else-if="deliveryDataAvailable"
+                      class="inline-flex items-center gap-1.5 text-muted/80"
+                    >
+                      <UIcon name="i-lucide-calendar-x" class="size-3.5" />
+                      Not scheduled
+                    </span>
+
+                    <span
+                      v-else
+                      class="inline-flex items-center gap-1.5 text-muted/80"
+                    >
+                      <UIcon name="i-lucide-calendar-clock" class="size-3.5" />
+                      Schedule unavailable
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <div class="flex shrink-0 items-center gap-2 text-muted transition-colors group-hover:text-primary">
-                <span class="hidden text-xs font-medium sm:inline">
-                  Edit assessment
-                </span>
-                <UIcon
-                  name="i-lucide-chevron-right"
-                  class="size-5"
-                />
+                <UDropdownMenu
+                  :items="assessmentMenuItems(assessment)"
+                  :content="{ align: 'end', side: 'bottom', sideOffset: 6 }"
+                  :ui="{ content: 'w-52', item: 'min-h-10', itemLabel: 'font-semibold' }"
+                >
+                  <UButton
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-lucide-ellipsis-vertical"
+                    square
+                    size="sm"
+                    :aria-label="`Actions for ${assessment.title}`"
+                  />
+                </UDropdownMenu>
               </div>
-            </NuxtLink>
+            </article>
           </div>
         </UCard>
 
