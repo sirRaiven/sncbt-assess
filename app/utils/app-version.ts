@@ -2,24 +2,22 @@ export const APP_NAME =
   "SNCBT Assess" as const;
 
 export const APP_DESCRIPTION =
-  "Classroom assessment and learning management" as const;
+  "Classroom assessment workspace for instructors and students" as const;
 
 export const APP_SUMMARY =
-  "A focused workspace for SNCBT instructors and students to manage classes, deliver assessments, monitor participation, and review released results." as const;
+  "SNCBT Assess supports everyday classroom assessment activities by giving instructors a place to organize classes and assessments, while giving students a clear place to take assessments and review available results. It is designed to keep these tasks simple, organized, and easier to follow." as const;
 
 export const APP_INSTITUTION =
   "St. Nicolas College of Business and Technology" as const;
 
 export const APP_VERSION =
-  "0.0.1" as const;
+  "0.1.0" as const;
 
 export const APP_VERSION_LABEL =
   `v${APP_VERSION}` as const;
 
-// Kept for changelog/release compatibility even though the About App UI
-// intentionally shows only the information most users need.
 export const APP_RELEASE_NAME =
-  "Initial Development Release" as const;
+  "September 2026 Update" as const;
 
 export const APP_RELEASE_DATE =
-  "August 2026" as const;
+  "September 2026" as const;
