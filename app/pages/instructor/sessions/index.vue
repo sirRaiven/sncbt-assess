@@ -15,6 +15,13 @@ const {
   listInstructorDeliveries,
 } = useAssessmentDelivery();
 
+const {
+  archiveDelivery,
+} = useInstructorArchive();
+
+const toast =
+  useToast();
+
 const deliveries = ref<InstructorDeliveryListItem[]>([]);
 const searchQuery = ref("");
 
@@ -28,6 +35,11 @@ const activeFilter = ref<
 
 const isLoading = ref(true);
 const errorMessage = ref("");
+
+const busyArchiveId =
+  ref<string | null>(
+    null,
+  );
 
 const filterItems = [
   { label: "All", value: "all" },
@@ -147,6 +159,70 @@ function actionIcon(
   return delivery.status === "open"
     ? "i-lucide-chart-no-axes-combined"
     : "i-lucide-arrow-right";
+}
+
+function canArchive(
+  delivery: InstructorDeliveryListItem,
+): boolean {
+  return (
+    delivery.status === "closed"
+    || delivery.status === "cancelled"
+  );
+}
+
+async function archiveSession(
+  delivery: InstructorDeliveryListItem,
+): Promise<void> {
+  if (!canArchive(delivery)) {
+    return;
+  }
+
+  busyArchiveId.value =
+    delivery.assignmentId;
+
+  const result =
+    await archiveDelivery(
+      delivery.assignmentId,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title:
+        "Session could not be archived",
+      description:
+        result.error
+        || "The closed session could not be moved to Archive.",
+      color:
+        "error",
+    });
+
+    busyArchiveId.value =
+      null;
+
+    return;
+  }
+
+  deliveries.value =
+    deliveries.value.filter(
+      (item) =>
+        item.assignmentId
+        !== delivery.assignmentId,
+    );
+
+  toast.add({
+    title:
+      "Session archived",
+    description:
+      "The session was removed from Live Sessions. Its assessment attempts and results were preserved.",
+    color:
+      "success",
+  });
+
+  busyArchiveId.value =
+    null;
 }
 
 async function loadDeliveries(): Promise<void> {
@@ -412,15 +488,31 @@ onMounted(loadDeliveries);
               </div>
             </div>
 
-            <UButton
-              :to="`/instructor/sessions/${delivery.assignmentId}/monitor`"
-              :icon="actionIcon(delivery)"
-              :color="delivery.status === 'open' ? 'primary' : 'neutral'"
-              :variant="delivery.status === 'open' ? 'solid' : 'soft'"
-              block
-            >
-              {{ actionLabel(delivery) }}
-            </UButton>
+            <div class="grid gap-2">
+              <UButton
+                :to="`/instructor/sessions/${delivery.assignmentId}/monitor`"
+                :icon="actionIcon(delivery)"
+                :color="delivery.status === 'open' ? 'primary' : 'neutral'"
+                :variant="delivery.status === 'open' ? 'solid' : 'soft'"
+                block
+              >
+                {{ actionLabel(delivery) }}
+              </UButton>
+
+              <UButton
+                v-if="canArchive(delivery)"
+                type="button"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-archive"
+                :loading="busyArchiveId === delivery.assignmentId"
+                :disabled="Boolean(busyArchiveId)"
+                block
+                @click="archiveSession(delivery)"
+              >
+                Archive
+              </UButton>
+            </div>
           </div>
         </div>
       </UCard>

@@ -1420,7 +1420,6 @@ function retryExpiredQuestionNow():
   void {
   if (
     !isOnline.value
-    || isSaving.value
     || isSubmitting.value
     || !questionPayload.value
     || questionPayload.value.finalized
@@ -2419,6 +2418,25 @@ async function synchronizeAnswer(
     return false;
   }
 
+  // Once the client clock reaches the authoritative question deadline,
+  // no queued draft autosave should start another request. The timeout
+  // transition owns reconciliation from this point and will send the
+  // latest local response through expire-question after any request
+  // already in flight has settled.
+  if (
+    !finalize
+    && questionSeconds.value === 0
+    && !questionPayload.value
+      .finalized
+  ) {
+    saveRecovery();
+
+    pendingSync.value =
+      true;
+
+    return false;
+  }
+
   const syncRevision =
     answerRevision.value;
 
@@ -2475,8 +2493,15 @@ async function synchronizeAnswer(
           ?.toLowerCase()
         || "";
 
+      const questionExpiryOwnsRecovery =
+        !finalize
+        && questionSeconds.value === 0
+        && !questionPayload.value
+          .finalized;
+
       const mayHaveReachedServer =
-        options?.recoverFinalized
+        !questionExpiryOwnsRecovery
+        && options?.recoverFinalized
           !== false
         && (
           result.code
@@ -2517,7 +2542,10 @@ async function synchronizeAnswer(
       pendingSync.value =
         true;
 
-      if (!options?.silentError) {
+      if (
+        !options?.silentError
+        && !questionExpiryOwnsRecovery
+      ) {
         toast.add({
           title:
             "Answer could not be synchronized",
@@ -3243,7 +3271,6 @@ async function handleQuestionTimeout():
   if (
     !delivery.value?.attempt
     || !questionPayload.value
-    || isSaving.value
     || isSubmitting.value
     || questionPayload.value.finalized
     || questionTimeoutTriggered.value
@@ -3258,6 +3285,16 @@ async function handleQuestionTimeout():
     return;
   }
 
+  const expiredAttemptId =
+    delivery.value.attempt.id;
+
+  const expiredQuestionId =
+    questionPayload.value
+      .question.id;
+
+  const expiredIndex =
+    currentIndex.value;
+
   questionTimeoutTriggered.value =
     true;
 
@@ -3269,8 +3306,74 @@ async function handleQuestionTimeout():
 
   saveRecovery();
 
-  const expiredIndex =
-    currentIndex.value;
+  // A timer can expire while a draft autosave is already using the same
+  // attempt/question row. Do not race a second request against it.
+  //
+  // Any queued draft that has not started yet will see questionSeconds=0
+  // inside synchronizeAnswer() and exit without making another network
+  // request. Once the queue settles, expire-question becomes the single
+  // authoritative transition for the timed-out question.
+  const pendingAnswerWork =
+    answerSyncQueue;
+
+  await pendingAnswerWork.catch(
+    () => undefined,
+  );
+
+  if (
+    !delivery.value?.attempt
+    || !questionPayload.value
+    || isSubmitting.value
+    || allowRouteLeave.value
+    || delivery.value.attempt.id
+      !== expiredAttemptId
+    || questionPayload.value
+      .question.id
+      !== expiredQuestionId
+    || currentIndex.value
+      !== expiredIndex
+  ) {
+    questionTimeoutSyncPending.value =
+      false;
+
+    questionTimeoutTriggered.value =
+      false;
+
+    return;
+  }
+
+  // The in-flight save may already have finalized this question.
+  if (questionPayload.value.finalized) {
+    questionTimeoutSyncPending.value =
+      false;
+
+    questionTimeoutTriggered.value =
+      false;
+
+    clearRecovery();
+
+    pendingSync.value =
+      false;
+
+    await continueAfterQuestionTimeout();
+
+    return;
+  }
+
+  // A reconciliation performed by the preceding save may reveal that the
+  // question still has time left after clock correction.
+  if (
+    questionSeconds.value !== null
+    && questionSeconds.value > 0
+  ) {
+    questionTimeoutSyncPending.value =
+      false;
+
+    questionTimeoutTriggered.value =
+      false;
+
+    return;
+  }
 
   const normalizedOptionIds =
     normalizeSelectedOptionIds();
@@ -3281,9 +3384,8 @@ async function handleQuestionTimeout():
 
   const result =
     await expireQuestion(
-      delivery.value.attempt.id,
-      questionPayload.value
-        .question.id,
+      expiredAttemptId,
+      expiredQuestionId,
       expiredIndex,
       {
         selectedOptionIds:
@@ -3391,9 +3493,9 @@ async function handleQuestionTimeout():
     }
   }
 
-  // Backward-compatible fallback: if the new expire-question action
-  // has not reached an Edge Function replica yet, or a transient relay
-  // error occurs, reconcile using get-question instead of freezing.
+  // A browser timeout does not prove that the Edge Function / database
+  // stopped processing. Read the canonical state instead of blindly
+  // resending the answer or leaving the Student parked at 00:00.
   const reconciliation =
     await reconcileExpiredQuestion();
 
@@ -3445,8 +3547,9 @@ async function handleQuestionTimeout():
     currentServerTimeMs()
     + retryDelay;
 
-  // Release the latch. startTimer(), focus, visibility and online
-  // recovery can now retry without creating overlapping requests.
+  // Release the latch. The timer, focus/visibility recovery, online event,
+  // and explicit Retry button can safely try again without overlapping
+  // the request that just completed.
   questionTimeoutTriggered.value =
     false;
 }
@@ -3965,9 +4068,11 @@ onBeforeRouteLeave(
               />
               <span>
                 {{
-                  isOnline
-                    ? "Closing this question and opening the next one…"
-                    : "Connection lost. We'll continue automatically when you're back online."
+                  !isOnline
+                    ? "Connection lost. We'll continue automatically when you're back online."
+                    : questionTimeoutRetryCount >= 1
+                      ? "This is taking longer than expected. Your latest response is cached while SNCBT Assess checks the server."
+                      : "Closing this question and opening the next one…"
                 }}
               </span>
             </div>
@@ -3998,13 +4103,33 @@ onBeforeRouteLeave(
                   Time's up
                 </p>
                 <p class="mt-1 max-w-sm text-sm text-muted">
-                  This question is closed. SNCBT Assess is moving you to the next question automatically.
+                  {{
+                    !isOnline
+                      ? "Your latest response is cached on this device. SNCBT Assess will continue when the connection returns."
+                      : questionTimeoutRetryCount >= 1
+                        ? "Your latest response is cached on this device. SNCBT Assess is confirming the server state before continuing."
+                        : "This question is closed. SNCBT Assess is moving you to the next question automatically."
+                  }}
                 </p>
+
                 <UIcon
-                  v-if="isOnline"
+                  v-if="isOnline && questionTimeoutRetryCount < 1"
                   name="i-lucide-loader-circle"
                   class="mt-4 size-5 animate-spin text-primary"
                 />
+
+                <UButton
+                  v-if="isOnline && questionTimeoutRetryCount >= 1"
+                  class="mt-4"
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-refresh-cw"
+                  :loading="questionTimeoutSyncPending || questionTimeoutTriggered"
+                  :disabled="isSubmitting || questionTimeoutSyncPending || questionTimeoutTriggered"
+                  @click="retryExpiredQuestionNow"
+                >
+                  Retry now
+                </UButton>
               </div>
 
               <template v-else>

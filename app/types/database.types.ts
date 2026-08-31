@@ -84,6 +84,7 @@ export type Database = {
       }
       assessment_assignments: {
         Row: {
+          archived_at: string | null
           assessment_id: string
           cancelled_at: string | null
           classroom_id: string
@@ -101,6 +102,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           assessment_id: string
           cancelled_at?: string | null
           classroom_id: string
@@ -118,6 +120,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           assessment_id?: string
           cancelled_at?: string | null
           classroom_id?: string
@@ -1593,14 +1596,6 @@ export type Database = {
       delete_assessment_question: {
         Args: { p_instructor_id: string; p_question_id: string }
         Returns: string
-      }
-      delete_instructor_archived_assessment: {
-        Args: { p_assessment_id: string; p_instructor_id: string }
-        Returns: Json
-      }
-      delete_instructor_closed_session: {
-        Args: { p_instructor_id: string; p_session_id: string }
-        Returns: Json
       }
       duplicate_assessment_question: {
         Args: { p_instructor_id: string; p_question_id: string }

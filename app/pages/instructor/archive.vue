@@ -6,6 +6,7 @@ import type {
 import type {
   InstructorClassroom,
 } from "~/types/classroom";
+
 import type {
   ArchiveSection,
   ArchivedAssessmentItem,
@@ -21,23 +22,18 @@ useSeoMeta({
   title: "Archive",
 });
 
-interface DeleteTarget {
-  kind:
-    | "assessment"
-    | "session";
-  id: string;
-  title: string;
-  detail: string;
-}
+const route =
+  useRoute();
 
-const route = useRoute();
-const router = useRouter();
-const toast = useToast();
+const router =
+  useRouter();
+
+const toast =
+  useToast();
 
 const {
   getArchiveOverview,
-  deleteArchivedAssessment,
-  deleteClosedSession,
+  restoreDelivery,
 } = useInstructorArchive();
 
 const {
@@ -45,13 +41,19 @@ const {
   reactivateClass,
 } = useClassrooms();
 
+const {
+  restoreAssessment,
+} = useAssessments();
+
 const overview =
   ref<InstructorArchiveOverview | null>(
     null,
   );
 
 const archivedClasses =
-  ref<InstructorClassroom[]>([]);
+  ref<InstructorClassroom[]>(
+    [],
+  );
 
 function initialSection(): ArchiveSection {
   const requested =
@@ -85,19 +87,20 @@ const isLoading =
 const errorMessage =
   ref("");
 
-const deleteTarget =
-  ref<DeleteTarget | null>(
+const busyClassroomId =
+  ref<string | null>(
     null,
   );
 
-const confirmationText =
-  ref("");
+const busyAssessmentId =
+  ref<string | null>(
+    null,
+  );
 
-const isDeleting =
-  ref(false);
-
-const busyClassroomId =
-  ref<string | null>(null);
+const busySessionId =
+  ref<string | null>(
+    null,
+  );
 
 const summary = computed(
   () =>
@@ -105,9 +108,7 @@ const summary = computed(
     ?? {
       archivedAssessments:
         0,
-      closedSessions:
-        0,
-      blockedAssessments:
+      archivedSessions:
         0,
       totalRecords:
         0,
@@ -198,7 +199,6 @@ const filteredSessions = computed(
           session.subjectCode,
           session.classroomName,
           session.section,
-          session.sessionCode,
           session.status,
         ]
           .join(" ")
@@ -224,16 +224,8 @@ const searchPlaceholder = computed(
       return "Search archived assessments";
     }
 
-    return "Search assessment, class, or code";
+    return "Search archived sessions";
   },
-);
-
-const canConfirmDelete = computed(
-  () =>
-    confirmationText.value
-      .trim()
-      .toUpperCase()
-    === "DELETE",
 );
 
 function selectSection(
@@ -241,6 +233,7 @@ function selectSection(
 ): void {
   activeSection.value =
     section;
+
   query.value =
     "";
 
@@ -272,6 +265,30 @@ function formatDate(
   );
 }
 
+function formatSessionWindow(
+  startsAt: string,
+  endsAt: string,
+): string {
+  const start =
+    new Date(startsAt);
+
+  const end =
+    new Date(endsAt);
+
+  const formatter =
+    new Intl.DateTimeFormat(
+      "en-PH",
+      {
+        dateStyle:
+          "medium",
+        timeStyle:
+          "short",
+      },
+    );
+
+  return `${formatter.format(start)} – ${formatter.format(end)}`;
+}
+
 function typeLabel(
   value: string,
 ): string {
@@ -285,55 +302,26 @@ function typeLabel(
     .join(" ");
 }
 
-function openAssessmentDelete(
-  assessment: ArchivedAssessmentItem,
-): void {
-  deleteTarget.value = {
-    kind:
-      "assessment",
-    id:
-      assessment.id,
-    title:
-      assessment.title,
-    detail:
-      `${assessment.subjectCode} · ${assessment.questionCount} questions`,
-  };
-
-  confirmationText.value =
-    "";
-}
-
-function openSessionDelete(
+function completionPercent(
   session: ArchivedSessionItem,
-): void {
-  deleteTarget.value = {
-    kind:
-      "session",
-    id:
-      session.id,
-    title:
-      session.assessmentTitle,
-    detail:
-      `${session.subjectCode} · ${session.section} · Code ${session.sessionCode}`,
-  };
-
-  confirmationText.value =
-    "";
-}
-
-function closeDeleteDialog(): void {
-  if (isDeleting.value) {
-    return;
+): number {
+  if (!session.classMemberCount) {
+    return 0;
   }
 
-  deleteTarget.value =
-    null;
-
-  confirmationText.value =
-    "";
+  return Math.min(
+    100,
+    Math.round(
+      (
+        session.completedCount
+        / session.classMemberCount
+      ) * 100,
+    ),
+  );
 }
 
-async function loadArchive(): Promise<void> {
+async function loadArchive():
+  Promise<void> {
   isLoading.value =
     true;
 
@@ -343,10 +331,11 @@ async function loadArchive(): Promise<void> {
   const [
     archiveResult,
     classesResult,
-  ] = await Promise.all([
-    getArchiveOverview(),
-    listInstructorClasses(),
-  ]);
+  ] =
+    await Promise.all([
+      getArchiveOverview(),
+      listInstructorClasses(),
+    ]);
 
   const errors =
     [
@@ -356,22 +345,20 @@ async function loadArchive(): Promise<void> {
       Boolean,
     ) as string[];
 
-  if (
-    archiveResult.data
-  ) {
+  if (archiveResult.data) {
     overview.value =
       archiveResult.data;
   }
 
-  if (
-    classesResult.data
-  ) {
+  if (classesResult.data) {
     archivedClasses.value =
-      classesResult.data.classrooms.filter(
-        (classroom) =>
-          classroom.status
-          === "archived",
-      );
+      classesResult.data
+        .classrooms
+        .filter(
+          (classroom) =>
+            classroom.status
+              === "archived",
+        );
   }
 
   if (errors.length > 0) {
@@ -410,6 +397,7 @@ async function reactivateArchivedClass(
 
     busyClassroomId.value =
       null;
+
     return;
   }
 
@@ -428,29 +416,130 @@ async function reactivateArchivedClass(
     null;
 }
 
+async function restoreArchivedAssessment(
+  assessment: ArchivedAssessmentItem,
+): Promise<void> {
+  busyAssessmentId.value =
+    assessment.id;
+
+  const result =
+    await restoreAssessment(
+      assessment.id,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title:
+        "Assessment could not be restored",
+      description:
+        result.error
+        || "The archived assessment could not be restored.",
+      color:
+        "error",
+    });
+
+    busyAssessmentId.value =
+      null;
+
+    return;
+  }
+
+  toast.add({
+    title:
+      "Assessment restored",
+    description:
+      `${assessment.title} was restored as a draft assessment.`,
+    color:
+      "success",
+  });
+
+  await loadArchive();
+
+  busyAssessmentId.value =
+    null;
+}
+
+async function restoreArchivedSession(
+  session: ArchivedSessionItem,
+): Promise<void> {
+  busySessionId.value =
+    session.id;
+
+  const result =
+    await restoreDelivery(
+      session.id,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title:
+        "Session could not be restored",
+      description:
+        result.error
+        || "The archived session could not be restored.",
+      color:
+        "error",
+    });
+
+    busySessionId.value =
+      null;
+
+    return;
+  }
+
+  toast.add({
+    title:
+      "Session restored",
+    description:
+      "The closed session is available again in Live Sessions.",
+    color:
+      "success",
+  });
+
+  await loadArchive();
+
+  busySessionId.value =
+    null;
+}
+
 function archivedClassMenuItems(
   classroom: InstructorClassroom,
 ): DropdownMenuItem[][] {
   return [
     [
       {
-        label: "View Class",
-        icon: "i-lucide-eye",
-        to: `/instructor/classes/${classroom.id}`,
+        label:
+          "View Class",
+        icon:
+          "i-lucide-eye",
+        to:
+          `/instructor/classes/${classroom.id}`,
       },
     ],
     [
       {
-        label: "Reactivate",
-        icon: "i-lucide-archive-restore",
-        color: "success",
+        label:
+          "Reactivate",
+        icon:
+          "i-lucide-archive-restore",
+        color:
+          "success",
         disabled:
-          Boolean(busyClassroomId.value),
-        onSelect: () => {
-          void reactivateArchivedClass(
-            classroom,
-          );
-        },
+          Boolean(
+            busyClassroomId.value,
+          ),
+        onSelect:
+          () => {
+            void reactivateArchivedClass(
+              classroom,
+            );
+          },
       },
     ],
   ];
@@ -462,96 +551,44 @@ function archivedAssessmentMenuItems(
   return [
     [
       {
-        label: "View Assessment",
-        icon: "i-lucide-eye",
-        to: `/instructor/assessments/${assessment.id}/preview`,
+        label:
+          "View Assessment",
+        icon:
+          "i-lucide-eye",
+        to:
+          `/instructor/assessments/${assessment.id}/preview`,
       },
     ],
     [
       {
-        label: "Delete Permanently",
-        icon: "i-lucide-trash-2",
-        color: "error",
-        onSelect: () => {
-          openAssessmentDelete(
-            assessment,
-          );
-        },
+        label:
+          "Restore as Draft",
+        icon:
+          "i-lucide-archive-restore",
+        color:
+          "success",
+        disabled:
+          Boolean(
+            busyAssessmentId.value,
+          ),
+        onSelect:
+          () => {
+            void restoreArchivedAssessment(
+              assessment,
+            );
+          },
       },
     ],
   ];
 }
 
-async function confirmPermanentDelete(): Promise<void> {
-  if (
-    !deleteTarget.value
-    || !canConfirmDelete.value
-  ) {
-    return;
-  }
-
-  isDeleting.value =
-    true;
-
-  const target =
-    deleteTarget.value;
-
-  const result =
-    target.kind
-      === "assessment"
-      ? await deleteArchivedAssessment(
-          target.id,
-        )
-      : await deleteClosedSession(
-          target.id,
-        );
-
-  if (
-    result.error
-    || !result.data
-  ) {
-    toast.add({
-      title:
-        "Permanent deletion failed",
-      description:
-        result.error
-        || "The record could not be deleted.",
-      color:
-        "error",
-    });
-
-    isDeleting.value =
-      false;
-
-    return;
-  }
-
-  toast.add({
-    title:
-      "Record permanently deleted",
-    description:
-      result.data.message,
-    color:
-      "success",
-  });
-
-  deleteTarget.value =
-    null;
-
-  confirmationText.value =
-    "";
-
-  await loadArchive();
-
-  isDeleting.value =
-    false;
-}
-
 watch(
-  () => route.query.section,
+  () =>
+    route.query.section,
   () => {
     activeSection.value =
       initialSection();
+
     query.value =
       "";
   },
@@ -571,7 +608,7 @@ onMounted(
       ]"
       eyebrow="Records management"
       title="Archive"
-      description="Review archived classes, archived assessments, and closed live sessions in one place."
+      description="Keep archived classes, assessments, and completed assessment sessions organized without deleting academic records."
     >
       <template #actions>
         <UButton
@@ -605,55 +642,38 @@ onMounted(
     </UAlert>
 
     <UAlert
-      v-if="activeSection !== 'classes'"
-      color="warning"
+      color="info"
       variant="soft"
-      icon="i-lucide-triangle-alert"
-      title="Permanent deletion"
-      description="Permanent deletion is available only for archived assessments and closed sessions. Keep academic records archived when they are still covered by your institution's retention policy."
+      icon="i-lucide-shield-check"
+      title="Archive keeps records safe"
+      description="Archived records stay available for review and can be restored. Permanent deletion is not available from this page."
     />
 
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard
         label="Archived classes"
-        :value="
-          String(
-            archivedClasses.length,
-          )
-        "
+        :value="String(archivedClasses.length)"
         icon="i-lucide-school"
         tone="info"
       />
 
       <StatCard
         label="Archived assessments"
-        :value="
-          String(
-            summary.archivedAssessments,
-          )
-        "
+        :value="String(summary.archivedAssessments)"
         icon="i-lucide-file-archive"
         tone="warning"
       />
 
       <StatCard
-        label="Closed sessions"
-        :value="
-          String(
-            summary.closedSessions,
-          )
-        "
-        icon="i-lucide-radio-tower"
+        label="Archived sessions"
+        :value="String(summary.archivedSessions)"
+        icon="i-lucide-history"
         tone="neutral"
       />
 
       <StatCard
         label="Archive records"
-        :value="
-          String(
-            archiveRecordCount,
-          )
-        "
+        :value="String(archiveRecordCount)"
         icon="i-lucide-archive"
         tone="primary"
       />
@@ -666,16 +686,11 @@ onMounted(
             type="button"
             class="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition lg:flex-none"
             :class="
-              activeSection
-                === 'classes'
+              activeSection === 'classes'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-muted hover:text-highlighted'
             "
-            @click="
-              selectSection(
-                'classes',
-              )
-            "
+            @click="selectSection('classes')"
           >
             <UIcon
               name="i-lucide-school"
@@ -685,9 +700,7 @@ onMounted(
             Classes
 
             <span class="rounded-md bg-black/10 px-1.5 py-0.5 text-xs">
-              {{
-                archivedClasses.length
-              }}
+              {{ archivedClasses.length }}
             </span>
           </button>
 
@@ -695,16 +708,11 @@ onMounted(
             type="button"
             class="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition lg:flex-none"
             :class="
-              activeSection
-                === 'assessments'
+              activeSection === 'assessments'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-muted hover:text-highlighted'
             "
-            @click="
-              selectSection(
-                'assessments',
-              )
-            "
+            @click="selectSection('assessments')"
           >
             <UIcon
               name="i-lucide-file-archive"
@@ -714,9 +722,7 @@ onMounted(
             Assessments
 
             <span class="rounded-md bg-black/10 px-1.5 py-0.5 text-xs">
-              {{
-                summary.archivedAssessments
-              }}
+              {{ summary.archivedAssessments }}
             </span>
           </button>
 
@@ -724,16 +730,11 @@ onMounted(
             type="button"
             class="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition lg:flex-none"
             :class="
-              activeSection
-                === 'sessions'
+              activeSection === 'sessions'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-muted hover:text-highlighted'
             "
-            @click="
-              selectSection(
-                'sessions',
-              )
-            "
+            @click="selectSection('sessions')"
           >
             <UIcon
               name="i-lucide-history"
@@ -743,9 +744,7 @@ onMounted(
             Sessions
 
             <span class="rounded-md bg-black/10 px-1.5 py-0.5 text-xs">
-              {{
-                summary.closedSessions
-              }}
+              {{ summary.archivedSessions }}
             </span>
           </button>
         </div>
@@ -761,620 +760,441 @@ onMounted(
 
     <div
       v-if="isLoading"
-      class="grid gap-4 xl:grid-cols-2"
+      class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
     >
       <USkeleton
-        v-for="number in 4"
+        v-for="number in 6"
         :key="number"
-        class="h-72 rounded-xl"
+        class="h-64 rounded-2xl"
       />
     </div>
 
-    <template v-else>
-      <template
-        v-if="
-          activeSection
-          === 'classes'
-        "
+    <template v-else-if="activeSection === 'classes'">
+      <EmptyPanel
+        v-if="filteredClasses.length === 0"
+        icon="i-lucide-school"
+        title="No archived classes"
+        description="Classes moved to Archive will appear here."
       >
-        <EmptyPanel
-          v-if="
-            filteredClasses.length
-            === 0
-          "
-          icon="i-lucide-school"
-          title="No archived classes"
-          description="Classes moved to Archive will appear here."
-        >
-          <template #actions>
-            <UButton
-              to="/instructor/classes"
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-school"
-            >
-              Open My Classes
-            </UButton>
-          </template>
-        </EmptyPanel>
-
-        <div
-          v-else
-          class="grid gap-5 md:grid-cols-2 xl:grid-cols-3"
-        >
-          <UCard
-            v-for="classroom in filteredClasses"
-            :key="classroom.id"
-            class="overflow-hidden"
-            :ui="{
-              body: 'p-0 sm:p-0',
-            }"
+        <template #actions>
+          <UButton
+            to="/instructor/classes"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-school"
           >
-            <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-5">
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex items-center gap-2">
-                  <div class="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15">
-                    <UIcon
-                      name="i-lucide-school"
-                      class="size-5"
-                    />
-                  </div>
+            Open My Classes
+          </UButton>
+        </template>
+      </EmptyPanel>
 
-                  <UBadge
-                    color="neutral"
-                    variant="soft"
-                  >
-                    Class
-                  </UBadge>
-                </div>
-
-                <div class="flex items-center gap-1">
-                  <StatusPill status="Archived" />
-
-                  <UDropdownMenu
-                    :items="archivedClassMenuItems(classroom)"
-                    :content="{
-                      align: 'end',
-                      side: 'bottom',
-                      sideOffset: 6,
-                    }"
-                    :ui="{
-                      content: 'w-48',
-                      item: 'min-h-10',
-                      itemLabel: 'font-semibold',
-                    }"
-                  >
-                    <UButton
-                      type="button"
-                      color="neutral"
-                      variant="ghost"
-                      size="sm"
-                      square
-                      icon="i-lucide-ellipsis-vertical"
-                      :aria-label="`Archived class actions for ${classroom.name}`"
-                    />
-                  </UDropdownMenu>
-                </div>
+      <div
+        v-else
+        class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
+      >
+        <UCard
+          v-for="classroom in filteredClasses"
+          :key="classroom.id"
+          class="overflow-hidden"
+          :ui="{ body: 'p-0 sm:p-0' }"
+        >
+          <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-info/20 via-info/10 to-transparent p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex size-10 items-center justify-center rounded-xl bg-info/15 text-info ring-1 ring-info/15">
+                <UIcon
+                  name="i-lucide-school"
+                  class="size-5"
+                />
               </div>
 
-              <NuxtLink
-                :to="`/instructor/classes/${classroom.id}`"
-                class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
-                :aria-label="`View archived class ${classroom.name}`"
-              >
-                <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
-                  {{ classroom.name }}
-                </h2>
+              <div class="flex items-center gap-1">
+                <StatusPill status="Archived" />
 
-                <p class="mt-2 text-sm font-medium text-muted">
-                  {{ classroom.subject_code }}
-                  ·
-                  {{ classroom.section }}
-                </p>
-              </NuxtLink>
+                <UDropdownMenu
+                  :items="archivedClassMenuItems(classroom)"
+                  :content="{ align: 'end', side: 'bottom', sideOffset: 6 }"
+                  :ui="{ content: 'w-48', item: 'min-h-10', itemLabel: 'font-semibold' }"
+                >
+                  <UButton
+                    type="button"
+                    color="neutral"
+                    variant="ghost"
+                    size="sm"
+                    square
+                    icon="i-lucide-ellipsis-vertical"
+                    :aria-label="`Archived class actions for ${classroom.name}`"
+                  />
+                </UDropdownMenu>
+              </div>
             </div>
 
-            <div class="p-5">
-              <div class="flex min-h-7 flex-wrap gap-2">
+            <NuxtLink
+              :to="`/instructor/classes/${classroom.id}`"
+              class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+            >
+              <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
+                {{ classroom.name }}
+              </h2>
+
+              <p class="mt-2 text-sm font-medium text-muted">
+                {{ classroom.subject_code }}
+                ·
+                {{ classroom.section }}
+              </p>
+            </NuxtLink>
+          </div>
+
+          <div class="p-5">
+            <div class="flex flex-wrap gap-2">
+              <UBadge
+                color="neutral"
+                variant="soft"
+              >
+                {{ classroom.school_year }}
+                ·
+                {{ classroom.semester }}
+              </UBadge>
+            </div>
+
+            <div class="mt-5 grid grid-cols-3 gap-3">
+              <div class="rounded-xl bg-elevated p-3">
+                <p class="text-xs text-muted">Students</p>
+
+                <p class="mt-2 text-lg font-black text-highlighted">
+                  {{ classroom.memberCounts.active }}
+                </p>
+              </div>
+
+              <div class="rounded-xl bg-elevated p-3">
+                <p class="text-xs text-muted">Pending</p>
+
+                <p class="mt-2 text-lg font-black text-highlighted">
+                  {{ classroom.memberCounts.pending }}
+                </p>
+              </div>
+
+              <div class="min-w-0 rounded-xl bg-elevated p-3">
+                <p class="text-xs text-muted">Archived</p>
+
+                <p
+                  class="mt-2 line-clamp-2 text-xs font-black leading-tight text-highlighted"
+                  :title="formatDate(classroom.archived_at || classroom.updated_at)"
+                >
+                  {{ formatDate(classroom.archived_at || classroom.updated_at) }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </UCard>
+      </div>
+    </template>
+
+    <template v-else-if="activeSection === 'assessments'">
+      <EmptyPanel
+        v-if="filteredAssessments.length === 0"
+        icon="i-lucide-file-archive"
+        title="No archived assessments"
+        description="Assessments moved to Archive will appear here."
+      >
+        <template #actions>
+          <UButton
+            to="/instructor/assessments"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-clipboard-list"
+          >
+            Open Assessments
+          </UButton>
+        </template>
+      </EmptyPanel>
+
+      <div
+        v-else
+        class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
+      >
+        <UCard
+          v-for="assessment in filteredAssessments"
+          :key="assessment.id"
+          class="overflow-hidden"
+          :ui="{ body: 'p-0 sm:p-0' }"
+        >
+          <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <div class="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15">
+                  <UIcon
+                    name="i-lucide-clipboard-check"
+                    class="size-5"
+                  />
+                </div>
+
                 <UBadge
                   color="neutral"
                   variant="soft"
-                  icon="i-lucide-calendar-range"
                 >
-                  {{ classroom.school_year }}
-                  ·
-                  {{ classroom.semester }}
+                  {{ typeLabel(assessment.assessmentType) }}
                 </UBadge>
               </div>
 
-              <div class="mt-5 grid grid-cols-3 gap-3">
-                <div class="rounded-xl bg-elevated p-3">
-                  <div class="flex items-center gap-2 text-muted">
-                    <UIcon
-                      name="i-lucide-users"
-                      class="size-4"
-                    />
-                    <span class="text-xs">Students</span>
-                  </div>
+              <div class="flex items-center gap-1">
+                <StatusPill status="Archived" />
 
-                  <p class="mt-2 text-lg font-black text-highlighted">
-                    {{ classroom.memberCounts.active }}
-                  </p>
-                </div>
-
-                <div class="rounded-xl bg-elevated p-3">
-                  <div class="flex items-center gap-2 text-muted">
-                    <UIcon
-                      name="i-lucide-user-round-clock"
-                      class="size-4"
-                    />
-                    <span class="text-xs">Pending</span>
-                  </div>
-
-                  <p class="mt-2 text-lg font-black text-highlighted">
-                    {{ classroom.memberCounts.pending }}
-                  </p>
-                </div>
-
-                <div class="min-w-0 rounded-xl bg-elevated p-3">
-                  <div class="flex items-center gap-2 text-muted">
-                    <UIcon
-                      name="i-lucide-archive"
-                      class="size-4"
-                    />
-                    <span class="text-xs">Archived</span>
-                  </div>
-
-                  <p
-                    class="mt-2 line-clamp-2 text-xs font-black leading-tight text-highlighted"
-                    :title="formatDate(classroom.archived_at || classroom.updated_at)"
-                  >
-                    {{
-                      formatDate(
-                        classroom.archived_at
-                        || classroom.updated_at,
-                      )
-                    }}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </UCard>
-        </div>
-      </template>
-
-      <template
-        v-else-if="
-          activeSection
-          === 'assessments'
-        "
-      >
-        <EmptyPanel
-          v-if="
-            filteredAssessments.length
-            === 0
-          "
-          icon="i-lucide-file-archive"
-          title="No archived assessments"
-          description="Assessments moved to Archive will appear here."
-        >
-          <template #actions>
-            <UButton
-              to="/instructor/assessments"
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-clipboard-list"
-            >
-              Open Assessments
-            </UButton>
-          </template>
-        </EmptyPanel>
-
-        <div
-          v-else
-          class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
-        >
-          <UCard
-            v-for="assessment in filteredAssessments"
-            :key="assessment.id"
-            class="overflow-hidden"
-            :ui="{
-              body: 'p-0 sm:p-0',
-            }"
-          >
-            <div class="relative min-h-40 border-b border-default bg-gradient-to-br from-primary/20 via-primary/10 to-transparent p-5">
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex items-center gap-2">
-                  <div class="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/15">
-                    <UIcon
-                      name="i-lucide-clipboard-check"
-                      class="size-5"
-                    />
-                  </div>
-
-                  <UBadge
+                <UDropdownMenu
+                  :items="archivedAssessmentMenuItems(assessment)"
+                  :content="{ align: 'end', side: 'bottom', sideOffset: 6 }"
+                  :ui="{ content: 'w-52', item: 'min-h-10', itemLabel: 'font-semibold' }"
+                >
+                  <UButton
+                    type="button"
                     color="neutral"
-                    variant="soft"
-                  >
-                    {{
-                      typeLabel(
-                        assessment.assessmentType,
-                      )
-                    }}
-                  </UBadge>
-                </div>
-
-                <div class="flex items-center gap-1">
-                  <StatusPill status="Archived" />
-
-                  <UDropdownMenu
-                    :items="archivedAssessmentMenuItems(assessment)"
-                    :content="{
-                      align: 'end',
-                      side: 'bottom',
-                      sideOffset: 6,
-                    }"
-                    :ui="{
-                      content: 'w-52',
-                      item: 'min-h-10',
-                      itemLabel: 'font-semibold',
-                    }"
-                  >
-                    <UButton
-                      type="button"
-                      color="neutral"
-                      variant="ghost"
-                      size="sm"
-                      square
-                      icon="i-lucide-ellipsis-vertical"
-                      :aria-label="`Archived assessment actions for ${assessment.title}`"
-                    />
-                  </UDropdownMenu>
-                </div>
+                    variant="ghost"
+                    size="sm"
+                    square
+                    icon="i-lucide-ellipsis-vertical"
+                    :aria-label="`Archived assessment actions for ${assessment.title}`"
+                  />
+                </UDropdownMenu>
               </div>
-
-              <NuxtLink
-                :to="`/instructor/assessments/${assessment.id}/preview`"
-                class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
-                :aria-label="`View archived assessment ${assessment.title}`"
-              >
-                <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
-                  {{ assessment.title }}
-                </h2>
-
-                <p class="mt-2 text-sm font-medium text-muted">
-                  {{ assessment.subjectCode }}
-                  · Archived assessment
-                </p>
-              </NuxtLink>
             </div>
 
-            <div class="p-5">
-              <div class="flex min-h-7 flex-wrap gap-2">
+            <NuxtLink
+              :to="`/instructor/assessments/${assessment.id}/preview`"
+              class="group mt-6 block rounded-lg focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/30"
+              :aria-label="`View archived assessment ${assessment.title}`"
+            >
+              <h2 class="line-clamp-2 text-xl font-black leading-tight text-highlighted transition group-hover:text-primary">
+                {{ assessment.title }}
+              </h2>
+
+              <p class="mt-2 text-sm font-medium text-muted">
+                {{ assessment.subjectCode }}
+                · Archived assessment
+              </p>
+            </NuxtLink>
+          </div>
+
+          <div class="p-5">
+            <div class="flex min-h-7 flex-wrap gap-2">
+              <UBadge
+                color="neutral"
+                variant="soft"
+                icon="i-lucide-archive"
+              >
+                Archived
+                {{ formatDate(assessment.archivedAt || assessment.updatedAt) }}
+              </UBadge>
+
+              <UBadge
+                v-if="assessment.linkedSessionCount > 0"
+                color="info"
+                variant="soft"
+                icon="i-lucide-link-2"
+              >
+                {{ assessment.linkedSessionCount }}
+                linked
+                {{ assessment.linkedSessionCount === 1 ? 'session' : 'sessions' }}
+              </UBadge>
+            </div>
+
+            <div class="mt-5 grid grid-cols-3 gap-3">
+              <div class="rounded-xl bg-elevated p-3">
+                <p class="text-xs text-muted">Questions</p>
+
+                <p class="mt-2 text-lg font-black text-highlighted">
+                  {{ assessment.questionCount }}
+                </p>
+              </div>
+
+              <div class="rounded-xl bg-elevated p-3">
+                <p class="text-xs text-muted">Points</p>
+
+                <p class="mt-2 text-lg font-black text-highlighted">
+                  {{ assessment.totalPoints }}
+                </p>
+              </div>
+
+              <div class="rounded-xl bg-elevated p-3">
+                <p class="text-xs text-muted">Classes</p>
+
+                <p class="mt-2 text-lg font-black text-highlighted">
+                  {{ assessment.assignedClassCount }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </UCard>
+      </div>
+    </template>
+
+    <template v-else>
+      <EmptyPanel
+        v-if="filteredSessions.length === 0"
+        icon="i-lucide-history"
+        title="No archived sessions"
+        description="Use Archive on an ended or cancelled Live Session to move it here."
+      >
+        <template #actions>
+          <UButton
+            to="/instructor/sessions"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-radio-tower"
+          >
+            Open Live Sessions
+          </UButton>
+        </template>
+      </EmptyPanel>
+
+      <div
+        v-else
+        class="grid gap-4 xl:grid-cols-2"
+      >
+        <UCard
+          v-for="session in filteredSessions"
+          :key="session.id"
+          class="overflow-hidden"
+          :ui="{ body: 'p-0 sm:p-0' }"
+        >
+          <div class="grid h-full lg:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)]">
+            <div class="bg-gradient-to-br from-slate-500/15 via-slate-500/5 to-transparent p-5 sm:p-6">
+              <div class="flex flex-wrap items-center gap-2">
+                <StatusPill :status="session.status" />
+
                 <UBadge
                   color="neutral"
                   variant="soft"
                   icon="i-lucide-archive"
                 >
                   Archived
-                  {{
-                    formatDate(
-                      assessment.archivedAt
-                      || assessment.updatedAt,
-                    )
-                  }}
                 </UBadge>
 
                 <UBadge
-                  v-if="assessment.linkedSessionCount > 0"
-                  color="warning"
+                  color="neutral"
                   variant="soft"
-                  icon="i-lucide-link-2"
                 >
-                  {{ assessment.linkedSessionCount }}
-                  linked
-                  {{
-                    assessment.linkedSessionCount === 1
-                      ? 'session'
-                      : 'sessions'
-                  }}
+                  {{ session.subjectCode }}
+                  ·
+                  {{ session.section }}
                 </UBadge>
               </div>
 
-              <div class="mt-5 grid grid-cols-3 gap-3">
-                <div class="rounded-xl bg-elevated p-3">
-                  <div class="flex items-center gap-2 text-muted">
-                    <UIcon
-                      name="i-lucide-list-checks"
-                      class="size-4"
-                    />
-                    <span class="text-xs">Questions</span>
-                  </div>
+              <h2 class="mt-4 text-xl font-black leading-tight text-highlighted sm:text-2xl">
+                {{ session.assessmentTitle }}
+              </h2>
 
-                  <p class="mt-2 text-lg font-black text-highlighted">
-                    {{ assessment.questionCount }}
-                  </p>
+              <div class="mt-4 space-y-2 text-sm text-muted">
+                <div class="flex items-start gap-2">
+                  <UIcon
+                    name="i-lucide-school"
+                    class="mt-0.5 size-4 shrink-0 text-primary"
+                  />
+
+                  <span>{{ session.classroomName }}</span>
                 </div>
 
-                <div class="rounded-xl bg-elevated p-3">
-                  <div class="flex items-center gap-2 text-muted">
-                    <UIcon
-                      name="i-lucide-circle-dot"
-                      class="size-4"
-                    />
-                    <span class="text-xs">Points</span>
-                  </div>
+                <div class="flex items-start gap-2">
+                  <UIcon
+                    name="i-lucide-calendar-clock"
+                    class="mt-0.5 size-4 shrink-0 text-primary"
+                  />
 
-                  <p class="mt-2 text-lg font-black text-highlighted">
-                    {{ assessment.totalPoints }}
-                  </p>
+                  <span>
+                    {{ formatSessionWindow(session.startsAt, session.endsAt) }}
+                  </span>
                 </div>
 
-                <div class="rounded-xl bg-elevated p-3">
-                  <div class="flex items-center gap-2 text-muted">
-                    <UIcon
-                      name="i-lucide-school"
-                      class="size-4"
-                    />
-                    <span class="text-xs">Classes</span>
-                  </div>
+                <div class="flex items-start gap-2">
+                  <UIcon
+                    name="i-lucide-archive"
+                    class="mt-0.5 size-4 shrink-0 text-primary"
+                  />
 
-                  <p class="mt-2 text-lg font-black text-highlighted">
-                    {{ assessment.assignedClassCount }}
-                  </p>
+                  <span>
+                    Archived {{ formatDate(session.archivedAt) }}
+                  </span>
                 </div>
               </div>
             </div>
-          </UCard>
-        </div>
 
-      </template>
+            <div class="flex flex-col justify-between gap-5 p-5 sm:p-6">
+              <div>
+                <div class="flex items-end justify-between gap-4">
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Completion
+                    </p>
 
-      <template v-else>
-        <EmptyPanel
-          v-if="
-            filteredSessions.length
-            === 0
-          "
-          icon="i-lucide-history"
-          title="No closed sessions"
-          description="Ended and cancelled live sessions will appear here."
-        >
-          <template #actions>
-            <UButton
-              to="/instructor/sessions"
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-radio-tower"
-            >
-              Open Live Sessions
-            </UButton>
-          </template>
-        </EmptyPanel>
-
-        <div
-          v-else
-          class="grid gap-4 xl:grid-cols-2"
-        >
-          <UCard
-            v-for="session in filteredSessions"
-            :key="session.id"
-          >
-            <div class="flex items-start gap-4">
-              <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-slate-500/10 text-muted">
-                <UIcon
-                  name="i-lucide-history"
-                  class="size-5"
-                />
-              </div>
-
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <h2 class="font-black text-highlighted">
-                      {{ session.assessmentTitle }}
-                    </h2>
-
-                    <p class="mt-1 text-sm text-muted">
-                      {{ session.subjectCode }}
-                      ·
-                      {{ session.section }}
+                    <p class="mt-1 text-xl font-black text-highlighted">
+                      {{ session.completedCount }} of {{ session.classMemberCount }}
+                      <span class="text-sm font-semibold text-muted">students</span>
                     </p>
                   </div>
 
-                  <StatusPill
-                    :status="session.status"
-                  />
+                  <span class="font-mono text-sm font-bold text-primary">
+                    {{ completionPercent(session) }}%
+                  </span>
                 </div>
+
+                <UProgress
+                  class="mt-3"
+                  :model-value="completionPercent(session)"
+                  color="success"
+                />
 
                 <div class="mt-4 flex flex-wrap gap-2">
                   <UBadge
-                    color="neutral"
+                    color="success"
                     variant="soft"
-                    class="font-mono tracking-[0.12em]"
                   >
-                    {{
-                      session.sessionCode
-                        .replace(
-                          /(\d{3})(\d{3})/,
-                          "$1 $2",
-                        )
-                    }}
+                    {{ session.completedCount }} completed
                   </UBadge>
 
                   <UBadge
-                    color="info"
+                    v-if="session.inProgressCount > 0"
+                    color="warning"
                     variant="soft"
                   >
-                    {{ session.classroomName }}
+                    {{ session.inProgressCount }} in progress
+                  </UBadge>
+
+                  <UBadge
+                    v-if="session.notStartedCount > 0"
+                    color="neutral"
+                    variant="soft"
+                  >
+                    {{ session.notStartedCount }} not started
                   </UBadge>
                 </div>
+              </div>
 
-                <div class="mt-5 grid grid-cols-2 gap-3">
-                  <div class="rounded-lg bg-elevated p-3">
-                    <p class="text-xs text-muted">
-                      Participants
-                    </p>
+              <div class="grid gap-2">
+                <UButton
+                  :to="`/instructor/sessions/${session.id}/monitor`"
+                  color="neutral"
+                  variant="soft"
+                  icon="i-lucide-eye"
+                  block
+                >
+                  View Session
+                </UButton>
 
-                    <p class="mt-1 font-black text-highlighted">
-                      {{ session.participantCount }}
-                    </p>
-                  </div>
-
-                  <div class="rounded-lg bg-elevated p-3">
-                    <p class="text-xs text-muted">
-                      Closed
-                    </p>
-
-                    <p class="mt-1 text-xs font-bold text-highlighted">
-                      {{
-                        formatDate(
-                          session.closedAt,
-                        )
-                      }}
-                    </p>
-                  </div>
-                </div>
-
-                <div class="mt-5">
-                  <UButton
-                    color="error"
-                    variant="soft"
-                    icon="i-lucide-trash-2"
-                    @click="
-                      openSessionDelete(
-                        session,
-                      )
-                    "
-                  >
-                    Delete Permanently
-                  </UButton>
-                </div>
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-archive-restore"
+                  :loading="busySessionId === session.id"
+                  :disabled="Boolean(busySessionId)"
+                  block
+                  @click="restoreArchivedSession(session)"
+                >
+                  Restore to Live Sessions
+                </UButton>
               </div>
             </div>
-          </UCard>
-        </div>
-      </template>
-    </template>
-
-    <Teleport to="body">
-      <div
-        v-if="deleteTarget"
-        class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
-        @click.self="closeDeleteDialog"
-      >
-        <section
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="archive-delete-title"
-          class="w-full max-w-lg rounded-xl border border-default bg-default p-6 shadow-2xl"
-        >
-          <div class="flex items-start gap-4">
-            <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-error/10 text-error">
-              <UIcon
-                name="i-lucide-triangle-alert"
-                class="size-5"
-              />
-            </div>
-
-            <div class="min-w-0 flex-1">
-              <h2
-                id="archive-delete-title"
-                class="text-lg font-black text-highlighted"
-              >
-                Permanently delete
-                {{
-                  deleteTarget.kind
-                    === "assessment"
-                    ? "assessment"
-                    : "session"
-                }}?
-              </h2>
-
-              <p class="mt-2 text-sm leading-6 text-muted">
-                <strong class="text-highlighted">
-                  {{ deleteTarget.title }}
-                </strong>
-
-                <br>
-
-                {{ deleteTarget.detail }}
-              </p>
-            </div>
-
-            <UButton
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-x"
-              aria-label="Close confirmation"
-              :disabled="isDeleting"
-              @click="closeDeleteDialog"
-            />
           </div>
-
-          <UAlert
-            class="mt-5"
-            color="error"
-            variant="soft"
-            title="This action cannot be undone"
-            :description="
-              deleteTarget.kind === 'assessment'
-                ? 'The assessment, class schedules, linked sessions, participants, questions, and existing attempt records will be removed together. Any active participant will lose access immediately.'
-                : 'The closed session, participants, and existing attempt records will be removed together.'
-            "
-          />
-
-          <div class="mt-5">
-            <label
-              for="archive-delete-confirmation"
-              class="text-sm font-bold text-highlighted"
-            >
-              Type
-              <span class="font-mono text-error">
-                DELETE
-              </span>
-              to continue
-            </label>
-
-            <UInput
-              id="archive-delete-confirmation"
-              v-model="confirmationText"
-              class="mt-2 w-full"
-              placeholder="DELETE"
-              autocomplete="off"
-              :disabled="isDeleting"
-              @keyup.enter="
-                confirmPermanentDelete
-              "
-            />
-          </div>
-
-          <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <UButton
-              color="neutral"
-              variant="outline"
-              :disabled="isDeleting"
-              @click="closeDeleteDialog"
-            >
-              Cancel
-            </UButton>
-
-            <UButton
-              color="error"
-              icon="i-lucide-trash-2"
-              :loading="isDeleting"
-              :disabled="
-                !canConfirmDelete
-              "
-              @click="
-                confirmPermanentDelete
-              "
-            >
-              Delete Permanently
-            </UButton>
-          </div>
-        </section>
+        </UCard>
       </div>
-    </Teleport>
+    </template>
   </div>
 </template>

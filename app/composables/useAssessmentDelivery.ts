@@ -25,6 +25,14 @@ interface MessageResponse {
   message: string;
 }
 
+const ASSESSMENT_REQUEST_TIMEOUT_MS = {
+  default: 15000,
+  draftSave: 10000,
+  finalAnswer: 25000,
+  questionExpiry: 30000,
+  attemptSubmit: 30000,
+} as const;
+
 export function useAssessmentDelivery() {
   const supabase =
     useSupabaseClient();
@@ -45,7 +53,9 @@ export function useAssessmentDelivery() {
     action: string,
     payload?:
       Record<string, unknown>,
-    timeoutMs = 15000,
+    timeoutMs =
+      ASSESSMENT_REQUEST_TIMEOUT_MS
+        .default,
     functionName =
       "assessment-delivery",
   ): Promise<FunctionResult<T>> {
@@ -104,7 +114,7 @@ export function useAssessmentDelivery() {
           data:
             null,
           error:
-            "We couldn't confirm that action in time. Your answer is still kept on this device and SNCBT Assess will recover automatically.",
+            "We couldn't confirm that action in time. Your latest response remains cached on this device while SNCBT Assess checks the server.",
           code:
             "REQUEST_TIMEOUT",
         };
@@ -147,7 +157,7 @@ export function useAssessmentDelivery() {
           data:
             null,
           error:
-            "We couldn't confirm that action in time. Your answer is still kept on this device and SNCBT Assess will recover automatically.",
+            "We couldn't confirm that action in time. Your latest response remains cached on this device while SNCBT Assess checks the server.",
           code:
             "REQUEST_TIMEOUT",
         };
@@ -357,8 +367,10 @@ export function useAssessmentDelivery() {
         finalize
         || commitForFeedback
       )
-        ? 12000
-        : 10000,
+        ? ASSESSMENT_REQUEST_TIMEOUT_MS
+            .finalAnswer
+        : ASSESSMENT_REQUEST_TIMEOUT_MS
+            .draftSave,
     );
   }
 
@@ -387,7 +399,8 @@ export function useAssessmentDelivery() {
         booleanResponse:
           answer.booleanResponse,
       },
-      12000,
+      ASSESSMENT_REQUEST_TIMEOUT_MS
+        .questionExpiry,
     );
   }
 
@@ -408,6 +421,8 @@ export function useAssessmentDelivery() {
         auto,
         reason,
       },
+      ASSESSMENT_REQUEST_TIMEOUT_MS
+        .attemptSubmit,
     );
   }
 

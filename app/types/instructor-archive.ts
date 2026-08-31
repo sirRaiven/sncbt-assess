@@ -4,7 +4,7 @@ export type ArchiveSection =
   | "sessions";
 
 export type ArchivedSessionStatus =
-  | "ended"
+  | "closed"
   | "cancelled";
 
 export interface ArchivedAssessmentItem {
@@ -22,7 +22,6 @@ export interface ArchivedAssessmentItem {
 
 export interface ArchivedSessionItem {
   id: string;
-  sessionCode: string;
   status: ArchivedSessionStatus;
   assessmentId: string;
   assessmentTitle: string;
@@ -30,20 +29,23 @@ export interface ArchivedSessionItem {
   classroomId: string;
   classroomName: string;
   section: string;
-  participantCount: number;
-  createdAt: string;
-  startedAt: string | null;
-  endedAt: string | null;
+  classMemberCount: number;
+  startedCount: number;
+  completedCount: number;
+  inProgressCount: number;
+  notStartedCount: number;
+  startsAt: string;
+  endsAt: string;
   cancelledAt: string | null;
   closedAt: string;
+  archivedAt: string;
 }
 
 export interface InstructorArchiveOverview {
   generatedAt: string;
   summary: {
     archivedAssessments: number;
-    closedSessions: number;
-    blockedAssessments: number;
+    archivedSessions: number;
     totalRecords: number;
   };
   assessments: ArchivedAssessmentItem[];

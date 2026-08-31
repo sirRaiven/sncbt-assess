@@ -12,13 +12,15 @@ interface FunctionResult<T> {
   code: string | null;
 }
 
-interface DeleteResponse {
+interface ArchiveDeliveryResponse {
   message: string;
-  deletedId: string;
+  assignmentId: string;
+  archivedAt: string | null;
 }
 
 export function useInstructorArchive() {
-  const supabase = useSupabaseClient();
+  const supabase =
+    useSupabaseClient();
 
   async function parseFunctionError(
     error: unknown,
@@ -92,31 +94,31 @@ export function useInstructorArchive() {
     );
   }
 
-  async function deleteArchivedAssessment(
-    assessmentId: string,
+  async function archiveDelivery(
+    assignmentId: string,
   ) {
-    return await invoke<DeleteResponse>(
-      "delete-assessment",
+    return await invoke<ArchiveDeliveryResponse>(
+      "archive-delivery",
       {
-        assessmentId,
+        assignmentId,
       },
     );
   }
 
-  async function deleteClosedSession(
-    sessionId: string,
+  async function restoreDelivery(
+    assignmentId: string,
   ) {
-    return await invoke<DeleteResponse>(
-      "delete-session",
+    return await invoke<ArchiveDeliveryResponse>(
+      "restore-delivery",
       {
-        sessionId,
+        assignmentId,
       },
     );
   }
 
   return {
     getArchiveOverview,
-    deleteArchivedAssessment,
-    deleteClosedSession,
+    archiveDelivery,
+    restoreDelivery,
   };
 }
