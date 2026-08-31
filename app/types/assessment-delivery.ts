@@ -184,18 +184,27 @@ export interface DeliveryQuestionPayload {
   attemptId: string;
   questionIndex: number;
   questionCount: number;
+  /**
+   * Null means this question has no question-level timer. It must not be
+   * interpreted as a timed-out question.
+   */
   deadlineAt: string | null;
   firstDeliveredAt: string;
   selectedOptionIds: string[];
   textResponse: string | null;
   booleanResponse: boolean | null;
+  /**
+   * Server-authoritative response lock state.
+   *
+   * false: draft; the Student may still change the response.
+   * true: finalized by Check Answer, question timeout, or attempt submission.
+   */
   finalized: boolean;
   canGoPrevious: boolean;
   canGoNext: boolean;
   allowBacktracking: boolean;
   question: SafeDeliveryQuestion;
 }
-
 
 export interface AttemptQuestionSelectionPolicy {
   questionId: string;
@@ -217,11 +226,19 @@ export interface SaveDeliveryAnswerResult {
   message: string;
   saved: boolean;
   timedOut: boolean;
+  /**
+   * A normal draft autosave returns false. True means the server has locked
+   * the answer.
+   */
   finalized: boolean;
   nextQuestionIndex: number;
   answeredCount: number;
   attemptClosed?: boolean;
   alreadyFinalized?: boolean;
+  /**
+   * Correctness feedback is only expected after an explicitly finalized
+   * response when the assessment policy allows score-and-answer feedback.
+   */
   feedback?: DeliveryAnswerFeedback | null;
 }
 
@@ -248,7 +265,6 @@ export interface SubmitDeliveryAttemptResult {
   score: number | null;
   alreadyCompleted: boolean;
 }
-
 
 export interface StudentLiveLeaderboardEntry {
   rank: number;

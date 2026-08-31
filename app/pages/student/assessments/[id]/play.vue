@@ -142,6 +142,9 @@ const isLoading =
 const isSaving =
   ref(false);
 
+const isFinalizingAnswer =
+  ref(false);
+
 const isSubmitting =
   ref(false);
 
@@ -178,6 +181,18 @@ let feedbackAdvanceTimer:
   ReturnType<typeof setTimeout>
   | null =
     null;
+
+let draftSaveTimer:
+  ReturnType<typeof setTimeout>
+  | null =
+    null;
+
+let answerSyncQueue:
+  Promise<void> =
+    Promise.resolve();
+
+const answerRevision =
+  ref(0);
 
 const isOnline =
   ref(true);
@@ -1669,10 +1684,23 @@ function isOptionChoiceDisabled(
     !questionPayload.value
     || questionPayload.value
       .finalized
+    || isFinalizingAnswer.value
     || questionTimeoutTriggered.value
     || questionSeconds.value === 0
   ) {
     return true;
+  }
+
+  // A multiple-choice question requires exactly one selection, but that
+  // selection is still a draft until Check Answer is clicked. Do not disable
+  // the other choices after the first click; selecting another option replaces
+  // the current draft selection.
+  if (
+    questionPayload.value
+      .question.questionType
+    === "multiple_choice"
+  ) {
+    return false;
   }
 
   if (isSelected(optionId)) {
@@ -1692,21 +1720,105 @@ function isOptionChoiceDisabled(
   );
 }
 
+function clearDraftSaveTimer():
+  void {
+  if (!draftSaveTimer) {
+    return;
+  }
+
+  clearTimeout(
+    draftSaveTimer,
+  );
+
+  draftSaveTimer =
+    null;
+}
+
+function enqueueAnswerSync(
+  finalize: boolean,
+  options?: {
+    silentError?: boolean;
+    recoverFinalized?: boolean;
+    commitForFeedback?: boolean;
+  },
+): Promise<boolean> {
+  const operation =
+    answerSyncQueue.then(
+      () =>
+        synchronizeAnswer(
+          finalize,
+          options,
+        ),
+    );
+
+  answerSyncQueue =
+    operation.then(
+      () => undefined,
+      () => undefined,
+    );
+
+  return operation;
+}
+
+function scheduleDraftAnswerSync(
+  delayMs = 350,
+): void {
+  clearDraftSaveTimer();
+
+  if (
+    !questionPayload.value
+    || questionPayload.value
+      .finalized
+    || isFinalizingAnswer.value
+    || questionTimeoutTriggered.value
+    || questionSeconds.value === 0
+    || !pendingSync.value
+  ) {
+    return;
+  }
+
+  draftSaveTimer =
+    setTimeout(
+      () => {
+        draftSaveTimer =
+          null;
+
+        void enqueueAnswerSync(
+          false,
+          {
+            silentError:
+              true,
+            recoverFinalized:
+              true,
+            commitForFeedback:
+              false,
+          },
+        );
+      },
+      delayMs,
+    );
+}
+
 function markAnswerChanged(): void {
   if (
     !questionPayload.value
     || questionPayload.value
       .finalized
+    || isFinalizingAnswer.value
     || questionTimeoutTriggered.value
     || questionSeconds.value === 0
   ) {
     return;
   }
 
+  answerRevision.value +=
+    1;
+
   pendingSync.value =
     true;
 
   saveRecovery();
+  scheduleDraftAnswerSync();
 }
 
 function selectBoolean(
@@ -1716,6 +1828,7 @@ function selectBoolean(
     !questionPayload.value
     || questionPayload.value
       .finalized
+    || isFinalizingAnswer.value
     || questionTimeoutTriggered.value
     || questionSeconds.value === 0
   ) {
@@ -1731,6 +1844,9 @@ function selectBoolean(
   }
 
   markAnswerChanged();
+  scheduleDraftAnswerSync(
+    0,
+  );
 }
 
 function selectOption(
@@ -1740,6 +1856,9 @@ function selectOption(
     !questionPayload.value
     || questionPayload.value
       .finalized
+    || isFinalizingAnswer.value
+    || questionTimeoutTriggered.value
+    || questionSeconds.value === 0
   ) {
     return;
   }
@@ -1783,6 +1902,9 @@ function selectOption(
   }
 
   markAnswerChanged();
+  scheduleDraftAnswerSync(
+    0,
+  );
 }
 
 function normalizeSelectedOptionIds():
@@ -1835,6 +1957,11 @@ function applyQuestionPayload(
   payload: DeliveryQuestionPayload,
   restoreLocalRecovery = true,
 ): void {
+  clearDraftSaveTimer();
+
+  answerRevision.value =
+    0;
+
   syncServerClock(
     payload.serverNow,
   );
@@ -1897,6 +2024,15 @@ function applyQuestionPayload(
     clearRecovery();
   } else if (restoreLocalRecovery) {
     restoreRecovery();
+
+    if (
+      pendingSync.value
+      && isOnline.value
+    ) {
+      scheduleDraftAnswerSync(
+        0,
+      );
+    }
   }
 }
 
@@ -2283,8 +2419,19 @@ async function synchronizeAnswer(
     return false;
   }
 
+  const syncRevision =
+    answerRevision.value;
+
   const normalizedOptionIds =
     normalizeSelectedOptionIds();
+
+  const normalizedTextResponse =
+    textResponse.value
+      .trim()
+    || null;
+
+  const normalizedBooleanResponse =
+    booleanResponse.value;
 
   selectedOptionIds.value = [
     ...normalizedOptionIds,
@@ -2292,6 +2439,11 @@ async function synchronizeAnswer(
 
   isSaving.value =
     true;
+
+  if (finalize) {
+    isFinalizingAnswer.value =
+      true;
+  }
 
   try {
     const result =
@@ -2303,11 +2455,9 @@ async function synchronizeAnswer(
           selectedOptionIds:
             normalizedOptionIds,
           textResponse:
-            textResponse.value
-              .trim()
-            || null,
+            normalizedTextResponse,
           booleanResponse:
-            booleanResponse.value,
+            normalizedBooleanResponse,
         },
         finalize,
         Boolean(
@@ -2382,14 +2532,17 @@ async function synchronizeAnswer(
       return false;
     }
 
-    clearRecovery();
-
-    pendingSync.value =
-      false;
+    const localAnswerChangedWhileSaving =
+      answerRevision.value
+      !== syncRevision;
 
     if (
       result.data.attemptClosed
     ) {
+      clearRecovery();
+
+      pendingSync.value =
+        false;
       await leaveAssessment(
         `/student/assessments/${assignmentId.value}/completed`,
       );
@@ -2493,9 +2646,10 @@ async function synchronizeAnswer(
         ...normalizedOptionIds,
       ];
       loadedTextResponse.value =
-        textResponse.value.trim();
+        normalizedTextResponse
+        ?? "";
       loadedBooleanResponse.value =
-        booleanResponse.value;
+        normalizedBooleanResponse;
 
       if (
         result.data.finalized
@@ -2509,6 +2663,22 @@ async function synchronizeAnswer(
       }
     }
 
+    if (
+      result.data.finalized
+      || result.data.timedOut
+      || !localAnswerChangedWhileSaving
+    ) {
+      clearRecovery();
+
+      pendingSync.value =
+        false;
+    } else {
+      pendingSync.value =
+        true;
+
+      saveRecovery();
+    }
+
     lastSyncedAt.value =
       new Date()
         .toISOString();
@@ -2517,6 +2687,11 @@ async function synchronizeAnswer(
   } finally {
     isSaving.value =
       false;
+
+    if (finalize) {
+      isFinalizingAnswer.value =
+        false;
+    }
   }
 }
 
@@ -2553,13 +2728,20 @@ async function goNext():
     return;
   }
 
+  clearDraftSaveTimer();
+
+  const shouldFinalizeAnswer =
+    instantFeedbackActive.value
+    || !questionPayload.value
+      .allowBacktracking;
+
   const saved =
-    await synchronizeAnswer(
-      !questionPayload.value
-        .allowBacktracking,
+    await enqueueAnswerSync(
+      shouldFinalizeAnswer,
       {
         commitForFeedback:
-          true,
+          instantFeedbackActive.value
+          && shouldFinalizeAnswer,
       },
     );
 
@@ -2635,12 +2817,14 @@ async function goPrevious():
     return;
   }
 
+  clearDraftSaveTimer();
+
   const saved =
-    await synchronizeAnswer(
+    await enqueueAnswerSync(
       false,
       {
         commitForFeedback:
-          true,
+          false,
       },
     );
 
@@ -2680,13 +2864,15 @@ async function submit(
     && !questionPayload.value
       .finalized
   ) {
+    clearDraftSaveTimer();
+
     const saved =
-      await synchronizeAnswer(
+      await enqueueAnswerSync(
         !questionPayload.value
           .allowBacktracking,
         {
           commitForFeedback:
-            true,
+            false,
         },
       );
 
@@ -3052,6 +3238,8 @@ async function continueAfterQuestionTimeout():
 
 async function handleQuestionTimeout():
   Promise<void> {
+  clearDraftSaveTimer();
+
   if (
     !delivery.value?.attempt
     || !questionPayload.value
@@ -3369,7 +3557,9 @@ async function handleOnline():
   if (
     pendingSync.value
   ) {
-    await synchronizeAnswer(
+    clearDraftSaveTimer();
+
+    await enqueueAnswerSync(
       false,
     );
   }
@@ -3448,6 +3638,7 @@ onMounted(
 onBeforeUnmount(
   () => {
     clearFeedbackAdvanceTimer();
+    clearDraftSaveTimer();
 
     if (timer) {
       clearInterval(timer);
@@ -3854,7 +4045,7 @@ onBeforeRouteLeave(
                       class="w-full"
                       placeholder="Type your answer"
                       :maxlength="1000"
-                      :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                      :disabled="questionPayload.finalized || isFinalizingAnswer || questionTimeoutTriggered || questionSeconds === 0"
                       @update:model-value="markAnswerChanged"
                     />
                   </UFormField>
@@ -3869,7 +4060,7 @@ onBeforeRouteLeave(
                       type="button"
                       class="flex min-h-18 items-center gap-3 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
                       :class="booleanResponse === true ? 'border-primary bg-primary/10 ring-2 ring-primary/10' : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'"
-                      :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                      :disabled="questionPayload.finalized || isFinalizingAnswer || questionTimeoutTriggered || questionSeconds === 0"
                       @click="selectBoolean(true)"
                     >
                       <UIcon name="i-lucide-circle-check" class="size-6 shrink-0 text-success" />
@@ -3880,7 +4071,7 @@ onBeforeRouteLeave(
                       type="button"
                       class="flex min-h-18 items-center gap-3 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-55"
                       :class="booleanResponse === false ? 'border-primary bg-primary/10 ring-2 ring-primary/10' : 'border-default bg-default hover:border-primary/50 hover:bg-elevated'"
-                      :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                      :disabled="questionPayload.finalized || isFinalizingAnswer || questionTimeoutTriggered || questionSeconds === 0"
                       @click="selectBoolean(false)"
                     >
                       <UIcon name="i-lucide-circle-x" class="size-6 shrink-0 text-error" />
@@ -3900,7 +4091,7 @@ onBeforeRouteLeave(
                       class="w-full"
                       placeholder="Write the correction"
                       :maxlength="1000"
-                      :disabled="questionPayload.finalized || questionTimeoutTriggered || questionSeconds === 0"
+                      :disabled="questionPayload.finalized || isFinalizingAnswer || questionTimeoutTriggered || questionSeconds === 0"
                       @update:model-value="markAnswerChanged"
                     />
                   </UFormField>
@@ -3912,7 +4103,7 @@ onBeforeRouteLeave(
                     variant="outline"
                     icon="i-lucide-arrow-left"
                     class="sm:w-auto"
-                    :disabled="!questionPayload.canGoPrevious || isSaving || (!questionPayload.finalized && (!selectionRequirementMet || questionTimeoutTriggered || questionSeconds === 0))"
+                    :disabled="!questionPayload.canGoPrevious || isSaving || isFinalizingAnswer || (!questionPayload.finalized && (!selectionRequirementMet || questionTimeoutTriggered || questionSeconds === 0))"
                     @click="goPrevious"
                   >
                     Previous
@@ -3922,7 +4113,7 @@ onBeforeRouteLeave(
                     :icon="isLastQuestion ? 'i-lucide-send' : 'i-lucide-arrow-right'"
                     :loading="isSaving"
                     class="justify-center sm:w-auto"
-                    :disabled="!questionPayload.finalized && (!selectionRequirementMet || questionTimeoutTriggered || questionSeconds === 0)"
+                    :disabled="isFinalizingAnswer || (!questionPayload.finalized && (!selectionRequirementMet || questionTimeoutTriggered || questionSeconds === 0))"
                     @click="goNext"
                   >
                     {{ nextActionLabel }}
