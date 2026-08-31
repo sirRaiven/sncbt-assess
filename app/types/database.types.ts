@@ -335,6 +335,45 @@ export type Database = {
           },
         ]
       }
+      assessment_student_archives: {
+        Row: {
+          archived_at: string | null
+          assignment_id: string
+          created_at: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          assignment_id: string
+          created_at?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          assignment_id?: string
+          created_at?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_student_archives_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_student_archives_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessment_attempts: {
         Row: {
           answered_count: number
@@ -1050,6 +1089,45 @@ export type Database = {
           metadata?: Json
         }
         Relationships: []
+      }
+      classroom_student_archives: {
+        Row: {
+          archived_at: string | null
+          classroom_id: string
+          created_at: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          classroom_id: string
+          created_at?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          classroom_id?: string
+          created_at?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_student_archives_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_student_archives_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       classroom_members: {
         Row: {

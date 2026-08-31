@@ -18,6 +18,13 @@ describe("application navigation", () => {
     expect(labels).not.toContain("Reports");
   });
 
+  it("includes a non-destructive Student archive destination", () => {
+    const items = getNavigation("student");
+    const archive = items.find((item) => item.label === "Archive");
+
+    expect(archive?.to).toBe("/student/archive");
+  });
+
   it("keeps role labels human-readable", () => {
     expect(getRoleLabel("student")).toBe("Student");
     expect(getRoleLabel("instructor")).toBe("Instructor");

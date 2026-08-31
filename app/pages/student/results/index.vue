@@ -107,6 +107,8 @@ async function loadResults():
       {
         includeArchivedCompleted:
           true,
+        includeStudentArchived:
+          true,
       },
     );
 

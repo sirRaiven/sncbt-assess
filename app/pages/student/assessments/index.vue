@@ -17,7 +17,11 @@ useSeoMeta({
 
 const {
   listStudentDeliveries,
+  archiveStudentDelivery,
 } = useAssessmentDelivery();
+
+const toast =
+  useToast();
 
 const deliveries =
   ref<StudentAssessmentDelivery[]>(
@@ -29,6 +33,11 @@ const isLoading =
 
 const errorMessage =
   ref("");
+
+const busyArchiveId =
+  ref<string | null>(
+    null,
+  );
 
 const query =
   ref("");
@@ -449,6 +458,78 @@ function assessmentTypeLabel(
   return labels[value];
 }
 
+function canArchive(
+  delivery:
+    StudentAssessmentDelivery,
+): boolean {
+  return (
+    delivery.status === "closed"
+    && !delivery.canStart
+    && !delivery.canResume
+    && delivery.attempt?.status
+      !== "in_progress"
+  );
+}
+
+async function archiveAssessment(
+  delivery:
+    StudentAssessmentDelivery,
+): Promise<void> {
+  if (
+    !canArchive(delivery)
+    || busyArchiveId.value
+  ) {
+    return;
+  }
+
+  busyArchiveId.value =
+    delivery.assignmentId;
+
+  const result =
+    await archiveStudentDelivery(
+      delivery.assignmentId,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title:
+        "Assessment could not be archived",
+      description:
+        result.error
+        || "The assessment could not be moved to Archive.",
+      color:
+        "error",
+    });
+
+    busyArchiveId.value =
+      null;
+
+    return;
+  }
+
+  deliveries.value =
+    deliveries.value.filter(
+      (item) =>
+        item.assignmentId
+        !== delivery.assignmentId,
+    );
+
+  toast.add({
+    title:
+      "Assessment archived",
+    description:
+      "The assessment was removed from this list. Your attempts, answers, and results were preserved.",
+    color:
+      "success",
+  });
+
+  busyArchiveId.value =
+    null;
+}
+
 async function loadDeliveries():
   Promise<void> {
   isLoading.value =
@@ -815,16 +896,31 @@ onMounted(
             />
           </div>
 
-          <UButton
-            :to="actionRoute(delivery)"
-            :color="delivery.canStart || delivery.canResume ? 'primary' : 'neutral'"
-            :variant="delivery.canStart || delivery.canResume ? 'solid' : 'soft'"
-            :icon="actionIcon(delivery)"
-            block
-            class="mt-4"
-          >
-            {{ actionLabel(delivery) }}
-          </UButton>
+          <div class="mt-4 grid gap-2">
+            <UButton
+              :to="actionRoute(delivery)"
+              :color="delivery.canStart || delivery.canResume ? 'primary' : 'neutral'"
+              :variant="delivery.canStart || delivery.canResume ? 'solid' : 'soft'"
+              :icon="actionIcon(delivery)"
+              block
+            >
+              {{ actionLabel(delivery) }}
+            </UButton>
+
+            <UButton
+              v-if="canArchive(delivery)"
+              type="button"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-archive"
+              :loading="busyArchiveId === delivery.assignmentId"
+              :disabled="Boolean(busyArchiveId)"
+              block
+              @click="archiveAssessment(delivery)"
+            >
+              Archive
+            </UButton>
+          </div>
         </div>
       </UCard>
     </div>

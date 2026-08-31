@@ -158,6 +158,14 @@ const items: Record<
       to:
         "/student/results",
     },
+    {
+      label:
+        "Archive",
+      icon:
+        "i-lucide-archive",
+      to:
+        "/student/archive",
+    },
   ],
 };
 

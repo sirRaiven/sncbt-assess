@@ -108,6 +108,21 @@ export interface StudentClassListItem {
   instructor: InstructorSummary;
 }
 
+export type StudentClassArchiveSource =
+  | "student"
+  | "instructor";
+
+export interface StudentClassArchiveSummary {
+  archivedAt: string;
+  source: StudentClassArchiveSource;
+  canRestore: boolean;
+}
+
+export interface StudentArchivedClassListItem
+  extends StudentClassListItem {
+  archive: StudentClassArchiveSummary;
+}
+
 export interface ClassroomFormInput {
   name: string;
   subjectCode: string;

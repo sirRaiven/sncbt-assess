@@ -551,7 +551,7 @@ onBeforeUnmount(
             props.role
             === 'student'
           "
-          class="h-[calc(5.75rem+env(safe-area-inset-bottom))] lg:hidden"
+          class="h-[calc(4.75rem+env(safe-area-inset-bottom))] lg:hidden"
           aria-hidden="true"
         />
       </main>

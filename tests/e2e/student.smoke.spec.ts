@@ -16,7 +16,7 @@ describe("student portal smoke", async () => {
     const problems = watchPageProblems(page);
     await signIn(page, "student");
 
-    for (const path of ["/student/dashboard", "/student/classes", "/student/assessments", "/student/results", "/student/profile"]) {
+    for (const path of ["/student/dashboard", "/student/classes", "/student/assessments", "/student/results", "/student/archive", "/student/profile"]) {
       await page.goto(url(path));
       await page.waitForURL(new RegExp(path.replaceAll("/", "\\/")));
       expect(page.url()).toMatch(new RegExp(path.replaceAll("/", "\\/")));

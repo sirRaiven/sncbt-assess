@@ -235,11 +235,25 @@ export function useAssessmentDelivery() {
     options?: {
       includeArchivedCompleted?:
         boolean;
+      includeStudentArchived?:
+        boolean;
+      onlyStudentArchived?:
+        boolean;
     },
   ) {
     const includeArchivedCompleted =
       options
         ?.includeArchivedCompleted
+      ?? false;
+
+    const includeStudentArchived =
+      options
+        ?.includeStudentArchived
+      ?? false;
+
+    const onlyStudentArchived =
+      options
+        ?.onlyStudentArchived
       ?? false;
 
     return await invoke<{
@@ -251,6 +265,8 @@ export function useAssessmentDelivery() {
       (
         classroomId
         || includeArchivedCompleted
+        || includeStudentArchived
+        || onlyStudentArchived
       )
         ? {
             classroomId:
@@ -258,8 +274,44 @@ export function useAssessmentDelivery() {
               || undefined,
 
             includeArchivedCompleted,
+            includeStudentArchived,
+            onlyStudentArchived,
           }
         : undefined,
+    );
+  }
+
+  async function archiveStudentDelivery(
+    assignmentId: string,
+  ) {
+    return await invoke<
+      MessageResponse
+      & {
+        assignmentId: string;
+        archivedAt: string;
+      }
+    >(
+      "archive-student-delivery",
+      {
+        assignmentId,
+      },
+    );
+  }
+
+  async function restoreStudentDelivery(
+    assignmentId: string,
+  ) {
+    return await invoke<
+      MessageResponse
+      & {
+        assignmentId: string;
+        archivedAt: null;
+      }
+    >(
+      "restore-student-delivery",
+      {
+        assignmentId,
+      },
     );
   }
 
@@ -477,6 +529,8 @@ export function useAssessmentDelivery() {
 
   return {
     listStudentDeliveries,
+    archiveStudentDelivery,
+    restoreStudentDelivery,
     getStudentDelivery,
     beginAttempt,
     getQuestion,

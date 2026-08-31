@@ -6,6 +6,7 @@ import type {
   ClassroomMember,
   InstructorClassroom,
   MembershipStatus,
+  StudentArchivedClassListItem,
   StudentClassListItem,
   StudentClassMembership,
   StudentClassmate,
@@ -323,6 +324,46 @@ export function useClassrooms() {
     );
   }
 
+  async function listStudentArchivedClasses() {
+    return await invoke<{
+      classes: StudentArchivedClassListItem[];
+    }>(
+      "list-student-archived-classes",
+    );
+  }
+
+  async function archiveStudentClass(
+    classroomId: string,
+  ) {
+    return await invoke<
+      MessageResponse & {
+        classroomId: string;
+        archivedAt: string;
+      }
+    >(
+      "archive-student-class",
+      {
+        classroomId,
+      },
+    );
+  }
+
+  async function restoreStudentClass(
+    classroomId: string,
+  ) {
+    return await invoke<
+      MessageResponse & {
+        classroomId: string;
+        archivedAt: null;
+      }
+    >(
+      "restore-student-class",
+      {
+        classroomId,
+      },
+    );
+  }
+
   async function getStudentClass(
     classroomId: string,
   ) {
@@ -406,6 +447,9 @@ export function useClassrooms() {
     rejectMember,
     removeMember,
     listStudentClasses,
+    listStudentArchivedClasses,
+    archiveStudentClass,
+    restoreStudentClass,
     getStudentClass,
     listClassmates,
     joinClass,

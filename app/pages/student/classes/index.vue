@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  DropdownMenuItem,
   FormSubmitEvent,
 } from "@nuxt/ui";
 
@@ -26,7 +27,11 @@ const route = useRoute();
 const {
   joinClass,
   listStudentClasses,
+  archiveStudentClass,
 } = useClassrooms();
+
+const toast =
+  useToast();
 
 const classes =
   ref<StudentClassListItem[]>([]);
@@ -34,6 +39,11 @@ const classes =
 const isLoading = ref(true);
 const errorMessage = ref("");
 const query = ref("");
+
+const busyArchiveClassId =
+  ref<string | null>(
+    null,
+  );
 
 const joinModalOpen = ref(false);
 const isJoining = ref(false);
@@ -114,6 +124,108 @@ function openJoinModal(
       .replace(/\s+/g, "");
 
   joinModalOpen.value = true;
+}
+
+function classActionItems(
+  item: StudentClassListItem,
+): DropdownMenuItem[][] {
+  if (
+    item.membership
+      .membership_status
+      !== "active"
+  ) {
+    return [];
+  }
+
+  return [
+    [
+      {
+        label:
+          "Open Class",
+        icon:
+          "i-lucide-arrow-up-right",
+        to:
+          `/student/classes/${item.classroom.id}`,
+      },
+    ],
+    [
+      {
+        label:
+          "Archive",
+        icon:
+          "i-lucide-archive",
+        disabled:
+          Boolean(
+            busyArchiveClassId.value,
+          ),
+        onSelect: () => {
+          void archiveClass(
+            item,
+          );
+        },
+      },
+    ],
+  ];
+}
+
+async function archiveClass(
+  item: StudentClassListItem,
+): Promise<void> {
+  if (
+    busyArchiveClassId.value
+    || item.membership
+      .membership_status
+      !== "active"
+  ) {
+    return;
+  }
+
+  busyArchiveClassId.value =
+    item.classroom.id;
+
+  const result =
+    await archiveStudentClass(
+      item.classroom.id,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title:
+        "Class could not be archived",
+      description:
+        result.error
+        || "The class could not be moved to your Archive.",
+      color:
+        "error",
+    });
+
+    busyArchiveClassId.value =
+      null;
+
+    return;
+  }
+
+  classes.value =
+    classes.value.filter(
+      (current) =>
+        current.classroom.id
+        !== item.classroom.id,
+    );
+
+  toast.add({
+    title:
+      "Class archived",
+    description:
+      "The class was removed from My Classes. Your membership, assessments, and results were preserved.",
+    color:
+      "success",
+  });
+
+  busyArchiveClassId.value =
+    null;
 }
 
 async function loadClasses(): Promise<void> {
@@ -351,13 +463,45 @@ onMounted(
               </UBadge>
             </div>
 
-            <StatusPill
-              :status="
-                item.membership.membership_status === 'pending'
-                  ? 'Pending approval'
-                  : item.classroom.status
-              "
-            />
+            <div class="flex items-center gap-1">
+              <StatusPill
+                :status="
+                  item.membership.membership_status === 'pending'
+                    ? 'Pending approval'
+                    : item.classroom.status
+                "
+              />
+
+              <UDropdownMenu
+                v-if="item.membership.membership_status === 'active'"
+                :items="classActionItems(item)"
+                :content="{
+                  align: 'end',
+                  side: 'bottom',
+                  sideOffset: 6,
+                }"
+                :ui="{
+                  content: 'w-48',
+                  item: 'min-h-10',
+                  itemLabel: 'font-semibold',
+                }"
+              >
+                <UButton
+                  type="button"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  square
+                  icon="i-lucide-ellipsis-vertical"
+                  :loading="busyArchiveClassId === item.classroom.id"
+                  :disabled="
+                    Boolean(busyArchiveClassId)
+                    && busyArchiveClassId !== item.classroom.id
+                  "
+                  :aria-label="`Class options for ${item.classroom.name}`"
+                />
+              </UDropdownMenu>
+            </div>
           </div>
 
           <NuxtLink
