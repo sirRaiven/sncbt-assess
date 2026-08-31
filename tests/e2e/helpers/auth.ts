@@ -1,3 +1,4 @@
+import { url } from "@nuxt/test-utils/e2e";
 import type { Page } from "playwright-core";
 
 export type TestRole = "student" | "instructor" | "admin";
@@ -18,7 +19,7 @@ export async function signIn(page: Page, role: TestRole): Promise<void> {
     throw new Error(`Missing E2E credentials for ${role}.`);
   }
 
-  await page.goto("/");
+  await page.goto(url("/"));
   await page.getByLabel("Username").fill(credentials.identifier);
   await page.getByRole("textbox", { name: /^Password\*?$/ }).fill(credentials.password);
   await page.getByRole("button", { name: /sign in/i }).click();

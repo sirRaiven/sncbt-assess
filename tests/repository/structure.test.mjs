@@ -23,6 +23,7 @@ const criticalPaths = [
   "supabase/functions/assessments/index.ts",
   "supabase/functions/classrooms/index.ts",
   "supabase/functions/questions/index.ts",
+  "scripts/audit-orphans.mjs",
   "vitest.config.ts",
 ];
 
@@ -43,15 +44,28 @@ test("every Supabase Edge Function directory contains an index.ts entry point", 
 
 test("local secrets and generated test artifacts are ignored", () => {
   const ignore = readFileSync(join(root, ".gitignore"), "utf8");
-  for (const pattern of [".env", "!.env.test.example", "supabase/.temp/", "playwright-report/", "test-results/"]) {
+  for (const pattern of [".env", "!.env.test.example", "supabase/.temp/", "playwright-report/", "test-results/", "coverage/"]) {
     assert.ok(ignore.includes(pattern), `.gitignore should contain ${pattern}`);
   }
 });
 
-test("Vitest and Nuxt Test Utils are the active test stack", () => {
+test("Vitest, Nuxt Test Utils, happy-dom, Vue Test Utils, and playwright-core are the active test stack", () => {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 
-  for (const script of ["test", "test:unit", "test:nuxt", "test:e2e", "check", "verify"]) {
+  for (const script of [
+    "test",
+    "test:unit",
+    "test:nuxt",
+    "test:e2e",
+    "test:e2e:chromium",
+    "test:e2e:firefox",
+    "test:e2e:webkit",
+    "test:api:browser",
+    "test:performance",
+    "audit:orphans",
+    "check",
+    "verify",
+  ]) {
     assert.ok(pkg.scripts?.[script], `Missing npm script: ${script}`);
   }
 
@@ -59,6 +73,30 @@ test("Vitest and Nuxt Test Utils are the active test stack", () => {
     assert.ok(pkg.devDependencies?.[dependency], `Missing test devDependency: ${dependency}`);
   }
 
-  assert.equal(pkg.devDependencies?.["@playwright/test"], undefined, "@playwright/test should not be installed");
-  assert.equal(pkg.devDependencies?.playwright, undefined, "playwright should not be installed as a standalone package");
+  assert.equal(pkg.devDependencies?.["@playwright/test"], undefined, "@playwright/test is not required for the Nuxt Test Utils browser runner");
+  assert.equal(pkg.devDependencies?.playwright, undefined, "playwright should not be installed as a separate package when using playwright-core here");
+});
+
+test("repository no longer contains stale temporary source artifacts", () => {
+  const roots = [join(root, "app"), join(root, "supabase/functions")];
+  const stale = [];
+
+  function walk(directory) {
+    for (const name of readdirSync(directory)) {
+      const path = join(directory, name);
+      const stats = statSync(path);
+
+      if (stats.isDirectory()) {
+        walk(path);
+      } else if (/\.(tmp|bak|old|orig|rej)$/i.test(name) || /~$/.test(name)) {
+        stale.push(path.replace(`${root}\\`, ""));
+      }
+    }
+  }
+
+  for (const directory of roots) {
+    walk(directory);
+  }
+
+  assert.deepEqual(stale, [], `Stale source artifacts found: ${stale.join(", ")}`);
 });
