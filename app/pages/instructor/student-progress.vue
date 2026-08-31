@@ -41,6 +41,14 @@ const selectedClassroom =
     ALL_CLASSES_VALUE,
   );
 
+const ALL_ASSESSMENTS_VALUE =
+  "__all_assessments__";
+
+const selectedAssessment =
+  ref(
+    ALL_ASSESSMENTS_VALUE,
+  );
+
 const query =
   ref("");
 
@@ -55,6 +63,8 @@ const detail =
 interface RecentResponseGroup {
   key: string;
   attemptId: string;
+  assessmentId: string;
+  classroomId: string | null;
   assessmentTitle: string;
   subjectCode: string;
   classroomName: string;
@@ -68,6 +78,20 @@ const recentResponseGroups =
     RecentResponseGroup[]
   >(
     () => {
+      const attemptsById =
+        new Map(
+          (
+            detail.value
+              ?.attempts
+            ?? []
+          ).map(
+            (attempt) => [
+              attempt.attemptId,
+              attempt,
+            ],
+          ),
+        );
+
       const groups =
         new Map<
           string,
@@ -114,6 +138,16 @@ const recentResponseGroups =
             key,
             attemptId:
               activity.attemptId,
+            assessmentId:
+              attemptsById.get(
+                activity.attemptId,
+              )?.assessmentId
+              ?? activity.attemptId,
+            classroomId:
+              attemptsById.get(
+                activity.attemptId,
+              )?.classroomId
+              ?? null,
             assessmentTitle:
               activity.assessmentTitle,
             subjectCode:
@@ -146,6 +180,97 @@ const recentResponseGroups =
             ),
       );
     },
+  );
+
+const classScopedAttempts =
+  computed(
+    () =>
+      (
+        detail.value
+          ?.attempts
+        ?? []
+      ).filter(
+        (attempt) =>
+          selectedClassroom.value
+            === ALL_CLASSES_VALUE
+          || attempt.classroomId
+            === selectedClassroom.value,
+      ),
+  );
+
+const assessmentItems =
+  computed(
+    () => {
+      const seen =
+        new Set<string>();
+
+      const items =
+        classScopedAttempts.value
+          .filter(
+            (attempt) => {
+              if (
+                seen.has(
+                  attempt.assessmentId,
+                )
+              ) {
+                return false;
+              }
+
+              seen.add(
+                attempt.assessmentId,
+              );
+
+              return true;
+            },
+          )
+          .map(
+            (attempt) => ({
+              label:
+                `${attempt.subjectCode} · ${attempt.assessmentTitle}`,
+              value:
+                attempt.assessmentId,
+            }),
+          );
+
+      return [
+        {
+          label:
+            "All assessments",
+          value:
+            ALL_ASSESSMENTS_VALUE,
+        },
+        ...items,
+      ];
+    },
+  );
+
+const filteredRecentResponseGroups =
+  computed(
+    () =>
+      recentResponseGroups.value
+        .filter(
+          (group) =>
+            selectedClassroom.value
+              === ALL_CLASSES_VALUE
+            || group.classroomId
+              === selectedClassroom.value,
+        )
+        .filter(
+          (group) =>
+            selectedAssessment.value
+              === ALL_ASSESSMENTS_VALUE
+            || group.assessmentId
+              === selectedAssessment.value,
+        ),
+  );
+
+const hasResponseFilters =
+  computed(
+    () =>
+      selectedClassroom.value
+        !== ALL_CLASSES_VALUE
+      || selectedAssessment.value
+        !== ALL_ASSESSMENTS_VALUE,
   );
 
 const isLoadingOverview =
@@ -255,8 +380,14 @@ const selectedStudent =
 const latestAttempt =
   computed(
     () =>
-      detail.value
-        ?.attempts[0]
+      classScopedAttempts.value
+        .find(
+          (attempt) =>
+            selectedAssessment.value
+              === ALL_ASSESSMENTS_VALUE
+            || attempt.assessmentId
+              === selectedAssessment.value,
+        )
       ?? null,
   );
 
@@ -494,6 +625,14 @@ async function loadStudent(
 function selectStudent(
   studentId: string,
 ): void {
+  if (
+    selectedStudentId.value
+    !== studentId
+  ) {
+    selectedAssessment.value =
+      ALL_ASSESSMENTS_VALUE;
+  }
+
   selectedStudentId.value =
     studentId;
 }
@@ -501,9 +640,39 @@ function selectStudent(
 watch(
   selectedStudentId,
   (studentId) => {
+    selectedAssessment.value =
+      ALL_ASSESSMENTS_VALUE;
+
     void loadStudent(
       studentId,
     );
+  },
+);
+
+watch(
+  [
+    selectedClassroom,
+    assessmentItems,
+  ],
+  () => {
+    if (
+      selectedAssessment.value
+        === ALL_ASSESSMENTS_VALUE
+    ) {
+      return;
+    }
+
+    if (
+      !assessmentItems.value
+        .some(
+          (item) =>
+            item.value
+            === selectedAssessment.value,
+        )
+    ) {
+      selectedAssessment.value =
+        ALL_ASSESSMENTS_VALUE;
+    }
   },
 );
 
@@ -595,13 +764,24 @@ onMounted(
         body: 'p-4 sm:p-5',
       }"
     >
-      <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
+      <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(18rem,24rem)]">
         <UFormField label="Class">
           <USelect
             v-model="selectedClassroom"
             :items="classroomItems"
             value-key="value"
             label-key="label"
+            class="w-full"
+          />
+        </UFormField>
+
+        <UFormField label="Assessment">
+          <USelect
+            v-model="selectedAssessment"
+            :items="assessmentItems"
+            value-key="value"
+            label-key="label"
+            :disabled="isLoadingDetail || !detail"
             class="w-full"
           />
         </UFormField>
@@ -835,16 +1015,20 @@ onMounted(
                 </h2>
 
                 <p class="mt-1 text-sm text-muted">
-                  Review every recorded answer, grouped by assessment.
+                  Review recorded answers for the selected class and assessment.
                 </p>
               </div>
             </template>
 
             <EmptyPanel
-              v-if="recentResponseGroups.length === 0"
+              v-if="filteredRecentResponseGroups.length === 0"
               icon="i-lucide-clipboard-list"
-              title="No responses yet"
-              description="This Student has not answered an assessment question yet."
+              :title="hasResponseFilters ? 'No matching responses' : 'No responses yet'"
+              :description="
+                hasResponseFilters
+                  ? 'This Student has no recorded responses for the selected class or assessment.'
+                  : 'This Student has not answered an assessment question yet.'
+              "
             />
 
             <div
@@ -852,7 +1036,7 @@ onMounted(
               class="space-y-4"
             >
               <section
-                v-for="group in recentResponseGroups"
+                v-for="group in filteredRecentResponseGroups"
                 :key="group.key"
                 class="overflow-hidden rounded-2xl border border-default"
               >
