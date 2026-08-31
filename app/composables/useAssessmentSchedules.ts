@@ -140,9 +140,70 @@ export function useAssessmentSchedules() {
     );
   }
 
+  async function editSchedule(
+    assignmentId: string,
+    startsAt: string,
+    endsAt: string,
+    reason = "",
+  ) {
+    return await invoke<
+      MessageResponse
+      & InstructorAssessmentScheduleOverview
+    >(
+      "edit-schedule",
+      {
+        assignmentId,
+        startsAt,
+        endsAt,
+        reason,
+      },
+    );
+  }
+
+  async function extendSchedule(
+    assignmentId: string,
+    endsAt: string,
+    reason: string,
+  ) {
+    return await invoke<
+      MessageResponse
+      & InstructorAssessmentScheduleOverview
+    >(
+      "extend-schedule",
+      {
+        assignmentId,
+        endsAt,
+        reason,
+      },
+    );
+  }
+
+  async function reopenSchedule(
+    assignmentId: string,
+    startsAt: string,
+    endsAt: string,
+    reason: string,
+  ) {
+    return await invoke<
+      MessageResponse
+      & InstructorAssessmentScheduleOverview
+    >(
+      "reopen-schedule",
+      {
+        assignmentId,
+        startsAt,
+        endsAt,
+        reason,
+      },
+    );
+  }
+
   return {
     getInstructorSchedule,
     saveSchedules,
     closeSchedule,
+    editSchedule,
+    extendSchedule,
+    reopenSchedule,
   };
 }

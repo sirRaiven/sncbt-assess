@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from "@nuxt/ui";
 
+import { assessmentScheduleActionAvailability } from "~/utils/assessment-schedule-actions";
+
 import type {
   AssessmentWithClassroom,
 } from "~/types/assessment";
@@ -12,6 +14,8 @@ import type {
 import type {
   ClassroomEnrollmentSettings,
 } from "~/types/classroom";
+
+type ScheduleAction = "extend" | "reopen";
 
 definePageMeta({
   layout: "instructor",
@@ -46,6 +50,11 @@ const {
   listInstructorDeliveries,
 } = useAssessmentDelivery();
 
+const {
+  extendSchedule,
+  reopenSchedule,
+} = useAssessmentSchedules();
+
 const enrollmentSettings =
   ref<ClassroomEnrollmentSettings | null>(null);
 
@@ -69,6 +78,11 @@ const requestedApprovalValue = ref(false);
 
 const archiveConfirmationOpen =
   ref(false);
+
+const scheduleActionOpen = ref(false);
+const scheduleAction = ref<ScheduleAction | null>(null);
+const pendingScheduleDelivery = ref<InstructorDeliveryListItem | null>(null);
+const isScheduleActionSaving = ref(false);
 
 const assignedAssessments = computed(
   () => assessments.value
@@ -183,28 +197,150 @@ function assessmentDelivery(
   return matching[0] ?? null;
 }
 
+function requestScheduleAction(
+  delivery: InstructorDeliveryListItem,
+  action: ScheduleAction,
+): void {
+  pendingScheduleDelivery.value = delivery;
+  scheduleAction.value = action;
+  scheduleActionOpen.value = true;
+}
+
 function assessmentMenuItems(
   assessment: AssessmentWithClassroom,
 ): DropdownMenuItem[][] {
   const delivery = assessmentDelivery(assessment.id);
 
-  return [
-    [
-      {
-        label: "Edit assessment",
-        icon: "i-lucide-pencil",
-        to: `/instructor/assessments/${assessment.id}/edit`,
-      },
-      {
-        label: "View live monitoring",
-        icon: "i-lucide-radio-tower",
-        to: delivery
-          ? `/instructor/sessions/${delivery.assignmentId}/monitor`
-          : undefined,
-        disabled: !delivery,
-      },
-    ],
+  const primary: DropdownMenuItem[] = [
+    {
+      label: "Edit assessment",
+      icon: "i-lucide-pencil",
+      to: `/instructor/assessments/${assessment.id}/edit`,
+    },
   ];
+
+  const scheduleItems: DropdownMenuItem[] = [];
+
+  if (!delivery) {
+    scheduleItems.push({
+      label: "Schedule assessment",
+      icon: "i-lucide-calendar-plus",
+      to: `/instructor/assessments/${assessment.id}/assign`,
+    });
+  } else {
+    const availability =
+      assessmentScheduleActionAvailability(
+        delivery.status,
+      );
+
+    if (availability.edit) {
+      scheduleItems.push({
+        label: "Edit schedule",
+        icon: "i-lucide-calendar-cog",
+        to: `/instructor/assessments/${assessment.id}/assign?action=edit&assignmentId=${delivery.assignmentId}`,
+      });
+    }
+
+    if (availability.extend) {
+      scheduleItems.push({
+        label: "Extend due date",
+        icon: "i-lucide-calendar-plus-2",
+        onSelect: () =>
+          requestScheduleAction(
+            delivery,
+            "extend",
+          ),
+      });
+    }
+
+    if (availability.reopen) {
+      scheduleItems.push({
+        label: "Reopen with new schedule",
+        icon: "i-lucide-rotate-ccw",
+        onSelect: () =>
+          requestScheduleAction(
+            delivery,
+            "reopen",
+          ),
+      });
+    }
+
+    scheduleItems.push({
+      label: "View live monitoring",
+      icon: "i-lucide-radio-tower",
+      to: `/instructor/sessions/${delivery.assignmentId}/monitor`,
+    });
+  }
+
+  return [
+    primary,
+    scheduleItems,
+  ];
+}
+
+async function confirmScheduleAction(
+  payload: {
+    startsAt: string | null;
+    endsAt: string;
+    reason: string;
+  },
+): Promise<void> {
+  if (
+    !pendingScheduleDelivery.value
+    || !scheduleAction.value
+  ) {
+    return;
+  }
+
+  isScheduleActionSaving.value = true;
+
+  const delivery = pendingScheduleDelivery.value;
+  const result =
+    scheduleAction.value === "extend"
+      ? await extendSchedule(
+          delivery.assignmentId,
+          payload.endsAt,
+          payload.reason,
+        )
+      : await reopenSchedule(
+          delivery.assignmentId,
+          payload.startsAt!,
+          payload.endsAt,
+          payload.reason,
+        );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title:
+        scheduleAction.value === "extend"
+          ? "Due date was not extended"
+          : "Assessment was not reopened",
+      description:
+        result.error
+        || "The assessment schedule could not be updated.",
+      color: "error",
+    });
+    isScheduleActionSaving.value = false;
+    return;
+  }
+
+  toast.add({
+    title:
+      scheduleAction.value === "extend"
+        ? "Due date extended"
+        : "Assessment reopened",
+    description: result.data.message,
+    color: "success",
+  });
+
+  scheduleActionOpen.value = false;
+  scheduleAction.value = null;
+  pendingScheduleDelivery.value = null;
+  isScheduleActionSaving.value = false;
+  await loadAssignedAssessments();
 }
 
 async function loadAssignedAssessments(): Promise<void> {
@@ -714,6 +850,10 @@ onMounted(() => {
                       class="inline-flex min-w-0 items-center gap-1.5"
                     >
                       <UIcon name="i-lucide-calendar-clock" class="size-3.5 shrink-0" />
+                      <span class="font-semibold text-highlighted">
+                        {{ typeLabel(assessmentDelivery(assessment.id)!.status) }}
+                      </span>
+                      <span aria-hidden="true">·</span>
                       <span class="truncate">
                         {{ formatScheduleWindow(assessmentDelivery(assessment.id)!.startsAt, assessmentDelivery(assessment.id)!.endsAt) }}
                       </span>
@@ -976,6 +1116,19 @@ onMounted(() => {
           </UCard>
         </div>
       </section>
+
+      <AssessmentScheduleActionModal
+        v-model:open="scheduleActionOpen"
+        :schedule="pendingScheduleDelivery ? {
+          id: pendingScheduleDelivery.assignmentId,
+          startsAt: pendingScheduleDelivery.startsAt,
+          endsAt: pendingScheduleDelivery.endsAt,
+          classroom: pendingScheduleDelivery.classroom,
+        } : null"
+        :action="scheduleAction"
+        :loading="isScheduleActionSaving"
+        @confirm="confirmScheduleAction"
+      />
 
       <ConfirmationModal
         v-model:open="archiveConfirmationOpen"

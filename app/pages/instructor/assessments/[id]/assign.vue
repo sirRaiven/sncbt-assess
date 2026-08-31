@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from "@nuxt/ui";
+
+import { assessmentScheduleActionAvailability } from "~/utils/assessment-schedule-actions";
+
 import type {
   AssessmentClassOption,
 } from "~/types/assessment";
@@ -31,6 +35,8 @@ interface ClassScheduleRow {
     | null;
 }
 
+type ScheduleAction = "edit" | "extend" | "reopen";
+
 const route =
   useRoute();
 
@@ -53,6 +59,9 @@ const {
   getInstructorSchedule,
   saveSchedules,
   closeSchedule,
+  editSchedule,
+  extendSchedule,
+  reopenSchedule,
 } = useAssessmentSchedules();
 
 const overview =
@@ -107,6 +116,11 @@ const pendingCloseSchedule =
     null,
   );
 
+const scheduleActionOpen = ref(false);
+const scheduleAction = ref<ScheduleAction | null>(null);
+const pendingScheduleAction = ref<AssessmentScheduleItem | null>(null);
+const isScheduleActionSaving = ref(false);
+
 const selectedRows =
   computed(
     () =>
@@ -142,15 +156,44 @@ const visibleRows =
     },
   );
 
-const removedExistingRows =
+const existingSchedules =
   computed(
     () =>
-      rows.value.filter(
-        (row) =>
-          Boolean(
-            row.existing,
-          )
-          && !row.selected,
+      [...(overview.value?.schedules ?? [])]
+        .filter(
+          (schedule) =>
+            !schedule.cancelledAt,
+        )
+        .sort(
+          (first, second) => {
+            const priority = {
+              open: 0,
+              upcoming: 1,
+              closed: 2,
+              cancelled: 3,
+            } as const;
+
+            const difference =
+              priority[first.status]
+              - priority[second.status];
+
+            if (difference !== 0) {
+              return difference;
+            }
+
+            return new Date(second.endsAt).getTime()
+              - new Date(first.endsAt).getTime();
+          },
+        ),
+  );
+
+const activeSchedulesForSave =
+  computed(
+    () =>
+      existingSchedules.value.filter(
+        (schedule) =>
+          schedule.status === "open"
+          || schedule.status === "upcoming",
       ),
   );
 
@@ -309,62 +352,43 @@ function buildRows(
   schedules:
     AssessmentScheduleItem[],
 ): ClassScheduleRow[] {
-  const activeMap =
-    new Map(
+  const scheduledClassroomIds =
+    new Set(
       schedules
         .filter(
           (schedule) =>
-            [
-              "upcoming",
-              "open",
-            ].includes(
-              schedule.status,
-            ),
+            !schedule.cancelledAt,
         )
         .map(
-          (schedule) => [
+          (schedule) =>
             schedule.classroomId,
-            schedule,
-          ],
         ),
     );
 
-  return classes.map(
-    (classroom) => {
-      const existing =
-        activeMap.get(
+  return classes
+    .filter(
+      (classroom) =>
+        !scheduledClassroomIds.has(
           classroom.id,
-        )
-        ?? null;
+        ),
+    )
+    .map(
+      (classroom) => {
+        const defaults =
+          defaultWindow();
 
-      const defaults =
-        defaultWindow();
-
-      return {
-        classroom,
-        selected:
-          Boolean(existing),
-        startsAtLocal:
-          existing
-            ? localInputValue(
-                existing.startsAt,
-              )
-            : defaults
-              .startsAtLocal,
-        endsAtLocal:
-          existing
-            ? localInputValue(
-                existing.endsAt,
-              )
-            : defaults
-              .endsAtLocal,
-        maxAttempts:
-          existing?.maxAttempts
-          ?? 1,
-        existing,
-      };
-    },
-  );
+        return {
+          classroom,
+          selected: false,
+          startsAtLocal:
+            defaults.startsAtLocal,
+          endsAtLocal:
+            defaults.endsAtLocal,
+          maxAttempts: 1,
+          existing: null,
+        };
+      },
+    );
 }
 
 function toggleRow(
@@ -519,7 +543,24 @@ async function save():
     return;
   }
 
-  const schedules:
+  const preservedSchedules:
+    AssessmentScheduleInput[] =
+    activeSchedulesForSave.value.map(
+      (schedule) => ({
+        classroomId:
+          schedule.classroomId,
+        startsAt:
+          schedule.startsAt,
+        endsAt:
+          schedule.endsAt,
+        timeLimitSeconds:
+          null,
+        maxAttempts:
+          schedule.maxAttempts,
+      }),
+    );
+
+  const newSchedules:
     AssessmentScheduleInput[] =
     selectedRows.value.map(
       (row) => ({
@@ -541,6 +582,12 @@ async function save():
           row.maxAttempts,
       }),
     );
+
+  const schedules =
+    [
+      ...preservedSchedules,
+      ...newSchedules,
+    ];
 
   isSaving.value =
     true;
@@ -570,7 +617,7 @@ async function save():
 
   const selectedClassroomIds =
     new Set(
-      schedules.map(
+      newSchedules.map(
         (schedule) =>
           schedule.classroomId,
       ),
@@ -644,6 +691,179 @@ async function backToAssessments():
   );
 }
 
+function requestScheduleAction(
+  schedule: AssessmentScheduleItem,
+  action: ScheduleAction,
+): void {
+  pendingScheduleAction.value =
+    schedule;
+  scheduleAction.value =
+    action;
+  scheduleActionOpen.value =
+    true;
+}
+
+function scheduleMenuItems(
+  schedule: AssessmentScheduleItem,
+): DropdownMenuItem[][] {
+  const availability =
+    assessmentScheduleActionAvailability(
+      schedule.status,
+    );
+
+  const lifecycleItems: DropdownMenuItem[] = [];
+
+  if (availability.edit) {
+    lifecycleItems.push({
+      label: "Edit schedule",
+      icon: "i-lucide-calendar-cog",
+      onSelect: () =>
+        requestScheduleAction(
+          schedule,
+          "edit",
+        ),
+    });
+  }
+
+  if (availability.extend) {
+    lifecycleItems.push({
+      label: "Extend due date",
+      icon: "i-lucide-calendar-plus-2",
+      onSelect: () =>
+        requestScheduleAction(
+          schedule,
+          "extend",
+        ),
+    });
+  }
+
+  if (availability.reopen) {
+    lifecycleItems.push({
+      label: "Reopen with new schedule",
+      icon: "i-lucide-rotate-ccw",
+      onSelect: () =>
+        requestScheduleAction(
+          schedule,
+          "reopen",
+        ),
+    });
+  }
+
+  const secondaryItems: DropdownMenuItem[] = [
+    {
+      label: "View live monitoring",
+      icon: "i-lucide-radio-tower",
+      to: `/instructor/sessions/${schedule.id}/monitor`,
+    },
+  ];
+
+  if (availability.close) {
+    secondaryItems.push({
+      label: "Close early",
+      icon: "i-lucide-lock",
+      color: "error",
+      onSelect: () =>
+        requestClose(
+          schedule,
+        ),
+    });
+  }
+
+  return [
+    ...(lifecycleItems.length > 0
+      ? [lifecycleItems]
+      : []),
+    secondaryItems,
+  ];
+}
+
+async function confirmScheduleAction(
+  payload: {
+    startsAt: string | null;
+    endsAt: string;
+    reason: string;
+  },
+): Promise<void> {
+  if (
+    !pendingScheduleAction.value
+    || !scheduleAction.value
+  ) {
+    return;
+  }
+
+  isScheduleActionSaving.value =
+    true;
+
+  const schedule =
+    pendingScheduleAction.value;
+
+  const result =
+    scheduleAction.value === "edit"
+      ? await editSchedule(
+          schedule.id,
+          payload.startsAt!,
+          payload.endsAt,
+          payload.reason,
+        )
+      : scheduleAction.value === "extend"
+        ? await extendSchedule(
+            schedule.id,
+            payload.endsAt,
+            payload.reason,
+          )
+        : await reopenSchedule(
+            schedule.id,
+            payload.startsAt!,
+            payload.endsAt,
+            payload.reason,
+          );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    toast.add({
+      title:
+        scheduleAction.value === "edit"
+          ? "Schedule was not edited"
+          : scheduleAction.value === "extend"
+            ? "Due date was not extended"
+            : "Assessment was not reopened",
+      description:
+        result.error
+        || "The schedule could not be updated.",
+      color: "error",
+    });
+
+    isScheduleActionSaving.value =
+      false;
+    return;
+  }
+
+  toast.add({
+    title:
+      scheduleAction.value === "edit"
+        ? "Schedule updated"
+        : scheduleAction.value === "extend"
+          ? "Due date extended"
+          : "Assessment reopened",
+    description:
+      result.data.message,
+    color: "success",
+  });
+
+  scheduleActionOpen.value =
+    false;
+  pendingScheduleAction.value =
+    null;
+  scheduleAction.value =
+    null;
+  isScheduleActionSaving.value =
+    false;
+
+  await loadData();
+}
+
 function requestClose(
   schedule:
     AssessmentScheduleItem,
@@ -713,7 +933,39 @@ async function confirmClose():
 }
 
 onMounted(
-  loadData,
+  async () => {
+    await loadData();
+
+    const requestedAssignmentId =
+      typeof route.query.assignmentId === "string"
+        ? route.query.assignmentId
+        : null;
+
+    const requestedAction =
+      route.query.action === "edit"
+      || route.query.action === "extend"
+      || route.query.action === "reopen"
+        ? route.query.action
+        : null;
+
+    if (
+      requestedAssignmentId
+      && requestedAction
+    ) {
+      const schedule =
+        overview.value?.schedules.find(
+          (item) =>
+            item.id === requestedAssignmentId,
+        );
+
+      if (schedule) {
+        requestScheduleAction(
+          schedule,
+          requestedAction,
+        );
+      }
+    }
+  },
 );
 </script>
 
@@ -731,7 +983,7 @@ onMounted(
         overview?.assessment.title
         || 'Assign Assessment'
       "
-      description="Choose the classes that should receive this assessment, then set their access window."
+      description="Manage existing class schedules safely, or assign this assessment to another class."
     />
 
     <AssessmentWorkspaceNavigation
@@ -795,6 +1047,76 @@ onMounted(
       </div>
 
       <UCard
+        v-if="existingSchedules.length > 0"
+        class="overflow-hidden"
+        :ui="{ body: 'p-0 sm:p-0' }"
+      >
+        <template #header>
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="font-black text-highlighted">Assigned schedules</h2>
+                <UBadge color="neutral" variant="soft">{{ existingSchedules.length }}</UBadge>
+              </div>
+              <p class="mt-1 text-sm text-muted">
+                Existing schedules are locked from free-form editing. Use an explicit action to change access.
+              </p>
+            </div>
+          </div>
+        </template>
+
+        <div class="divide-y divide-default">
+          <article
+            v-for="schedule in existingSchedules"
+            :key="schedule.id"
+            class="flex items-start gap-3 p-4 sm:p-5"
+          >
+            <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <UIcon name="i-lucide-calendar-clock" class="size-4" />
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="font-black text-highlighted">
+                  {{ schedule.classroom.subjectCode }} · {{ schedule.classroom.section }}
+                </p>
+                <StatusPill :status="schedule.status" />
+              </div>
+
+              <p class="mt-1 truncate text-sm text-muted">
+                {{ schedule.classroom.name }}
+              </p>
+
+              <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
+                <span class="inline-flex items-center gap-1.5">
+                  <UIcon name="i-lucide-calendar-days" class="size-3.5" />
+                  Opens {{ formatDate(schedule.startsAt) }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 font-semibold" :class="schedule.status === 'closed' ? 'text-muted' : 'text-highlighted'">
+                  <UIcon name="i-lucide-flag" class="size-3.5" />
+                  Due {{ formatDate(schedule.endsAt) }}
+                </span>
+              </div>
+            </div>
+
+            <UDropdownMenu
+              :items="scheduleMenuItems(schedule)"
+              :content="{ align: 'end', side: 'bottom', sideOffset: 6 }"
+              :ui="{ content: 'w-60', item: 'min-h-10', itemLabel: 'font-semibold' }"
+            >
+              <UButton
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-ellipsis-vertical"
+                square
+                :aria-label="`Schedule actions for ${schedule.classroom.subjectCode} ${schedule.classroom.section}`"
+              />
+            </UDropdownMenu>
+          </article>
+        </div>
+      </UCard>
+
+      <UCard
         class="overflow-hidden"
         :ui="{
           body: 'p-0 sm:p-0',
@@ -810,16 +1132,16 @@ onMounted(
               <div
                 class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary"
               >
-                <span class="text-sm font-black">1</span>
+                <UIcon name="i-lucide-school-plus" class="size-4" />
               </div>
 
               <div>
                 <h2 class="font-black text-highlighted">
-                  Choose classes
+                  Assign to another class
                 </h2>
 
                 <p class="mt-1 text-sm text-muted">
-                  Select the classes that should receive this assessment.
+                  Only classes without an existing schedule are listed here.
                 </p>
               </div>
             </div>
@@ -849,9 +1171,9 @@ onMounted(
         <EmptyPanel
           v-if="rows.length === 0"
           class="m-5"
-          icon="i-lucide-school"
-          title="No active classes"
-          description="Create or reactivate a class before assigning this assessment."
+          icon="i-lucide-calendar-check-2"
+          :title="existingSchedules.length > 0 ? 'No additional classes to assign' : 'No active classes'"
+          :description="existingSchedules.length > 0 ? 'Use the schedule actions above to edit, extend, close, or reopen an existing class schedule.' : 'Create or reactivate a class before assigning this assessment.'"
         />
 
         <EmptyPanel
@@ -905,14 +1227,6 @@ onMounted(
                     {{ row.classroom.section }}
                   </span>
 
-                  <UBadge
-                    v-if="row.existing"
-                    color="success"
-                    variant="soft"
-                    size="sm"
-                  >
-                    Assigned
-                  </UBadge>
                 </span>
 
                 <span class="mt-1 block truncate text-sm text-muted">
@@ -930,15 +1244,8 @@ onMounted(
               v-if="row.selected"
               class="border-t border-default/70 px-4 pb-5 pt-4 sm:px-5"
             >
-              <div
-                class="mb-3 flex items-center gap-2 text-sm font-semibold text-highlighted"
-              >
-                <div
-                  class="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary"
-                >
-                  <span class="text-xs font-black">2</span>
-                </div>
-
+              <div class="mb-3 flex items-center gap-2 text-sm font-semibold text-highlighted">
+                <UIcon name="i-lucide-calendar-range" class="size-4 text-primary" />
                 Set access window
               </div>
 
@@ -966,31 +1273,13 @@ onMounted(
                 </UFormField>
               </div>
 
-              <div
-                v-if="row.existing"
-                class="mt-4 flex items-center justify-between gap-3 rounded-xl bg-elevated/50 px-3 py-2.5"
-              >
-                <p class="text-xs text-muted">
-                  This class already has an active schedule.
-                </p>
-
-                <UButton
-                  color="error"
-                  variant="ghost"
-                  size="sm"
-                  icon="i-lucide-lock"
-                  :loading="closingId === row.existing.id"
-                  @click="requestClose(row.existing)"
-                >
-                  Close early
-                </UButton>
-              </div>
             </div>
           </article>
         </div>
       </UCard>
 
       <div
+        v-if="rows.length > 0"
         class="sticky bottom-4 z-20 rounded-2xl border border-default bg-default/95 p-3 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-default/85"
       >
         <div
@@ -1041,11 +1330,7 @@ onMounted(
             </div>
 
             <div class="min-w-0">
-              <p class="text-xs font-bold uppercase tracking-[0.14em] text-primary">
-                Step 3
-              </p>
-
-              <h2 class="mt-1 text-xl font-black text-highlighted">
+              <h2 class="text-xl font-black text-highlighted">
                 Review assignment
               </h2>
 
@@ -1089,15 +1374,6 @@ onMounted(
             </div>
           </div>
 
-          <UAlert
-            v-if="removedExistingRows.length > 0"
-            class="mt-4"
-            color="warning"
-            variant="soft"
-            icon="i-lucide-triangle-alert"
-            title="Existing assignments will be removed"
-            :description="`${removedExistingRows.length} previously assigned ${removedExistingRows.length === 1 ? 'class is' : 'classes are'} no longer selected.`"
-          />
 
           <div
             class="mt-6 flex flex-col-reverse gap-2 border-t border-default pt-4 sm:flex-row sm:justify-end"
@@ -1187,6 +1463,14 @@ onMounted(
         </div>
       </template>
     </UModal>
+
+    <AssessmentScheduleActionModal
+      v-model:open="scheduleActionOpen"
+      :schedule="pendingScheduleAction"
+      :action="scheduleAction"
+      :loading="isScheduleActionSaving"
+      @confirm="confirmScheduleAction"
+    />
 
     <ConfirmationModal
       v-model:open="closeConfirmationOpen"

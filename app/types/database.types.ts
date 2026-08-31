@@ -158,6 +158,80 @@ export type Database = {
           },
         ]
       }
+      assessment_assignment_schedule_events: {
+        Row: {
+          action: string
+          assessment_id: string
+          assignment_id: string
+          classroom_id: string
+          created_at: string
+          id: string
+          instructor_id: string
+          new_ends_at: string
+          new_starts_at: string
+          previous_ends_at: string
+          previous_starts_at: string
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          assessment_id: string
+          assignment_id: string
+          classroom_id: string
+          created_at?: string
+          id?: string
+          instructor_id: string
+          new_ends_at: string
+          new_starts_at: string
+          previous_ends_at: string
+          previous_starts_at: string
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          assessment_id?: string
+          assignment_id?: string
+          classroom_id?: string
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          new_ends_at?: string
+          new_starts_at?: string
+          previous_ends_at?: string
+          previous_starts_at?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_assignment_schedule_events_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_assignment_schedule_events_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_assignment_schedule_events_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_assignment_schedule_events_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessment_attempts: {
         Row: {
           answered_count: number
@@ -1310,6 +1384,25 @@ export type Database = {
         Args: { p_assignment_id: string; p_instructor_id: string }
         Returns: undefined
       }
+      edit_scheduled_assessment_assignment: {
+        Args: {
+          p_assignment_id: string
+          p_ends_at: string
+          p_instructor_id: string
+          p_reason?: string | null
+          p_starts_at: string
+        }
+        Returns: Json
+      }
+      extend_scheduled_assessment_assignment: {
+        Args: {
+          p_assignment_id: string
+          p_instructor_id: string
+          p_new_ends_at: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       commit_assessment_import: {
         Args: {
           p_excluded_row_ids: string[]
@@ -1587,6 +1680,16 @@ export type Database = {
             }
             Returns: Json
           }
+      reopen_scheduled_assessment_assignment: {
+        Args: {
+          p_assignment_id: string
+          p_ends_at: string
+          p_instructor_id: string
+          p_reason: string
+          p_starts_at: string
+        }
+        Returns: Json
+      }
       set_assessment_assignments: {
         Args: {
           p_assessment_id: string
