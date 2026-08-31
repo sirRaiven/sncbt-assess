@@ -15,6 +15,7 @@ describe("application navigation", () => {
     const labels = getNavigation("instructor").map((item) => item.label);
     expect(labels).toContain("Student Results");
     expect(labels).toContain("Student Progress");
+    expect(labels).not.toContain("Reports");
   });
 
   it("keeps role labels human-readable", () => {

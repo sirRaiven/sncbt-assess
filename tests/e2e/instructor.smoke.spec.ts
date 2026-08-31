@@ -22,7 +22,6 @@ describe("instructor portal smoke", async () => {
       "/instructor/assessments",
       "/instructor/student-progress",
       "/instructor/results",
-      "/instructor/reports",
       "/instructor/archive",
     ];
 

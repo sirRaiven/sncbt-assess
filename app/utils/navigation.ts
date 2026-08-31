@@ -123,14 +123,6 @@ const items: Record<
       to:
         "/instructor/archive",
     },
-    {
-      label:
-        "Reports",
-      icon:
-        "i-lucide-chart-no-axes-combined",
-      to:
-        "/instructor/reports",
-    },
   ],
 
   student: [

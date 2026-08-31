@@ -1,5 +1,4 @@
 import type {
-  InstructorAssessmentDetailedReport,
   InstructorReportFilters,
   InstructorReportFunctionResult,
   InstructorReportsOverview,
@@ -21,7 +20,7 @@ export function useInstructorReports() {
   }> {
     return await parseUserFacingFunctionError(
       error,
-      "We couldn't load the report right now. Please try again.",
+      "We couldn't load the student results right now. Please try again.",
     );
   }
 
@@ -70,7 +69,9 @@ export function useInstructorReports() {
       }
 
       return {
-        data,
+        data:
+          data
+          ?? null,
         error:
           null,
         code:
@@ -107,21 +108,7 @@ export function useInstructorReports() {
     );
   }
 
-  async function getAssessmentReport(
-    assessmentId: string,
-  ) {
-    return await invoke<
-      InstructorAssessmentDetailedReport
-    >(
-      "get-assessment-report",
-      {
-        assessmentId,
-      },
-    );
-  }
-
   return {
     getOverview,
-    getAssessmentReport,
   };
 }
