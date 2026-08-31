@@ -353,9 +353,12 @@ export function useAssessmentDelivery() {
         finalize,
         commitForFeedback,
       },
-      finalize
-        ? 5000
-        : 8000,
+      (
+        finalize
+        || commitForFeedback
+      )
+        ? 12000
+        : 10000,
     );
   }
 

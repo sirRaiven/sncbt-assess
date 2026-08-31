@@ -1941,6 +1941,98 @@ async function refreshFinalizedQuestionState():
   return true;
 }
 
+async function reconcileUncertainAnswerSave():
+  Promise<boolean> {
+  if (
+    !delivery.value?.attempt
+    || !questionPayload.value
+  ) {
+    return false;
+  }
+
+  const result =
+    await getQuestion(
+      delivery.value.attempt.id,
+      currentIndex.value,
+    );
+
+  if (
+    result.error
+    || !result.data
+  ) {
+    return false;
+  }
+
+  const payload =
+    result.data.payload;
+
+  syncServerClock(
+    payload.serverNow,
+  );
+
+  // A finalized server response always wins over stale browser state.
+  if (payload.finalized) {
+    applyQuestionPayload(
+      payload,
+      false,
+    );
+
+    return true;
+  }
+
+  const localOptionIds = [
+    ...normalizeSelectedOptionIds(),
+  ].sort();
+
+  const serverOptionIds = [
+    ...payload.selectedOptionIds,
+  ].sort();
+
+  const sameOptions =
+    localOptionIds.length
+      === serverOptionIds.length
+    && localOptionIds.every(
+      (optionId, index) =>
+        optionId
+          === serverOptionIds[index],
+    );
+
+  const sameText =
+    (
+      textResponse.value
+        .trim()
+    )
+      === (
+        payload.textResponse
+          ?.trim()
+        ?? ""
+      );
+
+  const sameBoolean =
+    booleanResponse.value
+      === (
+        payload.booleanResponse
+        ?? null
+      );
+
+  if (
+    !sameOptions
+    || !sameText
+    || !sameBoolean
+  ) {
+    return false;
+  }
+
+  // The request response was uncertain, but the canonical server
+  // state already contains exactly the answer currently in the UI.
+  applyQuestionPayload(
+    payload,
+    false,
+  );
+
+  return true;
+}
+
 async function ensureAttemptSelectionPolicy(
   attemptId: string,
 ): Promise<boolean> {
@@ -2233,11 +2325,15 @@ async function synchronizeAnswer(
           ?.toLowerCase()
         || "";
 
-      const mayAlreadyBeFinal =
+      const mayHaveReachedServer =
         options?.recoverFinalized
           !== false
         && (
-          lowerError.includes(
+          result.code
+            === "ANSWER_SAVE_FAILED"
+          || result.code
+            === "REQUEST_TIMEOUT"
+          || lowerError.includes(
             "already final",
           )
           || lowerError.includes(
@@ -2248,9 +2344,9 @@ async function synchronizeAnswer(
           )
         );
 
-      if (mayAlreadyBeFinal) {
+      if (mayHaveReachedServer) {
         const recovered =
-          await refreshFinalizedQuestionState();
+          await reconcileUncertainAnswerSave();
 
         if (recovered) {
           clearRecovery();
@@ -2299,6 +2395,48 @@ async function synchronizeAnswer(
       );
 
       return false;
+    }
+
+    if (
+      result.data.alreadyFinalized
+    ) {
+      // The original save can race a server deadline or a previous
+      // finalization request. Never overwrite that canonical state
+      // with the browser's stale local answer. Reload the finalized
+      // question and continue normally instead of showing a sync error.
+      const refreshed =
+        await reconcileUncertainAnswerSave();
+
+      if (!refreshed) {
+        saveRecovery();
+
+        pendingSync.value =
+          true;
+
+        if (!options?.silentError) {
+          toast.add({
+            title:
+              "Checking saved answer",
+            description:
+              "SNCBT Assess is confirming the latest answer state. Your response remains on this device.",
+            color:
+              "warning",
+          });
+        }
+
+        return false;
+      }
+
+      clearRecovery();
+
+      pendingSync.value =
+        false;
+
+      lastSyncedAt.value =
+        new Date()
+          .toISOString();
+
+      return true;
     }
 
     answerFeedback.value =

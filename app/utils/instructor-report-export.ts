@@ -323,10 +323,12 @@ function buildXlsxWorksheet<T>(
     )
     .join("");
 
+  const leftAlignedColumns = new Set([2, 3]);
+
   const dataRows = rows.map((row, rowIndex) => {
     const rowNumber = firstDataRow + rowIndex;
     const cells = columns.map((column, columnIndex) => {
-      const styleIndex = columnIndex === 2 ? 6 : 7;
+      const styleIndex = leftAlignedColumns.has(columnIndex) ? 6 : 7;
       return xlsxInlineStringCell(
         `${columnLetter(columnIndex)}${rowNumber}`,
         column.value(row, rowIndex),
@@ -343,7 +345,7 @@ function buildXlsxWorksheet<T>(
     ...(meta.subtitle ? [`A4:${endColumn}4`] : []),
   ];
 
-  const defaultWidths = [6, 18, 34, 14, 27];
+  const defaultWidths = [6, 18, 22, 22, 8, 14, 16];
   const columnDefinitions = columns.map((_, index) => {
     const width = defaultWidths[index] ?? 18;
     return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;

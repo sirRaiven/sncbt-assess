@@ -7,7 +7,20 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:unit:coverage": "vitest run --project unit --coverage",
+    "test:repo": "node --test tests/repository/*.test.mjs",
+    "test:integration": "node --test tests/integration/*.test.mjs",
+    "check": "npm run test:unit && npm run test:nuxt && npm run test:repo && npm run lint && npm run typecheck",
+    "verify": "npm run check && npm run build",
+    "verify:full": "npm run verify && npm run test:integration && npm run test:e2e",
+    "test:nuxt": "vitest run --project nuxt",
+    "test:e2e": "vitest run --project e2e",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.121",
@@ -23,6 +36,12 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "supabase": "^2.111.0"
+    "@nuxt/test-utils": "^4.2.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "@vue/test-utils": "^2.5.0",
+    "happy-dom": "^20.12.0",
+    "playwright-core": "^1.62.1",
+    "supabase": "^2.111.0",
+    "vitest": "^4.1.11"
   }
 }

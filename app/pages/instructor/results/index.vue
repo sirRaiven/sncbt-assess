@@ -110,6 +110,9 @@ const filteredResults = computed(() => {
     ? rows.filter((row) =>
         [
           row.studentName,
+          row.firstName,
+          row.middleName,
+          row.lastName,
           row.studentNumber,
           row.email,
           row.assessmentTitle,
@@ -117,6 +120,8 @@ const filteredResults = computed(() => {
           row.classroomName,
           row.section,
           row.status,
+          row.examAccessReferenceNumber,
+          row.examAccessStatus,
         ]
           .filter(Boolean)
           .join(" ")
@@ -174,6 +179,35 @@ function formatDuration(seconds: number | null): string {
 }
 function readableValue(value: string): string {
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function fallbackNamePart(value: string | null | undefined, fallback = "—"): string {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+}
+
+function middleInitial(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  return trimmed ? `${trimmed.charAt(0).toUpperCase()}.` : "—";
+}
+
+function formatPermitDisplay(row: InstructorStudentResultRow): string {
+  if (!row.requiresExamPermit) return "No required";
+
+  const reference = row.examAccessReferenceNumber?.trim() || null;
+
+  switch (row.examAccessStatus) {
+    case "permit":
+      return reference ? `P#${reference}` : "P";
+    case "promissory_note":
+      return reference ? `PN#${reference}` : "PN";
+    case "fully_paid":
+      return reference ? `FP#${reference}` : "FP";
+    case "to_follow":
+      return "To follow";
+    default:
+      return "No required";
+  }
 }
 
 const periodLabel = computed(() => {
@@ -239,10 +273,12 @@ function resetFilters(): void {
 
 const resultColumns: CsvColumn<InstructorStudentResultRow>[] = [
   { header: "No.", value: (_row, index) => index + 1 },
-  { header: "Student Number", value: (row) => row.studentNumber },
-  { header: "Student Name", value: (row) => row.studentName },
+  { header: "Student No.", value: (row) => row.studentNumber || "—" },
+  { header: "Last Name", value: (row) => fallbackNamePart(row.lastName) },
+  { header: "First Name", value: (row) => fallbackNamePart(row.firstName, row.studentName) },
+  { header: "M.I.", value: (row) => middleInitial(row.middleName) },
   { header: "Score", value: (row) => `${row.score} / ${row.maximumScore}` },
-  { header: "Submitted", value: (row) => formatDateTime(row.submittedAt) },
+  { header: "Permit", value: (row) => formatPermitDisplay(row) },
 ];
 
 function exportMeta(): ReportExportMeta {
@@ -337,18 +373,22 @@ onBeforeUnmount(() => {
             <tr>
               <th>No.</th>
               <th>Student No.</th>
-              <th>Student Name</th>
+              <th>Last Name</th>
+              <th>First Name</th>
+              <th>M.I.</th>
               <th>Score</th>
-              <th>Submitted</th>
+              <th>Permit</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(row, index) in filteredResults" :key="`grading-${row.attemptId}`">
               <td>{{ index + 1 }}</td>
               <td>{{ row.studentNumber || "—" }}</td>
-              <td>{{ row.studentName }}</td>
+              <td>{{ fallbackNamePart(row.lastName) }}</td>
+              <td>{{ fallbackNamePart(row.firstName, row.studentName) }}</td>
+              <td>{{ middleInitial(row.middleName) }}</td>
               <td>{{ row.score }} / {{ row.maximumScore }}</td>
-              <td>{{ formatDateTime(row.submittedAt) }}</td>
+              <td>{{ formatPermitDisplay(row) }}</td>
             </tr>
           </tbody>
         </table>
@@ -485,7 +525,7 @@ onBeforeUnmount(() => {
               <th>Unanswered</th>
               <th>Completion time</th>
               <th>Submitted</th>
-              <th class="no-print">Analysis</th>
+              <th>Permit No.</th>
             </tr>
           </thead>
           <tbody>
@@ -512,16 +552,8 @@ onBeforeUnmount(() => {
               <td>{{ row.unansweredCount }}</td>
               <td>{{ formatDuration(row.durationSeconds) }}</td>
               <td>{{ formatDateTime(row.submittedAt) }}</td>
-              <td class="no-print">
-                <UButton
-                  :to="`/instructor/reports/${row.assessmentId}`"
-                  color="neutral"
-                  variant="outline"
-                  size="sm"
-                  icon="i-lucide-chart-no-axes-combined"
-                >
-                  Analysis
-                </UButton>
+              <td>
+                <span class="font-semibold text-highlighted">{{ formatPermitDisplay(row) }}</span>
               </td>
             </tr>
           </tbody>
@@ -566,16 +598,10 @@ onBeforeUnmount(() => {
             <span class="text-right">{{ formatDateTime(row.submittedAt) }}</span>
           </div>
 
-          <UButton
-            class="mt-4"
-            block
-            :to="`/instructor/reports/${row.assessmentId}`"
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-chart-no-axes-combined"
-          >
-            Open Assessment Analysis
-          </UButton>
+          <div class="mt-4 rounded-xl border border-default px-3 py-2.5">
+            <p class="text-xs uppercase tracking-[0.16em] text-muted">Permit No.</p>
+            <p class="mt-1 font-semibold text-highlighted">{{ formatPermitDisplay(row) }}</p>
+          </div>
         </UCard>
       </div>
 
@@ -762,15 +788,19 @@ onBeforeUnmount(() => {
   }
 
   .grading-sheet-table th:nth-child(1),
-  .grading-sheet-table td:nth-child(1) { width: 7% !important; text-align: center !important; }
+  .grading-sheet-table td:nth-child(1) { width: 6% !important; text-align: center !important; }
   .grading-sheet-table th:nth-child(2),
-  .grading-sheet-table td:nth-child(2) { width: 20% !important; text-align: center !important; }
+  .grading-sheet-table td:nth-child(2) { width: 15% !important; text-align: center !important; }
   .grading-sheet-table th:nth-child(3),
-  .grading-sheet-table td:nth-child(3) { width: 35% !important; }
+  .grading-sheet-table td:nth-child(3) { width: 18% !important; }
   .grading-sheet-table th:nth-child(4),
-  .grading-sheet-table td:nth-child(4) { width: 14% !important; text-align: center !important; }
+  .grading-sheet-table td:nth-child(4) { width: 20% !important; }
   .grading-sheet-table th:nth-child(5),
-  .grading-sheet-table td:nth-child(5) { width: 24% !important; text-align: center !important; }
+  .grading-sheet-table td:nth-child(5) { width: 9% !important; text-align: center !important; }
+  .grading-sheet-table th:nth-child(6),
+  .grading-sheet-table td:nth-child(6) { width: 14% !important; text-align: center !important; }
+  .grading-sheet-table th:nth-child(7),
+  .grading-sheet-table td:nth-child(7) { width: 18% !important; text-align: center !important; }
 
   .grading-sheet-table tr {
     break-inside: avoid !important;

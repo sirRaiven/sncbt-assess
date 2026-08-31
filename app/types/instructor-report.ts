@@ -86,6 +86,9 @@ export interface InstructorStudentResultRow {
   assignmentId: string;
   studentId: string;
   studentName: string;
+  firstName: string | null;
+  middleName: string | null;
+  lastName: string | null;
   studentNumber: string | null;
   email: string | null;
   classroomId: string;
@@ -106,6 +109,9 @@ export interface InstructorStudentResultRow {
   submittedAt: string | null;
   durationSeconds: number | null;
   submittedReason: string | null;
+  requiresExamPermit: boolean;
+  examAccessStatus: string | null;
+  examAccessReferenceNumber: string | null;
 }
 
 export interface InstructorQuestionAnalysisRow {
