@@ -1000,8 +1000,7 @@ onMounted(
         >
           <UInput
             v-model="accessReferenceNumber"
-            type="number"
-            maxlength="100"
+            maxlength="12"
             autocomplete="off"
             :placeholder="selectedExamAccessItem?.referencePlaceholder"
             class="w-full"
