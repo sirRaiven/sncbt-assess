@@ -53,7 +53,7 @@ export function useAssessmentDelivery() {
     action: string,
     payload?:
       Record<string, unknown>,
-    timeoutMs =
+    timeoutMs: number =
       ASSESSMENT_REQUEST_TIMEOUT_MS
         .default,
     functionName =

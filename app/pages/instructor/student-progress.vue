@@ -699,9 +699,14 @@ watch(
           === selectedStudentId.value,
       )
     ) {
-      selectedStudentId.value =
-        visible[0]
-          .studentId;
+      const firstVisibleStudent =
+        visible[0];
+
+      if (firstVisibleStudent) {
+        selectedStudentId.value =
+          firstVisibleStudent
+            .studentId;
+      }
     }
   },
 );

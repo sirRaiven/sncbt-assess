@@ -744,8 +744,17 @@ export async function parseAssessmentQuestionWorkbook(
     );
   }
 
+  const headerRow =
+    worksheet.data[0];
+
+  if (!headerRow) {
+    throw new Error(
+      "The Create a Quiz worksheet is missing its header row.",
+    );
+  }
+
   const normalizedHeaders =
-    worksheet.data[0].map(
+    headerRow.map(
       normalizeHeader,
     );
 

@@ -1,4 +1,14 @@
 <script setup lang="ts">
+interface PwaClientApi {
+  isPWAInstalled?: unknown;
+  showInstallPrompt?: unknown;
+  needRefresh?: unknown;
+  updateServiceWorker: (
+    reloadPage?: boolean,
+  ) => Promise<void>;
+  install: () => Promise<void>;
+}
+
 const route =
   useRoute();
 
@@ -46,8 +56,10 @@ function reactiveBoolean(
 
 const pwa =
   computed(
-    () =>
-      nuxtApp.$pwa,
+    () => (
+      nuxtApp.$pwa as PwaClientApi
+      | undefined
+    ),
   );
 
 const installed =

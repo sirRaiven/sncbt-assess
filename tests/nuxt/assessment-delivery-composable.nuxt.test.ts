@@ -57,7 +57,7 @@ describe("useAssessmentDelivery save-answer contract", () => {
       ...functionsClient,
       invoke:
         functionInvokeMock,
-    } as typeof functionsClient);
+    } as unknown as typeof functionsClient);
   });
 
   afterEach(() => {

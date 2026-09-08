@@ -121,8 +121,15 @@ async function loadClass(): Promise<void> {
   state.schoolYear =
     classroom.school_year;
 
+  const parsedSemester =
+    schema.shape.semester.safeParse(
+      classroom.semester,
+    );
+
   state.semester =
-    classroom.semester;
+    parsedSemester.success
+      ? parsedSemester.data
+      : "First Semester";
 
   isLoading.value = false;
 }

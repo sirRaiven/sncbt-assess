@@ -23,7 +23,7 @@ withDefaults(
       list: 'flex-wrap gap-y-1',
       item: 'min-w-0',
       link: 'max-w-56 truncate text-xs font-semibold sm:max-w-72',
-      label: 'truncate',
+      linkLabel: 'truncate',
     }"
   />
 </template>

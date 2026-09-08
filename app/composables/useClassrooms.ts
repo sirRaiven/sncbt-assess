@@ -123,7 +123,9 @@ export function useClassrooms() {
       }
     >(
       "create-class",
-      input,
+      {
+        ...input,
+      },
     );
   }
 

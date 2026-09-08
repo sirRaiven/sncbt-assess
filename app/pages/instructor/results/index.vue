@@ -43,6 +43,28 @@ const filters = reactive<InstructorReportFilters>({
   assessmentId: null,
 });
 
+const dateFromInput = computed({
+  get: () =>
+    filters.dateFrom
+    ?? "",
+  set: (value: string) => {
+    filters.dateFrom =
+      value
+      || null;
+  },
+});
+
+const dateToInput = computed({
+  get: () =>
+    filters.dateTo
+    ?? "",
+  set: (value: string) => {
+    filters.dateTo =
+      value
+      || null;
+  },
+});
+
 const classroomItems = computed(() => [
   { label: "All classes / sections", value: "__all__" },
   ...(overview.value?.options.classrooms ?? []),
@@ -434,10 +456,10 @@ onBeforeUnmount(() => {
     <UCard class="no-print" :ui="{ body: 'p-4 sm:p-5' }">
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.2fr_1.2fr_auto]">
         <UFormField label="From" :error="dateRangeError || undefined">
-          <UInput v-model="filters.dateFrom" type="date" class="w-full" />
+          <UInput v-model="dateFromInput" type="date" class="w-full" />
         </UFormField>
         <UFormField label="To" :error="dateRangeError || undefined">
-          <UInput v-model="filters.dateTo" type="date" class="w-full" />
+          <UInput v-model="dateToInput" type="date" class="w-full" />
         </UFormField>
         <UFormField label="Class / Section">
           <USelect

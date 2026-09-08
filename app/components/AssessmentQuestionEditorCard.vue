@@ -177,7 +177,13 @@ function removeOption(index: number): void {
     editor.questionType === "multiple_choice"
     && !editor.options.some((option) => option.isCorrect)
   ) {
-    editor.options[0].isCorrect = true;
+    const firstOption =
+      editor.options[0];
+
+    if (firstOption) {
+      firstOption.isCorrect =
+        true;
+    }
   }
 }
 </script>

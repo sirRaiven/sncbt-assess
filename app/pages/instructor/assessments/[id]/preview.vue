@@ -132,7 +132,9 @@ const assignmentLabel = computed(() => {
   }
 
   if (assignedClassrooms.length === 1) {
-    return assignedClassrooms[0].section;
+    return assignedClassrooms[0]
+      ?.section
+      ?? "Assessment Library";
   }
 
   return `${assignedClassrooms.length} classes`;

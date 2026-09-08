@@ -1015,14 +1015,17 @@ async function loadData(
     selectQuestion(
       existingSelection,
     );
-  } else if (
-    questions.value.length > 0
-  ) {
-    selectQuestion(
-      questions.value[0],
-    );
   } else {
-    startNewQuestion();
+    const firstQuestion =
+      questions.value[0];
+
+    if (firstQuestion) {
+      selectQuestion(
+        firstQuestion,
+      );
+    } else {
+      startNewQuestion();
+    }
   }
 
   isLoading.value =
@@ -1380,6 +1383,10 @@ async function moveQuestion(
     1,
   );
 
+  if (!moved) {
+    return;
+  }
+
   reordered.splice(
     targetIndex,
     0,
@@ -1560,12 +1567,17 @@ async function handleQuestionsImported(): Promise<void> {
 
   if (existingSelection) {
     selectQuestion(existingSelection);
-  } else if (questions.value.length > 0) {
-    selectQuestion(
-      questions.value[questions.value.length - 1],
-    );
   } else {
-    startNewQuestion();
+    const lastQuestion =
+      questions.value.at(-1);
+
+    if (lastQuestion) {
+      selectQuestion(
+        lastQuestion,
+      );
+    } else {
+      startNewQuestion();
+    }
   }
 }
 

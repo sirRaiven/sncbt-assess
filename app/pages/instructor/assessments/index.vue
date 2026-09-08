@@ -174,7 +174,9 @@ function assignmentLabel(
   }
 
   if (count === 1) {
-    return assessment.assignedClassrooms[0].section;
+    return assessment.assignedClassrooms[0]
+      ?.section
+      ?? "Assessment Library";
   }
 
   return `${count} classes`;

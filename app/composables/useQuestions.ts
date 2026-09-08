@@ -17,6 +17,12 @@ interface MessageResponse {
   message: string;
 }
 
+interface FunctionErrorBody {
+  ok?: boolean;
+  code?: string | null;
+  message?: string | null;
+}
+
 export function useQuestions() {
   const supabase = useSupabaseClient();
 

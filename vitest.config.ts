@@ -177,6 +177,29 @@ export default defineConfig(
                 nuxt: {
                   domEnvironment:
                     "happy-dom",
+
+                  // Runtime component tests do not need a real service
+                  // worker. Disabling only the PWA client registration
+                  // keeps the production PWA configuration intact while
+                  // avoiding virtual:pwa-register/vue inside Vitest.
+                  overrides: {
+                    pwa: {
+                      injectRegister:
+                        null,
+
+                      client: {
+                        installPrompt:
+                          false,
+                        registerPlugin:
+                          false,
+                      },
+
+                      devOptions: {
+                        enabled:
+                          false,
+                      },
+                    },
+                  },
                 },
               },
             },

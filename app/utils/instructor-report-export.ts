@@ -489,7 +489,26 @@ export function createXlsxBlob<T>(
     },
   ];
 
-  return new Blob([createStoredZip(files)], { type: XLSX_MIME });
+  const zipBytes =
+    createStoredZip(files);
+
+  const zipBuffer =
+    new ArrayBuffer(
+      zipBytes.byteLength,
+    );
+
+  new Uint8Array(
+    zipBuffer,
+  ).set(
+    zipBytes,
+  );
+
+  return new Blob(
+    [zipBuffer],
+    {
+      type: XLSX_MIME,
+    },
+  );
 }
 
 export function downloadExcelReport<T>(
