@@ -75,6 +75,9 @@ const examAccessStatus =
 const accessReferenceNumber =
   ref("");
 
+const EXAM_ACCESS_REFERENCE_PATTERN =
+  /^\d{1,12}$/;
+
 const examAccessItems: Array<{
   label: string;
   description: string;
@@ -128,6 +131,15 @@ const requiresAccessReference =
           ?.referenceLabel,
       ),
   );
+
+function updateAccessReferenceNumber(
+  value: string | number,
+): void {
+  accessReferenceNumber.value =
+    String(value ?? "")
+      .replace(/\D+/g, "")
+      .slice(0, 12);
+}
 
 watch(
   examAccessStatus,
@@ -331,9 +343,10 @@ const examAccessReady =
       }
 
       if (requiresAccessReference.value) {
-        return accessReferenceNumber.value
-          .trim()
-          .length > 0;
+        return EXAM_ACCESS_REFERENCE_PATTERN
+          .test(
+            accessReferenceNumber.value,
+          );
       }
 
       return true;
@@ -996,14 +1009,19 @@ onMounted(
         <UFormField
           v-if="requiresAccessReference"
           :label="selectedExamAccessItem?.referenceLabel"
+          description="Numbers only (0–9), up to 12 digits."
           required
         >
           <UInput
-            v-model="accessReferenceNumber"
+            :model-value="accessReferenceNumber"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
             maxlength="12"
             autocomplete="off"
             :placeholder="selectedExamAccessItem?.referencePlaceholder"
             class="w-full"
+            @update:model-value="updateAccessReferenceNumber"
           />
         </UFormField>
 
