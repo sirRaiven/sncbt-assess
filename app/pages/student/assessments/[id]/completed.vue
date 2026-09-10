@@ -3,6 +3,10 @@ import type {
   StudentAssessmentDelivery,
 } from "~/types/assessment-delivery";
 
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
+
 definePageMeta({
   layout:
     "student",
@@ -82,23 +86,9 @@ function automaticSubmissionDescription(
 function formatDate(
   value: string | null,
 ): string {
-  if (!value) {
-    return "Not recorded";
-  }
-
-  return new Intl
-    .DateTimeFormat(
-      "en-PH",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short",
-      },
-    )
-    .format(
-      new Date(value),
-    );
+  return value
+    ? formatPhilippineDateTime(value)
+    : "Not recorded";
 }
 
 const attemptPolicy =
@@ -247,7 +237,18 @@ onMounted(
       variant="soft"
       title="Result could not be loaded"
       :description="errorMessage"
-    />
+    >
+      <template #actions>
+        <UButton
+          color="error"
+          variant="soft"
+          :loading="isLoading"
+          @click="loadResult"
+        >
+          Try Again
+        </UButton>
+      </template>
+    </UAlert>
 
     <div
       v-if="isLoading"

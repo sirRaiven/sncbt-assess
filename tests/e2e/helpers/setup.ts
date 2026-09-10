@@ -30,6 +30,12 @@ export function e2eSetupOptions() {
       ?.trim();
 
   return {
+    // Nuxt Test Utils has its own setup/teardown budgets. Keep these
+    // explicit so slow Windows cold starts do not fall back to the shorter
+    // default even when Vitest project hookTimeout is larger.
+    setupTimeout: 300_000,
+    teardownTimeout: 60_000,
+
     ...(host
       ? {
           host,

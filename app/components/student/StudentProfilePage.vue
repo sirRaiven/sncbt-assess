@@ -268,7 +268,18 @@ async function signOutFromProfile(): Promise<void> {
       variant="soft"
       title="Profile could not be loaded"
       :description="profileError"
-    />
+    >
+      <template #actions>
+        <UButton
+          color="error"
+          variant="soft"
+          :loading="isLoadingProfile"
+          @click="() => loadProfile()"
+        >
+          Try Again
+        </UButton>
+      </template>
+    </UAlert>
 
     <div
       v-if="isLoadingProfile"

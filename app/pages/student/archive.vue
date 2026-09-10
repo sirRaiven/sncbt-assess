@@ -7,6 +7,10 @@ import type {
   StudentArchivedClassListItem,
 } from "~/types/classroom";
 
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
+
 type StudentArchiveSection =
   | "classes"
   | "assessments";
@@ -232,19 +236,9 @@ function hasCompletedAttempt(
 function formatDate(
   value: string,
 ): string {
-  return new Intl
-    .DateTimeFormat(
-      "en-PH",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short",
-      },
-    )
-    .format(
-      new Date(value),
-    );
+  return formatPhilippineDateTime(
+    value,
+  );
 }
 
 function assessmentTypeLabel(
@@ -417,14 +411,15 @@ async function loadArchive():
       Boolean,
     ) as string[];
 
-  archivedClasses.value =
-    classResult.data?.classes
-    ?? [];
+  if (classResult.data) {
+    archivedClasses.value =
+      classResult.data.classes;
+  }
 
-  deliveries.value =
-    assessmentResult.data
-      ?.deliveries
-    ?? [];
+  if (assessmentResult.data) {
+    deliveries.value =
+      assessmentResult.data.deliveries;
+  }
 
   if (errors.length > 0) {
     errorMessage.value =

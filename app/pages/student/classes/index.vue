@@ -23,6 +23,7 @@ useSeoMeta({
 });
 
 const route = useRoute();
+const router = useRouter();
 
 const {
   joinClass,
@@ -262,6 +263,10 @@ async function loadClasses(): Promise<void> {
 async function submitJoin(
   event: FormSubmitEvent<JoinClassSchema>,
 ): Promise<void> {
+  if (isJoining.value) {
+    return;
+  }
+
   isJoining.value = true;
   joinErrorMessage.value = "";
   joinSuccessMessage.value = "";
@@ -328,6 +333,16 @@ onMounted(
       openJoinModal(
         sharedJoinCode,
       );
+
+      const nextQuery = {
+        ...route.query,
+      };
+
+      delete nextQuery.join;
+
+      await router.replace({
+        query: nextQuery,
+      });
     }
   },
 );
@@ -610,7 +625,7 @@ onMounted(
 
           <p class="mt-1.5 text-sm leading-6 text-muted">
             Class codes begin with SNC followed by six letters or numbers.
-            Most classes let you join immediately, while some require instructor approval.
+            Depending on the class setting, you will either join immediately or wait for instructor approval.
           </p>
         </div>
 

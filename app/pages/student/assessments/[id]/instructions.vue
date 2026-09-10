@@ -8,6 +8,10 @@ import type {
   AssessmentIntegrityPolicy,
 } from "~/types/assessment-integrity";
 
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
+
 definePageMeta({
   layout:
     "student",
@@ -246,19 +250,9 @@ const startConfirmationDescription =
 function formatDate(
   value: string,
 ): string {
-  return new Intl
-    .DateTimeFormat(
-      "en-PH",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short",
-      },
-    )
-    .format(
-      new Date(value),
-    );
+  return formatPhilippineDateTime(
+    value,
+  );
 }
 
 const actionLabel =
@@ -453,6 +447,10 @@ function requestProceed(): void {
 
 async function startAttempt():
   Promise<void> {
+  if (isStarting.value) {
+    return;
+  }
+
   if (!examAccessReady.value) {
     toast.add({
       title:
@@ -548,7 +546,18 @@ onMounted(
       variant="soft"
       title="Assessment could not be loaded"
       :description="errorMessage"
-    />
+    >
+      <template #actions>
+        <UButton
+          color="error"
+          variant="soft"
+          :loading="isLoading"
+          @click="loadDelivery"
+        >
+          Try Again
+        </UButton>
+      </template>
+    </UAlert>
 
     <div
       v-if="isLoading"

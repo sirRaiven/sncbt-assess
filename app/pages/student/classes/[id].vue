@@ -13,6 +13,10 @@ import type {
   AppBreadcrumbItem,
 } from "~/types/navigation";
 
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
+
 definePageMeta({
   layout:
     "student",
@@ -168,23 +172,9 @@ const leaveModalOpen =
 function formatDate(
   value: string | null,
 ): string {
-  if (!value) {
-    return "Not recorded";
-  }
-
-  return new Intl
-    .DateTimeFormat(
-      "en-PH",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short",
-      },
-    )
-    .format(
-      new Date(value),
-    );
+  return value
+    ? formatPhilippineDateTime(value)
+    : "Not recorded";
 }
 
 function deliveryStatus(
@@ -309,9 +299,6 @@ async function loadClassmates():
     result.error
     || !result.data
   ) {
-    classmates.value =
-      [];
-
     classmatesError.value =
       result.error
       || "Unable to load classmates.";
@@ -342,13 +329,19 @@ async function loadClass():
       classroomId.value,
     );
 
-  if (
-    classResult.error
-    || !classResult.data
-    || classResult.data
-      .classroom.status
-      !== "active"
-  ) {
+  const classUnavailable =
+    classResult.code
+      === "ACTIVE_MEMBERSHIP_NOT_FOUND"
+    || classResult.code
+      === "CLASSROOM_NOT_AVAILABLE"
+    || Boolean(
+      classResult.data
+      && classResult.data
+        .classroom.status
+        !== "active",
+    );
+
+  if (classUnavailable) {
     isLoading.value =
       false;
 
@@ -356,7 +349,8 @@ async function loadClass():
       title:
         "Class unavailable",
       description:
-        "This class has been archived and is no longer available in My Classes.",
+        classResult.error
+        || "This class is no longer available in My Classes.",
       color:
         "neutral",
     });
@@ -371,6 +365,30 @@ async function loadClass():
 
     return;
   }
+
+  if (
+    classResult.error
+    || !classResult.data
+  ) {
+    errorMessage.value =
+      classResult.error
+      || "We couldn't load this class right now. Please try again.";
+
+    isLoading.value =
+      false;
+
+    return;
+  }
+
+  classroom.value =
+    classResult.data.classroom;
+
+  membership.value =
+    classResult.data.membership;
+
+  instructorName.value =
+    classResult.data
+      .instructor.name;
 
   const [
     deliveryResult,
@@ -394,16 +412,6 @@ async function loadClass():
 
     return;
   }
-
-  classroom.value =
-    classResult.data.classroom;
-
-  membership.value =
-    classResult.data.membership;
-
-  instructorName.value =
-    classResult.data
-      .instructor.name;
 
   deliveries.value =
     deliveryResult.data
@@ -481,7 +489,18 @@ onMounted(
       variant="soft"
       title="Class could not be loaded"
       :description="errorMessage"
-    />
+    >
+      <template #actions>
+        <UButton
+          color="error"
+          variant="soft"
+          :loading="isLoading"
+          @click="loadClass"
+        >
+          Try Again
+        </UButton>
+      </template>
+    </UAlert>
 
     <div
       v-if="isLoading"
@@ -1041,7 +1060,11 @@ onMounted(
             color="warning"
             variant="soft"
             title="Leaving a class"
-            description="Your instructor must approve a new membership request if you decide to join this class again."
+            :description="
+              classroom.join_requires_approval
+                ? 'If you rejoin this class later, your instructor will need to approve the new membership request.'
+                : 'If the class code is still enabled, you can rejoin this class later without waiting for instructor approval.'
+            "
           />
         </div>
       </div>

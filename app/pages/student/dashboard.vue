@@ -3,6 +3,10 @@ import type {
   StudentAssessmentDelivery,
 } from "~/types/assessment-delivery";
 
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
+
 definePageMeta({
   layout:
     "student",
@@ -106,19 +110,9 @@ const classCount =
 function formatDate(
   value: string,
 ): string {
-  return new Intl
-    .DateTimeFormat(
-      "en-PH",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short",
-      },
-    )
-    .format(
-      new Date(value),
-    );
+  return formatPhilippineDateTime(
+    value,
+  );
 }
 
 function actionRoute(
@@ -221,7 +215,18 @@ onMounted(
       variant="soft"
       title="Overview could not be loaded"
       :description="errorMessage"
-    />
+    >
+      <template #actions>
+        <UButton
+          color="error"
+          variant="soft"
+          :loading="isLoading"
+          @click="loadOverview"
+        >
+          Try Again
+        </UButton>
+      </template>
+    </UAlert>
 
     <section class="space-y-4 sm:hidden" aria-label="Student priorities">
       <template v-if="isLoading">

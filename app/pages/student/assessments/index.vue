@@ -3,6 +3,10 @@ import type {
   StudentAssessmentDelivery,
 } from "~/types/assessment-delivery";
 
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
+
 definePageMeta({
   layout:
     "student",
@@ -272,19 +276,9 @@ const counts =
 function formatDate(
   value: string,
 ): string {
-  return new Intl
-    .DateTimeFormat(
-      "en-PH",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short",
-      },
-    )
-    .format(
-      new Date(value),
-    );
+  return formatPhilippineDateTime(
+    value,
+  );
 }
 
 function timelineLabel(
