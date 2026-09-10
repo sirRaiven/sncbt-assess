@@ -3,6 +3,10 @@ import type {
   InstructorDeliveryMonitor,
 } from "~/types/assessment-delivery";
 
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
+
 definePageMeta({
   layout:
     "instructor",
@@ -230,23 +234,9 @@ function integrityEventIcon(
 function formatDate(
   value: string | null,
 ): string {
-  if (!value) {
-    return "Not recorded";
-  }
-
-  return new Intl
-    .DateTimeFormat(
-      "en-PH",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short",
-      },
-    )
-    .format(
-      new Date(value),
-    );
+  return value
+    ? formatPhilippineDateTime(value)
+    : "Not recorded";
 }
 
 async function loadMonitor(

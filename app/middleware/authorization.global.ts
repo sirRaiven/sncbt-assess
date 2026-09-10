@@ -36,6 +36,15 @@ const callbackAndStatusPaths = new Set([
   "/account-unavailable",
 ]);
 
+const profileIndependentPaths = new Set([
+  "/confirm",
+  "/reset-password",
+]);
+
+const profileIndependentAuthenticatedPaths = new Set([
+  "/account-access-error",
+]);
+
 function getRequiredRole(
   path: string,
 ): AppRole | null {
@@ -125,19 +134,19 @@ export default defineNuxtRouteMiddleware(
       }
     }
 
-    if (
-      requiredRole
-      && !user.value
-    ) {
-      return navigateTo({
-        path: "/",
-        query: {
-          redirect: to.fullPath,
-        },
-      });
-    }
-
     if (!user.value) {
+      if (
+        requiredRole
+        || profileIndependentAuthenticatedPaths.has(to.path)
+      ) {
+        return navigateTo({
+          path: "/",
+          query: {
+            redirect: to.fullPath,
+          },
+        });
+      }
+
       return;
     }
 
@@ -162,13 +171,35 @@ export default defineNuxtRouteMiddleware(
       });
     }
 
+    if (
+      profileIndependentPaths.has(to.path)
+      || profileIndependentAuthenticatedPaths.has(to.path)
+    ) {
+      return;
+    }
+
     const {
       loadProfile,
+      profileLoadIssue,
     } = useCurrentProfile();
 
     const profile = await loadProfile();
 
     if (!profile) {
+      if (
+        profileLoadIssue.value
+        === "temporary-error"
+      ) {
+        return navigateTo({
+          path: "/account-access-error",
+          query: {
+            redirect: to.fullPath,
+          },
+        }, {
+          replace: true,
+        });
+      }
+
       const supabase = useSupabaseClient();
 
       await supabase.auth.signOut({
@@ -178,7 +209,7 @@ export default defineNuxtRouteMiddleware(
       return navigateTo({
         path: "/",
         query: {
-          reason: "profile-not-found",
+          reason: "account-incomplete",
         },
       });
     }

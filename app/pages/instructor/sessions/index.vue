@@ -2,6 +2,10 @@
 import type {
   InstructorDeliveryListItem,
 } from "~/types/assessment-delivery";
+import {
+  PHILIPPINE_TIME_ZONE,
+  toPhilippineLocalInput,
+} from "~/utils/philippine-time";
 
 definePageMeta({
   layout: "instructor",
@@ -121,19 +125,27 @@ function formatSessionWindow(
 
   const dateFormatter = new Intl.DateTimeFormat("en-PH", {
     dateStyle: "medium",
+    timeZone: PHILIPPINE_TIME_ZONE,
   });
 
   const timeFormatter = new Intl.DateTimeFormat("en-PH", {
     timeStyle: "short",
+    timeZone: PHILIPPINE_TIME_ZONE,
   });
 
-  if (start.toDateString() === end.toDateString()) {
+  const startLocalDate =
+    toPhilippineLocalInput(start).slice(0, 10);
+  const endLocalDate =
+    toPhilippineLocalInput(end).slice(0, 10);
+
+  if (startLocalDate === endLocalDate) {
     return `${dateFormatter.format(start)} · ${timeFormatter.format(start)} – ${timeFormatter.format(end)}`;
   }
 
   const fullFormatter = new Intl.DateTimeFormat("en-PH", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: PHILIPPINE_TIME_ZONE,
   });
 
   return `${fullFormatter.format(start)} – ${fullFormatter.format(end)}`;

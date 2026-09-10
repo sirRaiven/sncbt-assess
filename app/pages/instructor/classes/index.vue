@@ -99,20 +99,30 @@ async function loadClasses(): Promise<void> {
   isLoading.value = false;
 }
 
-function copyCode(
+async function copyCode(
   code: string,
-): void {
-  void navigator.clipboard
-    .writeText(code);
+): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(code);
 
-  toast.add({
-    title:
-      "Class code copied",
-    description:
-      code,
-    color:
-      "success",
-  });
+    toast.add({
+      title:
+        "Class code copied",
+      description:
+        code,
+      color:
+        "success",
+    });
+  } catch {
+    toast.add({
+      title:
+        "Unable to copy class code",
+      description:
+        "Select the code and copy it manually.",
+      color:
+        "warning",
+    });
+  }
 }
 
 function requestDuplicateClass(

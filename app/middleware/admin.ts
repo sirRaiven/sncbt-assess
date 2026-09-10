@@ -5,7 +5,7 @@ export default defineNuxtRouteMiddleware(async () => {
   const profile = await loadProfile();
 
   if (!profile) {
-    return navigateTo("/login");
+    return navigateTo("/");
   }
 
   if (

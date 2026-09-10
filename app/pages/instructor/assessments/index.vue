@@ -213,20 +213,6 @@ function assessmentMenuItems(
   const navigationItems:
     DropdownMenuItem[] = [];
 
-  if (
-    assessment.status
-    === "published"
-  ) {
-    navigationItems.push({
-      label:
-        "Start Live",
-      icon:
-        "i-lucide-radio-tower",
-      to:
-        `/instructor/sessions/create?assessmentId=${assessment.id}`,
-    });
-  }
-
   navigationItems.push(
     {
       label:

@@ -4,6 +4,10 @@ import type {
   AssessmentImportRow,
 } from "~/types/assessment-import";
 
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
+
 definePageMeta({
   layout: "instructor",
 });
@@ -405,7 +409,7 @@ onMounted(
 
             <p class="mt-1 text-sm text-muted">
               Staged rows expire at
-              {{ new Date(assessmentImport.expires_at).toLocaleString() }}
+              {{ formatPhilippineDateTime(assessmentImport.expires_at) }}
             </p>
           </div>
 

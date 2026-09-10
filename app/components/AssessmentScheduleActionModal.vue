@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import type { AssessmentScheduleItem } from "~/types/assessment-schedule";
+import {
+  formatPhilippineDateTime,
+  philippineLocalInputToIso,
+  toPhilippineLocalInput,
+} from "~/utils/philippine-time";
 
 export type AssessmentScheduleAction = "edit" | "extend" | "reopen";
 
@@ -26,31 +31,8 @@ const endsAtLocal = ref("");
 const reason = ref("");
 const validationMessage = ref("");
 
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-function localInputValue(value: Date | string): string {
-  const date = value instanceof Date ? value : new Date(value);
-  return [
-    date.getFullYear(),
-    "-",
-    pad(date.getMonth() + 1),
-    "-",
-    pad(date.getDate()),
-    "T",
-    pad(date.getHours()),
-    ":",
-    pad(date.getMinutes()),
-  ].join("");
-}
-
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en-PH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Manila",
-  }).format(new Date(value));
+  return formatPhilippineDateTime(value);
 }
 
 function defaultReopenWindow(): { startsAt: string; endsAt: string } {
@@ -60,8 +42,8 @@ function defaultReopenWindow(): { startsAt: string; endsAt: string } {
   const endsAt = new Date(startsAt.getTime() + 2 * 60 * 60 * 1000);
 
   return {
-    startsAt: localInputValue(startsAt),
-    endsAt: localInputValue(endsAt),
+    startsAt: toPhilippineLocalInput(startsAt),
+    endsAt: toPhilippineLocalInput(endsAt),
   };
 }
 
@@ -82,16 +64,16 @@ function initialize(): void {
     return;
   }
 
-  startsAtLocal.value = localInputValue(props.schedule.startsAt);
+  startsAtLocal.value = toPhilippineLocalInput(props.schedule.startsAt);
 
   if (props.action === "extend") {
     const currentEnd = new Date(props.schedule.endsAt);
     const suggestedEnd = new Date(currentEnd.getTime() + 24 * 60 * 60 * 1000);
-    endsAtLocal.value = localInputValue(suggestedEnd);
+    endsAtLocal.value = toPhilippineLocalInput(suggestedEnd);
     return;
   }
 
-  endsAtLocal.value = localInputValue(props.schedule.endsAt);
+  endsAtLocal.value = toPhilippineLocalInput(props.schedule.endsAt);
 }
 
 watch(
@@ -141,13 +123,26 @@ const confirmLabel = computed(() => {
 });
 
 function validate(): string | null {
-  if (!props.schedule || !props.action) return "No schedule was selected.";
+  if (!props.schedule || !props.action) {
+    return "No schedule was selected.";
+  }
 
-  const endsAt = new Date(endsAtLocal.value);
-  if (Number.isNaN(endsAt.getTime())) return "Choose a valid closing date and time.";
+  const endsAtIso =
+    philippineLocalInputToIso(
+      endsAtLocal.value,
+    );
+
+  if (!endsAtIso) {
+    return "Choose a valid closing date and time.";
+  }
+
+  const endsAt = new Date(endsAtIso);
 
   if (props.action === "extend") {
-    if (endsAt.getTime() <= new Date(props.schedule.endsAt).getTime()) {
+    if (
+      endsAt.getTime()
+      <= new Date(props.schedule.endsAt).getTime()
+    ) {
       return "The new due date must be later than the current due date.";
     }
 
@@ -158,12 +153,29 @@ function validate(): string | null {
     return null;
   }
 
-  const startsAt = new Date(startsAtLocal.value);
-  if (Number.isNaN(startsAt.getTime())) return "Choose a valid opening date and time.";
-  if (startsAt.getTime() <= Date.now()) return "Choose a future opening time.";
-  if (endsAt.getTime() <= startsAt.getTime()) return "The closing time must be later than the opening time.";
+  const startsAtIso =
+    philippineLocalInputToIso(
+      startsAtLocal.value,
+    );
 
-  if (props.action === "reopen" && reason.value.trim().length < 3) {
+  if (!startsAtIso) {
+    return "Choose a valid opening date and time.";
+  }
+
+  const startsAt = new Date(startsAtIso);
+
+  if (startsAt.getTime() <= Date.now()) {
+    return "Choose a future opening time.";
+  }
+
+  if (endsAt.getTime() <= startsAt.getTime()) {
+    return "The closing time must be later than the opening time.";
+  }
+
+  if (
+    props.action === "reopen"
+    && reason.value.trim().length < 3
+  ) {
     return "Enter a short reason for reopening the assessment.";
   }
 
@@ -177,13 +189,34 @@ function submit(): void {
     return;
   }
 
+  const endsAt =
+    philippineLocalInputToIso(
+      endsAtLocal.value,
+    );
+  const startsAt =
+    props.action === "extend"
+      ? null
+      : philippineLocalInputToIso(
+          startsAtLocal.value,
+        );
+
+  if (
+    !endsAt
+    || (
+      props.action !== "extend"
+      && !startsAt
+    )
+  ) {
+    validationMessage.value =
+      "Choose valid Philippine Time dates before continuing.";
+    return;
+  }
+
   validationMessage.value = "";
 
   emit("confirm", {
-    startsAt: props.action === "extend"
-      ? null
-      : new Date(startsAtLocal.value).toISOString(),
-    endsAt: new Date(endsAtLocal.value).toISOString(),
+    startsAt,
+    endsAt,
     reason: reason.value.trim(),
   });
 }
@@ -223,6 +256,10 @@ function submit(): void {
           <span class="text-muted">Current due date</span>
           <span class="ml-2 font-semibold text-highlighted">{{ formatDate(schedule.endsAt) }}</span>
         </div>
+
+        <p class="mt-4 text-xs font-medium text-muted">
+          All schedule times use Philippine Time (PHT, UTC+8).
+        </p>
 
         <div class="mt-5 grid gap-4">
           <UFormField

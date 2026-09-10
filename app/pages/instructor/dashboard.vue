@@ -2,6 +2,9 @@
 import type {
   InstructorDeliveryListItem,
 } from "~/types/assessment-delivery";
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
 
 definePageMeta({
   layout:
@@ -91,19 +94,7 @@ const activeStudents =
 function formatDate(
   value: string,
 ): string {
-  return new Intl
-    .DateTimeFormat(
-      "en-PH",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short",
-      },
-    )
-    .format(
-      new Date(value),
-    );
+  return formatPhilippineDateTime(value);
 }
 
 async function loadOverview():

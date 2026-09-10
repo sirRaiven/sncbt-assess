@@ -14,6 +14,10 @@ import type {
   InstructorArchiveOverview,
 } from "~/types/instructor-archive";
 
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
+
 definePageMeta({
   layout: "instructor",
 });
@@ -252,41 +256,14 @@ function formatDate(
     return "Not recorded";
   }
 
-  return new Intl.DateTimeFormat(
-    "en-PH",
-    {
-      dateStyle:
-        "medium",
-      timeStyle:
-        "short",
-    },
-  ).format(
-    new Date(value),
-  );
+  return formatPhilippineDateTime(value);
 }
 
 function formatSessionWindow(
   startsAt: string,
   endsAt: string,
 ): string {
-  const start =
-    new Date(startsAt);
-
-  const end =
-    new Date(endsAt);
-
-  const formatter =
-    new Intl.DateTimeFormat(
-      "en-PH",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short",
-      },
-    );
-
-  return `${formatter.format(start)} – ${formatter.format(end)}`;
+  return `${formatPhilippineDateTime(startsAt)} – ${formatPhilippineDateTime(endsAt)}`;
 }
 
 function typeLabel(

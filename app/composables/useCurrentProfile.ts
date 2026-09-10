@@ -3,6 +3,7 @@ import type {
   AdminProfile,
   InstructorProfile,
   Profile,
+  ProfileLoadIssue,
   StudentProfile,
   UserRole,
 } from "~/types/profile";
@@ -91,6 +92,11 @@ export function useCurrentProfile() {
     () => null,
   );
 
+  const profileLoadIssue = useState<ProfileLoadIssue>(
+    "current-user-profile-load-issue",
+    () => null,
+  );
+
   async function loadRoleProfile(
     account: Account,
   ): Promise<RoleProfile | null> {
@@ -167,6 +173,7 @@ export function useCurrentProfile() {
 
     isLoadingProfile.value = true;
     profileError.value = null;
+    profileLoadIssue.value = null;
 
     try {
       const {
@@ -179,24 +186,18 @@ export function useCurrentProfile() {
         .maybeSingle();
 
       if (accountError) {
-        console.error(
-          "Unable to load the authenticated account.",
-          {
-            code: accountError.code,
-            message: accountError.message,
-            details: accountError.details,
-            hint: accountError.hint,
-            userId,
-          },
-        );
+        profileLoadIssue.value =
+          "temporary-error";
 
         throw accountError;
       }
 
       if (!account) {
         profile.value = null;
+        profileLoadIssue.value =
+          "account-missing";
         profileError.value =
-          "No application account was found for this user.";
+          "Your SNCBT Assess account setup is incomplete.";
 
         return null;
       }
@@ -206,8 +207,10 @@ export function useCurrentProfile() {
 
       if (!roleProfile) {
         profile.value = null;
+        profileLoadIssue.value =
+          "role-profile-missing";
         profileError.value =
-          "Your role profile is incomplete. Please contact the system administrator.";
+          "Your SNCBT Assess profile setup is incomplete.";
 
         return null;
       }
@@ -216,10 +219,16 @@ export function useCurrentProfile() {
         account,
         roleProfile,
       );
+      profileLoadIssue.value = null;
 
       return profile.value;
     } catch (error) {
       profile.value = null;
+
+      if (!profileLoadIssue.value) {
+        profileLoadIssue.value =
+          "temporary-error";
+      }
 
       profileError.value =
         toUserFacingError(
@@ -238,17 +247,20 @@ export function useCurrentProfile() {
   ): void {
     profile.value = value;
     profileError.value = null;
+    profileLoadIssue.value = null;
   }
 
   function clearProfile(): void {
     profile.value = null;
     profileError.value = null;
+    profileLoadIssue.value = null;
     isLoadingProfile.value = false;
   }
 
   return {
     profile,
     profileError,
+    profileLoadIssue,
     isLoadingProfile,
     loadProfile,
     setProfile,

@@ -5,7 +5,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   if (!user.value) {
     return navigateTo({
-      path: "/login",
+      path: "/",
       query: {
         redirect: to.fullPath,
       },
@@ -17,9 +17,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   if (!profile) {
     return navigateTo({
-      path: "/login",
+      path: "/",
       query: {
-        reason: "profile-not-found",
+        reason: "account-incomplete",
       },
     });
   }

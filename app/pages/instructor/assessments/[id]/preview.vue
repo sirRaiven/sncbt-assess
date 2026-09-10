@@ -297,10 +297,10 @@ onMounted(
             assessment?.status
             === 'published'
           "
-          :to="`/instructor/sessions/create?assessmentId=${assessmentId}`"
-          icon="i-lucide-radio-tower"
+          :to="`/instructor/assessments/${assessmentId}/assign`"
+          icon="i-lucide-calendar-clock"
         >
-          Start Live
+          Schedule Classes
         </UButton>
 
         <UButton

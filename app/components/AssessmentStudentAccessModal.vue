@@ -4,6 +4,12 @@ import type {
   AssessmentStudentAccessRow,
 } from "~/types/assessment-student-access";
 
+import {
+  formatPhilippineDateTime,
+  philippineLocalInputToIso,
+  toPhilippineLocalInput,
+} from "~/utils/philippine-time";
+
 const props = defineProps<{
   assignmentId: string | null;
 }>();
@@ -31,30 +37,19 @@ const reason = ref("");
 const revokeTarget = ref<AssessmentStudentAccessRow | null>(null);
 const revokeOpen = ref(false);
 
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-function localInputValue(value: Date): string {
-  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
-}
-
 function resetGrantForm(): void {
   const start = new Date(Date.now() + 5 * 60 * 1000);
   start.setSeconds(0, 0);
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  startsAtLocal.value = localInputValue(start);
-  endsAtLocal.value = localInputValue(end);
+  startsAtLocal.value = toPhilippineLocalInput(start);
+  endsAtLocal.value = toPhilippineLocalInput(end);
   reason.value = "";
 }
 
 function formatDate(value: string | null): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("en-PH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Manila",
-  }).format(new Date(value));
+  return value
+    ? formatPhilippineDateTime(value)
+    : "—";
 }
 
 function attemptLabel(row: AssessmentStudentAccessRow): string {
@@ -99,11 +94,26 @@ function chooseStudent(row: AssessmentStudentAccessRow): void {
 }
 
 function validateGrant(): string | null {
-  const start = new Date(startsAtLocal.value);
-  const end = new Date(endsAtLocal.value);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "Enter a valid personal access window.";
-  if (end <= start) return "The closing time must be later than the opening time.";
-  if (end.getTime() <= Date.now()) return "The personal access window must end in the future.";
+  const startIso =
+    philippineLocalInputToIso(startsAtLocal.value);
+  const endIso =
+    philippineLocalInputToIso(endsAtLocal.value);
+
+  if (!startIso || !endIso) {
+    return "Enter a valid personal access window.";
+  }
+
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+
+  if (end <= start) {
+    return "The closing time must be later than the opening time.";
+  }
+
+  if (end.getTime() <= Date.now()) {
+    return "The personal access window must end in the future.";
+  }
+
   return null;
 }
 
@@ -115,12 +125,26 @@ async function grant(): Promise<void> {
     return;
   }
 
+  const startsAt =
+    philippineLocalInputToIso(startsAtLocal.value);
+  const endsAt =
+    philippineLocalInputToIso(endsAtLocal.value);
+
+  if (!startsAt || !endsAt) {
+    toast.add({
+      title: "Check the access window",
+      description: "Enter a valid personal access window.",
+      color: "warning",
+    });
+    return;
+  }
+
   isSaving.value = true;
   const result = await grantStudentAccess(
     props.assignmentId,
     selectedStudent.value.studentId,
-    new Date(startsAtLocal.value).toISOString(),
-    new Date(endsAtLocal.value).toISOString(),
+    startsAt,
+    endsAt,
     reason.value.trim(),
   );
 
@@ -262,6 +286,7 @@ watch(
               </p>
               <h3 class="mt-1 font-black text-highlighted">{{ selectedStudent.studentName }}</h3>
               <p class="mt-1 text-xs text-muted">One additional personal access window. The class schedule is unchanged.</p>
+                  <p class="mt-2 text-xs font-medium text-primary">Times use Philippine Time (PHT, UTC+8).</p>
 
               <div class="mt-5 space-y-4">
                 <UFormField label="Available from">

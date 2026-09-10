@@ -11,6 +11,9 @@ import {
   downloadExcelReport,
   printCurrentReport,
 } from "~/utils/instructor-report-export";
+import {
+  philippineDateInput,
+} from "~/utils/philippine-time";
 
 definePageMeta({ layout: "instructor" });
 useSeoMeta({ title: "Student Results" });
@@ -27,18 +30,13 @@ let requestSequence = 0;
 
 const isBusy = computed(() => isLoading.value || isRefreshing.value);
 
-function localDateInput(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-const today = new Date();
-const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+const todayInput =
+  philippineDateInput(new Date());
+const monthStartInput =
+  `${todayInput.slice(0, 8)}01`;
 const filters = reactive<InstructorReportFilters>({
-  dateFrom: localDateInput(monthStart),
-  dateTo: localDateInput(today),
+  dateFrom: monthStartInput,
+  dateTo: todayInput,
   classroomId: null,
   assessmentId: null,
 });
@@ -286,8 +284,9 @@ function scheduleResultsLoad(delay = 300): void {
 }
 
 function resetFilters(): void {
-  filters.dateFrom = localDateInput(monthStart);
-  filters.dateTo = localDateInput(today);
+  const resetTodayInput = philippineDateInput(new Date());
+  filters.dateFrom = `${resetTodayInput.slice(0, 8)}01`;
+  filters.dateTo = resetTodayInput;
   filters.classroomId = null;
   filters.assessmentId = null;
   query.value = "";

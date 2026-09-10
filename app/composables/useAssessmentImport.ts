@@ -3,8 +3,6 @@ import type {
   AssessmentImportCommitResult,
   AssessmentImportPreviewResult,
   AssessmentImportValidationResult,
-  ExcelQuestionImportQuestion,
-  ExcelQuestionImportResult,
 } from "~/types/assessment-import";
 
 import {
@@ -174,25 +172,10 @@ export function useAssessmentImport() {
     );
   }
 
-  // Retained for compatibility with the earlier browser-preview import flow.
-  async function importQuestions(
-    assessmentId: string,
-    questions: ExcelQuestionImportQuestion[],
-  ): Promise<FunctionResult<ExcelQuestionImportResult>> {
-    return await invokeJson<ExcelQuestionImportResult>(
-      "import-questions",
-      {
-        assessmentId,
-        questions,
-      },
-    );
-  }
-
   return {
     validateWorkbook,
     getImport,
     commitImport,
     cancelImport,
-    importQuestions,
   };
 }

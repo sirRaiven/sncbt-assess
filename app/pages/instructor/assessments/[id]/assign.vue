@@ -2,6 +2,11 @@
 import type { DropdownMenuItem } from "@nuxt/ui";
 
 import { assessmentScheduleActionAvailability } from "~/utils/assessment-schedule-actions";
+import {
+  formatPhilippineDateTime,
+  philippineLocalInputToIso,
+  toPhilippineLocalInput,
+} from "~/utils/philippine-time";
 
 import type {
   AssessmentClassOption,
@@ -224,47 +229,6 @@ const canEdit =
       === "published",
   );
 
-function pad(
-  value: number,
-): string {
-  return String(value)
-    .padStart(
-      2,
-      "0",
-    );
-}
-
-function localInputValue(
-  value:
-    | Date
-    | string,
-): string {
-  const date =
-    value instanceof Date
-      ? value
-      : new Date(value);
-
-  return [
-    date.getFullYear(),
-    "-",
-    pad(
-      date.getMonth() + 1,
-    ),
-    "-",
-    pad(
-      date.getDate(),
-    ),
-    "T",
-    pad(
-      date.getHours(),
-    ),
-    ":",
-    pad(
-      date.getMinutes(),
-    ),
-  ].join("");
-}
-
 function defaultWindow() {
   const startsAt =
     new Date();
@@ -287,11 +251,11 @@ function defaultWindow() {
 
   return {
     startsAtLocal:
-      localInputValue(
+      toPhilippineLocalInput(
         startsAt,
       ),
     endsAtLocal:
-      localInputValue(
+      toPhilippineLocalInput(
         endsAt,
       ),
   };
@@ -300,38 +264,18 @@ function defaultWindow() {
 function formatDate(
   value: string,
 ): string {
-  return new Intl
-    .DateTimeFormat(
-      "en-PH",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short",
-      },
-    )
-    .format(
-      new Date(value),
-    );
+  return formatPhilippineDateTime(value);
 }
 
 function formatLocalDate(
   value: string,
 ): string {
-  const date =
-    new Date(value);
+  const isoValue =
+    philippineLocalInputToIso(value);
 
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return "Invalid date";
-  }
-
-  return formatDate(
-    date.toISOString(),
-  );
+  return isoValue
+    ? formatDate(isoValue)
+    : "Invalid date";
 }
 
 function selectVisibleClasses(): void {
@@ -410,26 +354,27 @@ function validateRows():
     const row
     of selectedRows.value
   ) {
-    const startsAt =
-      new Date(
+    const startsAtIso =
+      philippineLocalInputToIso(
         row.startsAtLocal,
       );
 
-    const endsAt =
-      new Date(
+    const endsAtIso =
+      philippineLocalInputToIso(
         row.endsAtLocal,
       );
 
     if (
-      Number.isNaN(
-        startsAt.getTime(),
-      )
-      || Number.isNaN(
-        endsAt.getTime(),
-      )
+      !startsAtIso
+      || !endsAtIso
     ) {
       return `Enter valid dates for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
     }
+
+    const startsAt =
+      new Date(startsAtIso);
+    const endsAt =
+      new Date(endsAtIso);
 
     if (
       endsAt.getTime()
@@ -444,7 +389,6 @@ function validateRows():
     ) {
       return `The closing time must be in the future for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
     }
-
   }
 
   return null;
@@ -563,27 +507,42 @@ async function save():
     );
 
   const newSchedules:
-    AssessmentScheduleInput[] =
-    selectedRows.value.map(
-      (row) => ({
-        classroomId:
-          row.classroom.id,
-        startsAt:
-          new Date(
-            row.startsAtLocal,
-          ).toISOString(),
-        endsAt:
-          new Date(
-            row.endsAtLocal,
-          ).toISOString(),
-        // Deprecated whole-attempt timing is always disabled.
-        // The class closing time is the only assessment deadline.
-        timeLimitSeconds:
-          null,
-        maxAttempts:
-          row.maxAttempts,
-      }),
-    );
+    AssessmentScheduleInput[] = [];
+
+  for (
+    const row
+    of selectedRows.value
+  ) {
+    const startsAt =
+      philippineLocalInputToIso(
+        row.startsAtLocal,
+      );
+    const endsAt =
+      philippineLocalInputToIso(
+        row.endsAtLocal,
+      );
+
+    if (!startsAt || !endsAt) {
+      errorMessage.value =
+        `Enter valid Philippine Time dates for ${row.classroom.subjectCode} · ${row.classroom.section}.`;
+      saveConfirmationOpen.value =
+        false;
+      return;
+    }
+
+    newSchedules.push({
+      classroomId:
+        row.classroom.id,
+      startsAt,
+      endsAt,
+      // Deprecated whole-attempt timing is always disabled.
+      // The class closing time is the only assessment deadline.
+      timeLimitSeconds:
+        null,
+      maxAttempts:
+        row.maxAttempts,
+    });
+  }
 
   const schedules =
     [
@@ -1260,6 +1219,10 @@ onMounted(
                 <UIcon name="i-lucide-calendar-range" class="size-4 text-primary" />
                 Set access window
               </div>
+
+              <p class="mb-4 text-xs font-medium text-muted">
+                Times are entered in Philippine Time (PHT, UTC+8).
+              </p>
 
               <div class="grid gap-4 md:grid-cols-2">
                 <UFormField

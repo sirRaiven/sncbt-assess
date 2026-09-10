@@ -9,6 +9,10 @@ import type {
   MembershipStatus,
 } from "~/types/classroom";
 
+import {
+  formatPhilippineDateTime,
+} from "~/utils/philippine-time";
+
 definePageMeta({
   layout: "instructor",
 });
@@ -570,13 +574,7 @@ function studentMenuItems(
 function formatRequestedAt(
   value: string,
 ): string {
-  return new Intl.DateTimeFormat(
-    "en-PH",
-    {
-      dateStyle: "medium",
-      timeStyle: "short",
-    },
-  ).format(new Date(value));
+  return formatPhilippineDateTime(value);
 }
 
 watch(

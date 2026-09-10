@@ -6,6 +6,12 @@ export type UserRole =
 export type AccountStatus =
   Database["public"]["Enums"]["account_status"];
 
+export type ProfileLoadIssue =
+  | "account-missing"
+  | "role-profile-missing"
+  | "temporary-error"
+  | null;
+
 export type Account =
   Database["public"]["Tables"]["accounts"]["Row"];
 

@@ -73,6 +73,14 @@ const successMessage = computed(() => {
   return "";
 });
 
+const accountNotice = computed(() => {
+  if (route.query.reason === "account-incomplete") {
+    return "Your SNCBT Assess account setup is incomplete. Please contact SNCBT system support before signing in again.";
+  }
+
+  return "";
+});
+
 async function signIn(
   event: FormSubmitEvent<SignInSchema>,
 ): Promise<void> {
@@ -101,6 +109,7 @@ async function signIn(
 
     const {
       loadProfile,
+      profileLoadIssue,
     } = useCurrentProfile();
 
     const profile =
@@ -110,12 +119,31 @@ async function signIn(
       });
 
     if (!profile) {
+      if (
+        profileLoadIssue.value
+        === "temporary-error"
+      ) {
+        const requestedRedirect =
+          typeof route.query.redirect === "string"
+            ? route.query.redirect
+            : "/";
+
+        await navigateTo({
+          path: "/account-access-error",
+          query: {
+            redirect: requestedRedirect,
+          },
+        });
+
+        return;
+      }
+
       await supabase.auth.signOut({
         scope: "local",
       });
 
       throw new Error(
-        "Your account setup is incomplete. Please contact the system administrator.",
+        "Your SNCBT Assess account setup is incomplete. Please contact SNCBT system support.",
       );
     }
 
@@ -258,6 +286,16 @@ async function signIn(
               icon="i-lucide-circle-check-big"
               title="Account ready"
               :description="successMessage"
+            />
+
+            <UAlert
+              v-if="accountNotice"
+              class="mt-6"
+              color="warning"
+              variant="soft"
+              icon="i-lucide-triangle-alert"
+              title="Account setup needs attention"
+              :description="accountNotice"
             />
 
             <UAlert
