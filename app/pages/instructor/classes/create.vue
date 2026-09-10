@@ -19,7 +19,6 @@ const toast = useToast();
 
 const {
   createClass,
-  setEnrollmentApprovalRequired,
 } = useClassrooms();
 
 const schema = z.object({
@@ -83,7 +82,7 @@ const state = reactive<CreateClassSchema>({
   schoolYear: "2026-2027",
   semester: "First Semester",
   joinEnabled: true,
-  requireApproval: false,
+  requireApproval: true,
 });
 
 const isSubmitting = ref(false);
@@ -92,9 +91,7 @@ const errorMessage = ref("");
 watch(
   () => state.joinEnabled,
   (enabled) => {
-    if (!enabled) {
-      state.requireApproval = false;
-    }
+    state.requireApproval = enabled;
   },
 );
 
@@ -127,6 +124,9 @@ async function submit(
 
       joinEnabled:
         event.data.joinEnabled,
+
+      requireApproval:
+        event.data.requireApproval,
     });
 
   if (
@@ -139,35 +139,6 @@ async function submit(
 
     isSubmitting.value = false;
     return;
-  }
-
-  if (
-    event.data.joinEnabled
-    && event.data.requireApproval
-  ) {
-    const approvalResult =
-      await setEnrollmentApprovalRequired(
-        result.data.classroom.id,
-        true,
-      );
-
-    if (
-      approvalResult.error
-      || !approvalResult.data
-    ) {
-      toast.add({
-        title: "Class created",
-        description:
-          "The class was created, but the approval setting couldn't be saved. You can update it from the class page.",
-        color: "warning",
-      });
-
-      await navigateTo(
-        `/instructor/classes/${result.data.classroom.id}`,
-      );
-
-      return;
-    }
   }
 
   toast.add({

@@ -1,0 +1,983 @@
+{
+  "generated_from": "supabase/sncbt-ams-database-reference.json and current supabase/functions source",
+  "phase": "Phase 1 Database & Authorization Hardening",
+  "definition_count": 65,
+  "unique_function_name_count": 62,
+  "policy_helper_exceptions": [
+    "current_user_role",
+    "current_account_status"
+  ],
+  "functions": [
+    {
+      "name": "edit_scheduled_assessment_assignment",
+      "signature_snapshot": "public.edit_scheduled_assessment_assignment(p_instructor_id uuid, p_assignment_id uuid, p_starts_at timestamp with time zone, p_ends_at timestamp with time zone, p_reason text DEFAULT NULL::text)",
+      "security_definer": true,
+      "snapshot_search_path": "public",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-schedules/index.ts"
+      ]
+    },
+    {
+      "name": "extend_scheduled_assessment_assignment",
+      "signature_snapshot": "public.extend_scheduled_assessment_assignment(p_instructor_id uuid, p_assignment_id uuid, p_new_ends_at timestamp with time zone, p_reason text)",
+      "security_definer": true,
+      "snapshot_search_path": "public",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-schedules/index.ts"
+      ]
+    },
+    {
+      "name": "reopen_scheduled_assessment_assignment",
+      "signature_snapshot": "public.reopen_scheduled_assessment_assignment(p_instructor_id uuid, p_assignment_id uuid, p_starts_at timestamp with time zone, p_ends_at timestamp with time zone, p_reason text)",
+      "security_definer": true,
+      "snapshot_search_path": "public",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-schedules/index.ts"
+      ]
+    },
+    {
+      "name": "close_scheduled_assessment_assignment",
+      "signature_snapshot": "public.close_scheduled_assessment_assignment(p_instructor_id uuid, p_assignment_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "public",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "set_scheduled_assessment_assignments"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-schedules/index.ts"
+      ]
+    },
+    {
+      "name": "revoke_student_assessment_access_grant",
+      "signature_snapshot": "public.revoke_student_assessment_access_grant(p_instructor_id uuid, p_grant_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "public",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-schedules/index.ts"
+      ]
+    },
+    {
+      "name": "begin_granted_scheduled_assessment_attempt_with_access_declarat",
+      "signature_snapshot": "public.begin_granted_scheduled_assessment_attempt_with_access_declarat(p_student_id uuid, p_assignment_id uuid, p_exam_access_status text DEFAULT NULL::text, p_permit_number text DEFAULT NULL::text)",
+      "security_definer": true,
+      "snapshot_search_path": "other_or_missing",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "grant_scheduled_attempt_extra_time",
+      "signature_snapshot": "public.grant_scheduled_attempt_extra_time(p_instructor_id uuid, p_attempt_id uuid, p_extra_seconds integer)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-delivery/index.ts"
+      ]
+    },
+    {
+      "name": "grant_student_assessment_access",
+      "signature_snapshot": "public.grant_student_assessment_access(p_instructor_id uuid, p_assignment_id uuid, p_student_id uuid, p_starts_at timestamp with time zone, p_ends_at timestamp with time zone, p_reason text DEFAULT NULL::text)",
+      "security_definer": true,
+      "snapshot_search_path": "other_or_missing",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-schedules/index.ts"
+      ]
+    },
+    {
+      "name": "begin_granted_assessment_attempt_with_access",
+      "signature_snapshot": "public.begin_granted_assessment_attempt_with_access(p_student_id uuid, p_assignment_id uuid, p_exam_access_status text DEFAULT NULL::text, p_permit_number text DEFAULT NULL::text)",
+      "security_definer": true,
+      "snapshot_search_path": "other_or_missing",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "begin_granted_scheduled_assessment_attempt_with_access_declarat"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-delivery/index.ts"
+      ]
+    },
+    {
+      "name": "rls_auto_enable",
+      "signature_snapshot": "public.rls_auto_enable()",
+      "security_definer": true,
+      "snapshot_search_path": "other_or_missing",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "enforce_attempt_question_timer_policy",
+      "signature_snapshot": "public.enforce_attempt_question_timer_policy()",
+      "security_definer": false,
+      "snapshot_search_path": "public",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": true,
+      "called_by_database_functions": [],
+      "phase1_category": "trigger_internal",
+      "phase1_execution_target": "database_internal_only",
+      "edge_function_files": []
+    },
+    {
+      "name": "current_user_role",
+      "signature_snapshot": "public.current_user_role()",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": true,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "rls_policy_helper",
+      "phase1_execution_target": "authenticated_and_service_role",
+      "edge_function_files": []
+    },
+    {
+      "name": "set_updated_at",
+      "signature_snapshot": "public.set_updated_at()",
+      "security_definer": false,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": true,
+      "called_by_database_functions": [],
+      "phase1_category": "trigger_internal",
+      "phase1_execution_target": "database_internal_only",
+      "edge_function_files": []
+    },
+    {
+      "name": "apply_assessment_question_timer_defaults",
+      "signature_snapshot": "public.apply_assessment_question_timer_defaults(p_instructor_id uuid, p_assessment_id uuid, p_time_limit_seconds integer, p_show_timer_progress boolean)",
+      "security_definer": true,
+      "snapshot_search_path": "public",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/questions/index.ts"
+      ]
+    },
+    {
+      "name": "return_or_create_editable_assessment_draft",
+      "signature_snapshot": "public.return_or_create_editable_assessment_draft(p_instructor_id uuid, p_assessment_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "public",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessments/index.ts"
+      ]
+    },
+    {
+      "name": "save_assessment_question",
+      "signature_snapshot": "public.save_assessment_question(p_instructor_id uuid, p_assessment_id uuid, p_question_id uuid, p_question_type assessment_question_type, p_question_text text, p_image_url text, p_explanation text, p_points numeric, p_time_limit_seconds integer, p_options jsonb)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "commit_assessment_import",
+        "import_assessment_questions",
+        "save_assessment_question"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/questions/index.ts"
+      ]
+    },
+    {
+      "name": "begin_scheduled_assessment_attempt",
+      "signature_snapshot": "public.begin_scheduled_assessment_attempt(p_student_id uuid, p_assignment_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "begin_scheduled_assessment_attempt_with_access_declaration"
+      ],
+      "phase1_category": "database_internal_helper",
+      "phase1_execution_target": "database_internal_or_service_role_only",
+      "edge_function_files": []
+    },
+    {
+      "name": "delete_assessment_question",
+      "signature_snapshot": "public.delete_assessment_question(p_instructor_id uuid, p_question_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/questions/index.ts"
+      ]
+    },
+    {
+      "name": "reorder_assessment_questions",
+      "signature_snapshot": "public.reorder_assessment_questions(p_instructor_id uuid, p_assessment_id uuid, p_question_ids uuid[])",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/questions/index.ts"
+      ]
+    },
+    {
+      "name": "start_assessment_session",
+      "signature_snapshot": "public.start_assessment_session(p_instructor_id uuid, p_session_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "create_assessment_session",
+      "signature_snapshot": "public.create_assessment_session(p_instructor_id uuid, p_assessment_id uuid, p_allow_late_join boolean)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "join_assessment_session",
+      "signature_snapshot": "public.join_assessment_session(p_student_id uuid, p_session_code text)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "remove_session_participant",
+      "signature_snapshot": "public.remove_session_participant(p_instructor_id uuid, p_session_id uuid, p_participant_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "leave_session_lobby",
+      "signature_snapshot": "public.leave_session_lobby(p_student_id uuid, p_session_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "begin_scheduled_assessment_attempt_with_access_declaration",
+      "signature_snapshot": "public.begin_scheduled_assessment_attempt_with_access_declaration(p_student_id uuid, p_assignment_id uuid, p_exam_access_status text DEFAULT NULL::text, p_permit_number text DEFAULT NULL::text)",
+      "security_definer": true,
+      "snapshot_search_path": "other_or_missing",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "begin_granted_assessment_attempt_with_access"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-delivery/index.ts"
+      ]
+    },
+    {
+      "name": "assert_assessment_publishable",
+      "signature_snapshot": "public.assert_assessment_publishable(p_instructor_id uuid, p_assessment_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/questions/index.ts",
+        "supabase/functions/assessments/index.ts"
+      ]
+    },
+    {
+      "name": "close_assessment_session",
+      "signature_snapshot": "public.close_assessment_session(p_instructor_id uuid, p_session_id uuid, p_target_status assessment_session_status)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "begin_student_attempt",
+      "signature_snapshot": "public.begin_student_attempt(p_student_id uuid, p_session_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/exam-attempts/index.ts"
+      ]
+    },
+    {
+      "name": "prepare_attempt_question",
+      "signature_snapshot": "public.prepare_attempt_question(p_student_id uuid, p_attempt_id uuid, p_requested_index integer)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/exam-attempts/index.ts"
+      ]
+    },
+    {
+      "name": "save_attempt_response",
+      "signature_snapshot": "public.save_attempt_response(p_student_id uuid, p_attempt_id uuid, p_question_id uuid, p_selected_option_ids uuid[], p_finalize boolean)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "save_attempt_response"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/exam-attempts/index.ts"
+      ]
+    },
+    {
+      "name": "set_assessment_assignments",
+      "signature_snapshot": "public.set_assessment_assignments(p_instructor_id uuid, p_assessment_id uuid, p_classroom_ids uuid[])",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessments/index.ts"
+      ]
+    },
+    {
+      "name": "submit_scheduled_assessment_attempt",
+      "signature_snapshot": "public.submit_scheduled_assessment_attempt(p_student_id uuid, p_attempt_id uuid, p_auto boolean, p_reason text)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "archive_assessment_safely",
+        "archive_classroom_safely",
+        "begin_scheduled_assessment_attempt",
+        "finalize_due_assessment_attempts",
+        "prepare_scheduled_attempt_question",
+        "return_assessment_to_draft_safely",
+        "save_scheduled_attempt_response"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-delivery/index.ts"
+      ]
+    },
+    {
+      "name": "create_assessment_with_assignments",
+      "signature_snapshot": "public.create_assessment_with_assignments(p_instructor_id uuid, p_classroom_ids uuid[], p_title text, p_subject_name text, p_subject_code text, p_instructions text, p_assessment_type assessment_type, p_scoring_mode assessment_scoring_mode, p_randomize_questions boolean, p_randomize_options boolean, p_result_visibility assessment_result_visibility, p_leaderboard_enabled boolean, p_allow_backtracking boolean, p_overall_time_limit_seconds integer)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessments/index.ts"
+      ]
+    },
+    {
+      "name": "import_assessment_questions",
+      "signature_snapshot": "public.import_assessment_questions(p_instructor_id uuid, p_assessment_id uuid, p_questions jsonb)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "remove_live_session_participant",
+      "signature_snapshot": "public.remove_live_session_participant(p_instructor_id uuid, p_session_id uuid, p_participant_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-sessions/index.ts"
+      ]
+    },
+    {
+      "name": "leave_live_session_lobby",
+      "signature_snapshot": "public.leave_live_session_lobby(p_student_id uuid, p_session_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-sessions/index.ts"
+      ]
+    },
+    {
+      "name": "create_live_assessment_session",
+      "signature_snapshot": "public.create_live_assessment_session(p_instructor_id uuid, p_assessment_id uuid, p_classroom_id uuid, p_session_mode live_session_mode, p_allow_late_join boolean, p_show_leaderboard boolean)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-sessions/index.ts"
+      ]
+    },
+    {
+      "name": "start_live_assessment_session",
+      "signature_snapshot": "public.start_live_assessment_session(p_instructor_id uuid, p_session_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-sessions/index.ts"
+      ]
+    },
+    {
+      "name": "close_live_assessment_session",
+      "signature_snapshot": "public.close_live_assessment_session(p_instructor_id uuid, p_session_id uuid, p_target_status assessment_session_status)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-sessions/index.ts"
+      ]
+    },
+    {
+      "name": "join_live_assessment_session",
+      "signature_snapshot": "public.join_live_assessment_session(p_student_id uuid, p_session_code text)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-sessions/index.ts"
+      ]
+    },
+    {
+      "name": "purge_assessment_integrity_events",
+      "signature_snapshot": "public.purge_assessment_integrity_events(p_before timestamp with time zone)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "apply_classroom_enrollment_mode",
+      "signature_snapshot": "public.apply_classroom_enrollment_mode()",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": true,
+      "called_by_database_functions": [],
+      "phase1_category": "trigger_internal",
+      "phase1_execution_target": "database_internal_only",
+      "edge_function_files": []
+    },
+    {
+      "name": "duplicate_assessment_question",
+      "signature_snapshot": "public.duplicate_assessment_question(p_instructor_id uuid, p_question_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/questions/index.ts"
+      ]
+    },
+    {
+      "name": "duplicate_assessment_with_questions",
+      "signature_snapshot": "public.duplicate_assessment_with_questions(p_instructor_id uuid, p_assessment_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessments/index.ts"
+      ]
+    },
+    {
+      "name": "get_assessment_integrity_monitor",
+      "signature_snapshot": "public.get_assessment_integrity_monitor(p_assignment_id uuid, p_attempt_ids uuid[])",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-monitor/index.ts"
+      ]
+    },
+    {
+      "name": "save_scheduled_attempt_response",
+      "signature_snapshot": "public.save_scheduled_attempt_response(p_student_id uuid, p_attempt_id uuid, p_question_id uuid, p_selected_option_ids uuid[], p_finalize boolean)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "save_scheduled_attempt_response"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-delivery/index.ts"
+      ]
+    },
+    {
+      "name": "set_scheduled_assessment_assignments",
+      "signature_snapshot": "public.set_scheduled_assessment_assignments(p_instructor_id uuid, p_assessment_id uuid, p_schedules jsonb)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-schedules/index.ts"
+      ]
+    },
+    {
+      "name": "prepare_scheduled_attempt_question",
+      "signature_snapshot": "public.prepare_scheduled_attempt_question(p_student_id uuid, p_attempt_id uuid, p_requested_index integer)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-delivery/index.ts"
+      ]
+    },
+    {
+      "name": "finalize_due_assessment_attempts",
+      "signature_snapshot": "public.finalize_due_assessment_attempts()",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-delivery/index.ts",
+        "supabase/functions/assessment-monitor/index.ts"
+      ]
+    },
+    {
+      "name": "force_submit_scheduled_attempt",
+      "signature_snapshot": "public.force_submit_scheduled_attempt(p_instructor_id uuid, p_attempt_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "close_scheduled_assessment_assignment"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-delivery/index.ts"
+      ]
+    },
+    {
+      "name": "return_assessment_to_draft_safely",
+      "signature_snapshot": "public.return_assessment_to_draft_safely(p_instructor_id uuid, p_assessment_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "return_or_create_editable_assessment_draft"
+      ],
+      "phase1_category": "database_internal_helper",
+      "phase1_execution_target": "database_internal_or_service_role_only",
+      "edge_function_files": []
+    },
+    {
+      "name": "archive_assessment_safely",
+      "signature_snapshot": "public.archive_assessment_safely(p_instructor_id uuid, p_assessment_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "return_or_create_editable_assessment_draft"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessments/index.ts"
+      ]
+    },
+    {
+      "name": "get_classroom_enrollment_settings",
+      "signature_snapshot": "public.get_classroom_enrollment_settings(p_classroom_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "handle_new_auth_user_split_profiles",
+      "signature_snapshot": "public.handle_new_auth_user_split_profiles()",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": true,
+      "called_by_database_functions": [],
+      "phase1_category": "trigger_internal",
+      "phase1_execution_target": "database_internal_only",
+      "edge_function_files": []
+    },
+    {
+      "name": "normalize_split_profile_identifier",
+      "signature_snapshot": "public.normalize_split_profile_identifier()",
+      "security_definer": false,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": true,
+      "called_by_database_functions": [],
+      "phase1_category": "trigger_internal",
+      "phase1_execution_target": "database_internal_only",
+      "edge_function_files": []
+    },
+    {
+      "name": "sync_auth_user_email_to_account",
+      "signature_snapshot": "public.sync_auth_user_email_to_account()",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": true,
+      "called_by_database_functions": [],
+      "phase1_category": "trigger_internal",
+      "phase1_execution_target": "database_internal_only",
+      "edge_function_files": []
+    },
+    {
+      "name": "current_account_status",
+      "signature_snapshot": "public.current_account_status()",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": true,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "rls_policy_helper",
+      "phase1_execution_target": "authenticated_and_service_role",
+      "edge_function_files": []
+    },
+    {
+      "name": "resolve_auth_identifier",
+      "signature_snapshot": "public.resolve_auth_identifier(p_identifier text)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "set_classroom_enrollment_approval",
+      "signature_snapshot": "public.set_classroom_enrollment_approval(p_classroom_id uuid, p_required boolean)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": false,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "legacy_or_unreferenced_review",
+      "phase1_execution_target": "service_role_only_until_reviewed",
+      "edge_function_files": []
+    },
+    {
+      "name": "complete_student_attempt",
+      "signature_snapshot": "public.complete_student_attempt(p_student_id uuid, p_attempt_id uuid, p_auto boolean, p_reason text)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "close_assessment_session"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/exam-attempts/index.ts"
+      ]
+    },
+    {
+      "name": "commit_assessment_import",
+      "signature_snapshot": "public.commit_assessment_import(p_instructor_id uuid, p_import_id uuid, p_excluded_row_ids uuid[])",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-import/index.ts"
+      ]
+    },
+    {
+      "name": "save_assessment_question",
+      "signature_snapshot": "public.save_assessment_question(p_instructor_id uuid, p_assessment_id uuid, p_question_id uuid, p_question_type assessment_question_type, p_question_text text, p_image_url text, p_explanation text, p_points numeric, p_time_limit_seconds integer, p_options jsonb, p_accepted_answers text[], p_correct_boolean boolean)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "commit_assessment_import",
+        "import_assessment_questions",
+        "save_assessment_question"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/questions/index.ts"
+      ]
+    },
+    {
+      "name": "save_attempt_response",
+      "signature_snapshot": "public.save_attempt_response(p_student_id uuid, p_attempt_id uuid, p_question_id uuid, p_selected_option_ids uuid[], p_text_response text, p_boolean_response boolean, p_finalize boolean)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "save_attempt_response"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/exam-attempts/index.ts"
+      ]
+    },
+    {
+      "name": "save_scheduled_attempt_response",
+      "signature_snapshot": "public.save_scheduled_attempt_response(p_student_id uuid, p_attempt_id uuid, p_question_id uuid, p_selected_option_ids uuid[], p_text_response text, p_boolean_response boolean, p_finalize boolean)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [
+        "save_scheduled_attempt_response"
+      ],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/assessment-delivery/index.ts"
+      ]
+    },
+    {
+      "name": "archive_classroom_safely",
+      "signature_snapshot": "public.archive_classroom_safely(p_instructor_id uuid, p_classroom_id uuid)",
+      "security_definer": true,
+      "snapshot_search_path": "empty",
+      "referenced_by_edge_function_source": true,
+      "referenced_by_rls_policy_snapshot": false,
+      "referenced_by_trigger_snapshot": false,
+      "called_by_database_functions": [],
+      "phase1_category": "edge_function_rpc",
+      "phase1_execution_target": "service_role_only",
+      "edge_function_files": [
+        "supabase/functions/classrooms/index.ts"
+      ]
+    }
+  ]
+}

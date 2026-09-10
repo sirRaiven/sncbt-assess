@@ -42,19 +42,6 @@ const remaining = computed(
   () => Math.min(safeCount(props.remainingCount), totalCount.value),
 );
 
-const resolved = computed(
-  () => Math.min(
-    totalCount.value,
-    correct.value + wrong.value + unanswered.value,
-  ),
-);
-
-const resolvedPercent = computed(
-  () => totalCount.value > 0
-    ? Math.round((resolved.value / totalCount.value) * 100)
-    : 0,
-);
-
 const segments = computed(() => {
   if (totalCount.value < 1) {
     return [];

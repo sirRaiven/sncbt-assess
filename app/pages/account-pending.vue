@@ -4,7 +4,7 @@ definePageMeta({
 });
 
 useSeoMeta({
-  title: "Account pending",
+  title: "Account setup",
 });
 
 const {
@@ -29,11 +29,11 @@ await loadProfile({
         </div>
 
         <h1 class="mt-5 text-2xl font-black text-highlighted">
-          Instructor account pending
+          Account setup needs attention
         </h1>
 
         <p class="mt-3 text-sm leading-6 text-muted">
-          Your email is confirmed. An administrator must approve your instructor account before you can create classes and assessments.
+          Your account could not be activated automatically. Please contact the system administrator so your institutional information can be checked.
         </p>
 
         <div class="mt-6 rounded-xl border border-default bg-elevated/50 p-4 text-left text-sm">
@@ -52,7 +52,7 @@ await loadProfile({
               Account status
             </span>
 
-            <StatusPill status="Pending approval" />
+            <StatusPill status="Setup required" />
           </div>
         </div>
 

@@ -5,7 +5,7 @@ import type {
 
 withDefaults(
   defineProps<{
-    items: AppBreadcrumbItem[];
+    items?: AppBreadcrumbItem[];
   }>(),
   {
     items: () => [],

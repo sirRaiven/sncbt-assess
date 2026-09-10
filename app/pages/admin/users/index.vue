@@ -8,7 +8,7 @@ definePageMeta({
   <FeaturePage
     eyebrow="Account governance"
     title="User accounts"
-    description="Review registrations, approve instructors, and manage account access."
+    description="Manage user accounts and account access."
     action-label="Add User"
     action-to="/admin/users/new"
     action-icon="i-lucide-user-plus"

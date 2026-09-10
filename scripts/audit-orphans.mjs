@@ -39,7 +39,7 @@ function parseArgs(argv) {
 }
 
 function extension(path) {
-  const match = path.match(/(\.[^.\/\\]+)$/)
+  const match = path.match(/(\.[^./\\]+)$/)
   return match?.[1]?.toLowerCase() ?? ''
 }
 

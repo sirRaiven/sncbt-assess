@@ -8,6 +8,10 @@ import {
 } from "zod";
 
 import {
+  getAccountDestination,
+} from "~/utils/auth-navigation";
+
+import {
   toUserFacingError,
 } from "~/utils/user-facing-error";
 
@@ -21,6 +25,13 @@ useSeoMeta({
 
 const supabase = useSupabaseClient();
 const requestUrl = useRequestURL();
+
+const {
+  checkRegistrationIdentity,
+} = useRegistrationCheck();
+
+const ACCOUNT_EXISTS_MESSAGE =
+  "An account already exists for the provided registration information. Please sign in or use password recovery.";
 const studentNumberFormat = /^\d{2,}-\d{3,}$/;
 const employeeNumberFormat = /^[A-Za-z]+\d{2,}-\d{2,}$/;
 const studentNumberAllowedCharacters = /^[0-9-]+$/;
@@ -249,15 +260,40 @@ async function register(
         ? "instructor"
         : "student";
 
+    const email =
+      event.data.email
+        .trim()
+        .toLowerCase();
+
+    const accountNumber =
+      isInstructor
+        ? event.data.accountNumber
+            .trim()
+            .toUpperCase()
+        : event.data.accountNumber
+            .trim();
+
+    const registrationCheck =
+      await checkRegistrationIdentity(
+        requestedRole,
+        email,
+        accountNumber,
+      );
+
+    if (!registrationCheck.allowed) {
+      errorMessage.value =
+        registrationCheck.code === "ACCOUNT_EXISTS"
+          ? ACCOUNT_EXISTS_MESSAGE
+          : registrationCheck.error
+            || "We couldn't verify your registration information right now. Please try again.";
+      return;
+    }
+
     const {
       data,
       error,
     } = await supabase.auth.signUp({
-      email:
-        event.data.email
-          .trim()
-          .toLowerCase(),
-
+      email,
       password:
         event.data.password,
 
@@ -282,13 +318,11 @@ async function register(
           student_number:
             isInstructor
               ? null
-              : event.data.accountNumber.trim(),
+              : accountNumber,
 
           employee_number:
             isInstructor
-              ? event.data.accountNumber
-                  .trim()
-                  .toUpperCase()
+              ? accountNumber
               : null,
         },
       },
@@ -303,11 +337,25 @@ async function register(
         authCode === "email_exists"
         || authCode === "user_already_exists"
       ) {
-        registrationCompleted.value = true;
+        errorMessage.value =
+          ACCOUNT_EXISTS_MESSAGE;
         return;
       }
 
       throw error;
+    }
+
+    // Supabase can intentionally return an obfuscated user for an existing
+    // confirmed email when Confirm Email is enabled. The server-side precheck
+    // handles normal duplicates; this is a final race-condition fallback.
+    if (
+      data.user
+      && Array.isArray(data.user.identities)
+      && data.user.identities.length === 0
+    ) {
+      errorMessage.value =
+        ACCOUNT_EXISTS_MESSAGE;
+      return;
     }
 
     if (
@@ -325,9 +373,7 @@ async function register(
 
       if (profile) {
         await navigateTo(
-          profile.account_status === "pending"
-            ? "/account-pending"
-            : "/student/dashboard",
+          getAccountDestination(profile),
         );
 
         return;
@@ -437,10 +483,10 @@ async function register(
                   </div>
                   <div>
                     <p class="text-sm font-semibold text-highlighted">
-                      Role verification
+                      Duplicate account protection
                     </p>
                     <p class="mt-0.5 text-xs leading-5 text-muted">
-                      Instructor accounts require administrator approval before access is activated.
+                      Your email and school number are checked before a new account is created.
                     </p>
                   </div>
                 </div>
@@ -492,7 +538,7 @@ async function register(
               variant="soft"
               icon="i-lucide-mail-check"
               title="Check your email"
-              description="If the information can be used to create an account, a confirmation message will be sent to the email address provided."
+              description="Your account was created. Check the email address you provided and follow the confirmation link to continue."
             />
 
             <UForm
@@ -655,11 +701,11 @@ async function register(
                 <UAlert
                   v-if="state.accountType === 'Instructor'"
                   class="mt-3"
-                  color="warning"
+                  color="primary"
                   variant="soft"
-                  icon="i-lucide-clock-3"
-                  title="Administrator approval required"
-                  description="Instructor access remains pending until the registration is verified and approved by an administrator."
+                  icon="i-lucide-shield-check"
+                  title="Instructor account validation"
+                  description="Your Employee Number and email are checked for an existing account before registration continues."
                 />
               </section>
 

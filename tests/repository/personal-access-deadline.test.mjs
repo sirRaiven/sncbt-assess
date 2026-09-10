@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
-const migrationPath = "supabase/migrations/20260908_fix_personal_access_attempt_deadlines.sql";
+const migrationPath = "supabase/migrations/20260908000000_fix_personal_access_attempt_deadlines.sql";
 const verificationPath = "supabase/verification/20260908_verify_personal_access_attempt_deadlines.sql";
 
 function readRequired(path) {

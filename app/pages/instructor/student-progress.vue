@@ -2,7 +2,6 @@
 import type {
   InstructorStudentProgressDetail,
   InstructorStudentProgressOverview,
-  StudentProgressListItem,
   StudentRecentResponse,
 } from "~/types/instructor-student-progress";
 
@@ -359,22 +358,6 @@ const filteredStudents =
         },
       );
     },
-  );
-
-const selectedStudent =
-  computed<
-    StudentProgressListItem
-    | null
-  >(
-    () =>
-      overview.value
-        ?.students
-        .find(
-          (student) =>
-            student.studentId
-            === selectedStudentId.value,
-        )
-      ?? null,
   );
 
 const latestAttempt =

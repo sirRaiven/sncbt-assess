@@ -134,4 +134,5 @@ export interface ClassroomFormInput {
     | "Second Semester"
     | "Summer";
   joinEnabled: boolean;
+  requireApproval?: boolean;
 }

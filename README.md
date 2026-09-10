@@ -121,7 +121,7 @@ The current remediation work is documented under:
 - `docs/remediation/PHASE-0-INVENTORY.md`
 - `docs/superpowers/plans/2026-09-10-phase-0-baseline-safety-net.md`
 
-Phase 0 changes repository safety/tooling only. Database privilege hardening starts in Phase 1.
+Phase 0 established the repository safety/tooling baseline. Phase 1 database authorization hardening is implemented in `supabase/migrations/20260910040000_phase1_database_authorization_hardening.sql`. Before applying it to production, follow `docs/remediation/PHASE_1_DATABASE_AUTHORIZATION.md`, check remote migration history, and run a dry-run first. No Supabase Edge Function redeploy is required for Phase 1.
 
 ## Temporary maintenance mode
 
