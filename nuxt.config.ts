@@ -78,6 +78,12 @@ export default defineNuxtConfig({
     securityContactEmail: process.env.SECURITY_CONTACT_EMAIL || "",
 
     public: {
+      // Temporary production maintenance gate. Nuxt automatically allows
+      // NUXT_PUBLIC_MAINTENANCE_MODE to override this runtime value.
+      // Keep the source default enabled for the maintenance release, then
+      // explicitly set the environment variable to false when reopening.
+      maintenanceMode: true,
+
       // Hosted SNCBT-AMS canonical origin. Override with NUXT_PUBLIC_APP_URL
       // when intentionally running another environment.
       appUrl: "https://sncbt-assess.autox.workers.dev",

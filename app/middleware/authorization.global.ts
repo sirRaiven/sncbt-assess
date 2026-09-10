@@ -7,6 +7,10 @@ import {
   isAppRole,
 } from "~/utils/auth-navigation";
 
+import {
+  isMaintenanceModeEnabled,
+} from "~/utils/maintenance-mode";
+
 const protectedPrefixes: Record<AppRole, string> = {
   admin: "/admin",
   instructor: "/instructor",
@@ -56,6 +60,28 @@ function getRequiredRole(
 
 export default defineNuxtRouteMiddleware(
   async (to) => {
+    const runtimeConfig = useRuntimeConfig();
+    const maintenanceModeEnabled =
+      isMaintenanceModeEnabled(
+        runtimeConfig.public.maintenanceMode,
+      );
+
+    if (maintenanceModeEnabled) {
+      if (to.path !== "/maintenance") {
+        return navigateTo("/maintenance", {
+          replace: true,
+        });
+      }
+
+      return;
+    }
+
+    if (to.path === "/maintenance") {
+      return navigateTo("/", {
+        replace: true,
+      });
+    }
+
     const user = useSupabaseUser();
     const requiredRole = getRequiredRole(to.path);
 

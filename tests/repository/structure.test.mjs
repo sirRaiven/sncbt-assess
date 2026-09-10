@@ -77,6 +77,15 @@ test("Vitest, Nuxt Test Utils, happy-dom, Vue Test Utils, and playwright-core ar
   assert.equal(pkg.devDependencies?.playwright, undefined, "playwright should not be installed as a separate package when using playwright-core here");
 });
 
+test("repository pins a Cloudflare-compatible Node 22 runtime", () => {
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const nvmrc = readFileSync(join(root, ".nvmrc"), "utf8").trim();
+
+  assert.equal(pkg.engines?.node, ">=22.19.0 <23");
+  assert.equal(pkg.engines?.npm, ">=10 <12");
+  assert.equal(nvmrc, "22.23.2");
+});
+
 test("repository no longer contains stale temporary source artifacts", () => {
   const roots = [join(root, "app"), join(root, "supabase/functions")];
   const stale = [];
